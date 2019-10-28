@@ -1,7 +1,7 @@
 
 # test if dots expand correctly in expression list
-let k = (Scope)
-'bind k 'x true
+let k =
+    'bind (Scope) 'x true
 
 run-stage;
 

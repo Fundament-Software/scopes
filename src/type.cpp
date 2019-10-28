@@ -359,10 +359,10 @@ SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT) {
 // TYPE CHECK PREDICATES
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(void) verify(const Type *typea, const Type *typeb) {
+SCOPES_RESULT(void) verify(const Type *need, const Type *have) {
     SCOPES_RESULT_TYPE(void);
-    if (strip_lifetime(typea) != strip_lifetime(typeb)) {
-        SCOPES_ERROR(ParameterTypeMismatch, typea, typeb);
+    if (strip_lifetime(need) != strip_lifetime(have)) {
+        SCOPES_ERROR(ParameterTypeMismatch, need, have);
     }
     return {};
 }

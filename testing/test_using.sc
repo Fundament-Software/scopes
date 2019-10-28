@@ -1,8 +1,8 @@
 
-let S = (Scope)
-'bind S
-    test =
-        fn () true
+let S =
+    'bind (Scope)
+        test =
+            fn () true
 
 run-stage;
 

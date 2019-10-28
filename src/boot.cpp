@@ -266,7 +266,7 @@ SCOPES_RESULT(int) try_main() {
 skip_regular_load:
     const Anchor *anchor = expr.anchor();
     auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
-    TemplateRef tmpfn = SCOPES_GET_RESULT(expand_module(anchor, list, Scope::from(sc_get_globals())));
+    TemplateRef tmpfn = SCOPES_GET_RESULT(expand_module(anchor, list, sc_get_globals()));
 
 #if 0 //SCOPES_DEBUG_CODEGEN
     StyledStream ss(std::cout);

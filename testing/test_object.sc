@@ -42,8 +42,9 @@ main 0 null
 
 print "-----------------"
 
-let scope = (Scope)
-'bind scope 'main main
+let scope =
+    'bind-symbols (Scope)
+        main = main
 
 compile-object
     default-target-triple
@@ -58,4 +59,5 @@ compile-object
 
     output will be
 
+    y constructor called
     hello world 6 7

@@ -24,7 +24,7 @@ struct Pure;
 
 template<typename T>
 struct TValueRef {
-#if 0
+#if 1
     struct Hash {
         std::size_t operator()(const TValueRef<T> & s) const {
             return s.hash();

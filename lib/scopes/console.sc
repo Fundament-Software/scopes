@@ -102,18 +102,19 @@ fn read-eval-print-loop ()
             [let] $? = ([system] [block])
             ;
 
-    'bind-symbols eval-scope
-        module-dir = cwd
-        module-path = (cwd .. "/<console>.sc")
-        module-name = "<console>"
-        main-module? = true
-        sh = sh
-        help = help
-        exit =
-            typedef (do "Enter 'exit;' or Ctrl+D to exit")
-                inline __typecall () (if true (exit 0))
+    let eval-scope =
+        'bind-symbols eval-scope
+            module-dir = cwd
+            module-path = (cwd .. "/<console>.sc")
+            module-name = "<console>"
+            main-module? = true
+            sh = sh
+            help = help
+            exit =
+                typedef (do "Enter 'exit;' or Ctrl+D to exit")
+                    inline __typecall () (if true (exit 0))
 
-    loop (preload cmdlist counter = "" "" 0)
+    loop (preload cmdlist counter eval-scope = "" "" 0 eval-scope)
         fn make-idstr (counter)
             .. "$" (tostring counter)
 
@@ -152,7 +153,7 @@ fn read-eval-print-loop ()
             if terminated? ""
             else (leading-spaces cmd)
         if (not terminated?)
-            repeat preload cmdlist counter
+            repeat preload cmdlist counter eval-scope
 
         spice count-folds (x key values...)
             let x = (x as i32)
@@ -179,17 +180,12 @@ fn read-eval-print-loop ()
                             else
                                 `(store `arg (getelementptr outargs i))
                     sc_expression_append block
-                        `('bind scope key (sc_argument_list_new acount outargs))
-                    sc_expression_append block
-                        `('set-docstring scope key docstr)
-                    sc_expression_append block scope
+                        `('bind-with-docstring scope key (sc_argument_list_new acount outargs) docstr)
                     return block
                 else
                     return
                         spice-quote
-                            'bind scope key vals...
-                            'set-docstring scope key docstr
-                            scope
+                            'bind-with-docstring scope key vals... docstr
             scope
 
         sugar fold-imports ((eval-scope as Scope))
@@ -226,9 +222,9 @@ fn read-eval-print-loop ()
                     return
                         spice-quote
                             print outargs
-                            counter
+                            _ counter eval-scope
             elseif (count != 0)
-                let eval-scope = (eval-scope as Scope)
+                local eval-scope = eval-scope
                 let block = (sc_expression_new)
                 let outargs =
                     sc_argument_list_map_new (count * 2 + 1)
@@ -242,19 +238,24 @@ fn read-eval-print-loop ()
                             let arg = ('getarg vals... i)
                             let idstr = (make-idstr (counter + i))
                             let idsym = (Symbol idstr)
-                            sc_expression_append block
-                                if (('typeof arg) == Value)
-                                    `('bind eval-scope idsym ``arg)
-                                else
-                                    `('bind eval-scope idsym `arg)
+                            eval-scope =
+                                do
+                                    let eval-scope = (deref eval-scope)
+                                    if (('typeof arg) == Value)
+                                        `('bind eval-scope idsym ``arg)
+                                    else
+                                        `('bind eval-scope idsym `arg)
+                            sc_expression_append block eval-scope
                             `idstr
                 let counter = (counter + count)
+                let eval-scope = (deref eval-scope)
                 return
                     spice-quote
                         block
                         print outargs
-                        counter
-            `counter
+                        _ counter eval-scope
+            spice-quote
+                _ counter eval-scope
 
         fn get-bound-name (eval-scope expr)
             if ((countof expr) == 1)
@@ -266,7 +267,7 @@ fn read-eval-print-loop ()
                     except (err)
             _ unnamed `()
 
-        let counter =
+        let counter eval-scope =
             try
                 let user-expr = (list-parse cmdlist)
                 let expression-anchor = ('anchor user-expr)
@@ -281,7 +282,7 @@ fn read-eval-print-loop ()
                     let f = (sc_compile (sc_typify_template expr 0 null) 0:u64)
                     let fptr = (f as (pointer (raises (function void) Error)))
                     fptr;
-                    counter
+                    _ counter eval-scope
                 else
                     let tmp = (Symbol "#result...")
                     let list-expression =
@@ -290,21 +291,22 @@ fn read-eval-print-loop ()
                             [let] [tmp] =
                                 [embed]
                                     unquote-splice user-expr
-                            [fold-imports] [eval-scope]
-                            [handle-retargs]
-                                [fold-locals] 0 [count-folds]
-                                \ [counter] [eval-scope] [tmp]
+                            [let]
+                                inserted = ([fold-locals] 0 [count-folds])
+                                eval-scope = ([fold-imports] [eval-scope])
+                            [handle-retargs] inserted
+                                \ [counter] eval-scope [tmp]
                     hide-traceback;
                     let expression = (sc_eval
                         expression-anchor list-expression (Scope eval-scope))
                     let f = (sc_compile expression 0:u64)
                     let fptr =
-                        f as (pointer (raises (function i32) Error))
+                        f as (pointer (raises (function (Arguments i32 Scope)) Error))
                     fptr;
             except (exc)
                 'dump exc
-                counter
-        repeat "" "" counter
+                _ counter eval-scope
+        repeat "" "" counter eval-scope
 
 if main-module?
     read-eval-print-loop;

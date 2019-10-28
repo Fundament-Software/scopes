@@ -138,7 +138,7 @@ StyledStream& operator<<(StyledStream& ost, const Anchor *anchor);
 StyledStream& operator<<(StyledStream& ss, const Closure *closure);
 StyledStream& operator<<(StyledStream& ost, const List *list);
 StyledStream& operator<<(StyledStream& ost, const Nothing &value);
-StyledStream& operator<<(StyledStream& ost, Scope *scope);
+StyledStream& operator<<(StyledStream& ost, const Scope *scope);
 StyledStream& operator<<(StyledStream& ost, const String *s);
 StyledStream& operator<<(StyledStream& ost, const Syntax *value);
 StyledStream& operator<<(StyledStream& ost, const Type *type);

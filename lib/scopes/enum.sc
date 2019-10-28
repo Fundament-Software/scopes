@@ -183,14 +183,14 @@ fn finalize-enum-runtime (T storage)
     inline check-field-redefinition (name finalized-fieldT)
         # if field has already been seen, its "last type" is finalized-fieldT
         # ie. this checks if we defined the same tag twice.
-        let previously-definedT = 
+        let previously-definedT =
             try
                 'typeof ('@ T (name as Symbol))
             except (ex)
                 return;
         if (previously-definedT == finalized-fieldT)
             hide-traceback;
-            error (.. "Duplicate enum fields aren't allowed: " (repr (name as Symbol)) ":" (repr T)) 
+            error (.. "Duplicate enum fields aren't allowed: " (repr (name as Symbol)) ":" (repr T))
 
     let classic? =
         if (T < CEnum) true
@@ -199,8 +199,7 @@ fn finalize-enum-runtime (T storage)
             error
                 .. "type " (repr T) " must have Enum or CEnum supertype"
                     \ " but has supertype " (repr ('superof T))
-    let using-scope = (Scope)
-    'set-symbol T '__using using-scope
+    local using-scope = (Scope)
     if classic?
         # no storage definition means `plain` was used.
         let storage =
@@ -225,7 +224,8 @@ fn finalize-enum-runtime (T storage)
             let value = (sc_const_int_new T index)
             check-field-redefinition name T
             'set-symbol T name value
-            'bind using-scope name value
+            using-scope =
+                'bind using-scope name value
         # build repr function
         spice-quote
             inline __repr (self)
@@ -284,8 +284,10 @@ fn finalize-enum-runtime (T storage)
 
             check-field-redefinition name Unknown
             'set-symbol T name value
-            'bind using-scope name value
-
+            using-scope =
+                'bind using-scope name value
+    'set-symbol T '__using (deref using-scope)
+    ;
 
 spice finalize-enum (T storage)
     if ('constant? T)

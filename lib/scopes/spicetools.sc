@@ -15,7 +15,7 @@ inline parse-argument-matcher (failfunc expr scope params cb)
     let params = (params as list)
     let params = (uncomma params)
     let paramcount = (countof params)
-    loop (i rest varargs = 0 params false)
+    loop (i rest varargs scope = 0 params false scope)
         if (empty? rest)
             return
                 spice-quote
@@ -23,6 +23,7 @@ inline parse-argument-matcher (failfunc expr scope params cb)
                             [(? varargs (sub paramcount 1) paramcount)]
                             [(? varargs -1 paramcount)]))
                         failfunc;
+                scope
         let paramv rest = (decons rest)
         let T = ('typeof paramv)
         if (T == Symbol)
@@ -35,8 +36,8 @@ inline parse-argument-matcher (failfunc expr scope params cb)
                     `(sc_getarglist expr i)
                 else
                     `(sc_getarg expr i)
-            cb param arg
             repeat (i + 1) rest (| varargs variadic?)
+                cb param arg scope
         elseif (T == list)
             let param = (paramv as list)
             let head head-rest = (decons param)
@@ -53,8 +54,8 @@ inline parse-argument-matcher (failfunc expr scope params cb)
                     let arg =
                         if (operator-valid? conv) `(conv arg)
                         else (failfunc)
-                cb param arg
                 repeat (i + 1) rest varargs
+                    cb param arg scope
             elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
                 let exprT = (decons mid-rest)
                 let exprT = (sc_expand exprT '() scope)
@@ -68,24 +69,27 @@ inline parse-argument-matcher (failfunc expr scope params cb)
                             arg as exprT
                         else
                             failfunc;
-                cb param arg
                 repeat (i + 1) rest varargs
+                    cb param arg scope
         error "unsupported pattern"
 
 fn gen-argument-matcher (failfunc expr scope params)
     let outexpr = (sc_expression_new)
     local outargs = (sc_argument_list_new 0 null)
-    let header =
+    let header scope =
         parse-argument-matcher failfunc expr scope params
-            inline (param arg)
+            inline (param arg scope)
                 sc_expression_append outexpr arg
                 outargs =
                     sc_argument_list_join_values outargs arg
                 'bind scope param arg
-    'bind scope '*... (deref outargs)
-    spice-quote
-        header
-        outexpr
+    let scope =
+        'bind scope '*... (deref outargs)
+    _
+        spice-quote
+            header
+            outexpr
+        scope
 
 define spice-match
     gen-match-block-parser gen-argument-matcher

@@ -227,7 +227,7 @@ typedef+ vec-type
                         else arg
             `(vec-constructor2 self args)
 
-    unlet vec-type-constructor vec-constructor2
+    unlet vec-constructor2
 
     spice _vec-repr (self)
         let T = ('typeof self)

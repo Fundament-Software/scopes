@@ -1293,83 +1293,101 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
 
     assert(scope);
     auto parent = sc_scope_get_parent(scope);
-    auto docstr = sc_scope_get_docstring(scope, ConstInt::symbol_from(SYM_Unnamed));
+    auto docstr = sc_scope_module_docstring(scope);
 
-    auto newscope = (parent?sc_scope_new_subscope(parent):sc_scope_new());
-    if (sc_string_count(docstr)) {
-        sc_scope_set_docstring(newscope, ConstInt::symbol_from(SYM_Unnamed), docstr);
-    }
+    auto newscope =
+        parent?
+            sc_scope_new_subscope(parent)
+            : (sc_string_count(docstr)?sc_scope_new_with_docstring(docstr):sc_scope_new());
 
-    ValueRef tmp = ref(anchor, ConstPointer::scope_from(newscope));
 
     auto block = ref(anchor, Expression::unscoped_from());
     //StyledStream ss;
-    int last_key = -1;
-    while (true) {
-        // generate deletions
-        auto next = sc_scope_next_deleted(scope, last_key);
-        if (next._1 < 0)
-            break;
-        last_key = next._1;
-        sc_scope_unbind(newscope, next._0);
+    {
+        auto it = sc_scope_next_deleted(scope, -1);
+        while (it._1 != -1) {
+            // generate deletions
+            newscope = sc_scope_unbind(newscope, it._0);
+            it = sc_scope_next_deleted(scope, it._1);
+        }
     }
-    last_key = -1;
-    while (true) {
+    // generate constant insertions
+    auto it = sc_scope_next(scope, -1);
+    while (it._2 != -1) {
         // generate insertions
-        auto key_value = sc_scope_next(scope, last_key);
-        auto key = key_value._0;
-        auto untyped_value = key_value._1;
-        if (key_value._2 < 0)
-            break;
-        last_key = key_value._2;
-        auto keydocstr = sc_scope_get_docstring(scope, key);
+        auto key = it._0;
+        auto untyped_value = it._1;
+        auto keydocstr = sc_scope_docstring(scope, key);
         auto value = SCOPES_GET_RESULT(prove(ctx, untyped_value));
 
         if (is_value_stage_constant(value)) {
-            sc_scope_bind(newscope, key, value);
             if (sc_string_count(keydocstr))
-                sc_scope_set_docstring(newscope, key, keydocstr);
-            continue;
+                newscope = sc_scope_bind_with_docstring(newscope, key, value, keydocstr);
+            else
+                newscope = sc_scope_bind(newscope, key, value);
         }
+        it = sc_scope_next(scope, it._2);
+    }
 
-        //ss << "assigning " << key << " " << value << std::endl;
-        //ss << "assigning " << key << std::endl;
+    // generate variable insertions
+    ValueRef tmp = ref(anchor, ConstPointer::scope_from(newscope));
+    it = sc_scope_next(scope, -1);
+    while (it._2 != -1) {
+        // generate insertions
+        auto key = it._0;
+        auto untyped_value = it._1;
+        auto keydocstr = sc_scope_docstring(scope, key);
+        auto value = SCOPES_GET_RESULT(prove(ctx, untyped_value));
 
-        auto value_anchor = value.anchor();
+        if (!is_value_stage_constant(value)) {
+            //ss << "assigning " << key << " " << value << std::endl;
+            //ss << "assigning " << key << std::endl;
 
-        int argc = sc_argcount(value);
-        auto vkey = ref(anchor, Quote::from(key));
-        if (argc == 1) {
-            {
-                block->append(ref(anchor,
-                    CallTemplate::from(g_sc_scope_bind, { tmp,  vkey,
-                        ref(value_anchor, Quote::from(value))
-                    })));
-            }
-            block->append(ref(anchor,
-                CallTemplate::from(g_sc_scope_set_docstring, { tmp, vkey,
-                    ref(anchor, ConstPointer::string_from(keydocstr)) })));
-        } else {
-            Values newvalues;
-            newvalues.reserve(argc);
-            for (int i = 0; i < argc; ++i) {
-                auto arg = sc_getarg(value, i);
-                auto arg_anchor = arg.anchor();
-                if (sc_value_type(arg) == TYPE_ValueRef) {
-                    newvalues.push_back(
-                        ref(arg_anchor, Quote::from(ref(arg_anchor, Quote::from(arg)))));
+            auto value_anchor = value.anchor();
+
+            int argc = sc_argcount(value);
+            auto vkey = ref(anchor, Quote::from(key));
+            if (argc == 1) {
+                if (sc_string_count(keydocstr)) {
+                    tmp = ref(anchor,
+                        CallTemplate::from(g_sc_scope_bind_with_docstring, { tmp,  vkey,
+                            ref(value_anchor, Quote::from(value)),
+                            ref(anchor, ConstPointer::string_from(keydocstr))
+                        }));
                 } else {
-                    newvalues.push_back(
-                        ref(arg_anchor, Quote::from(arg)));
+                    tmp = ref(anchor,
+                        CallTemplate::from(g_sc_scope_bind, { tmp,  vkey,
+                            ref(value_anchor, Quote::from(value))
+                        }));
+                }
+            } else {
+                Values newvalues;
+                newvalues.reserve(argc);
+                for (int i = 0; i < argc; ++i) {
+                    auto arg = sc_getarg(value, i);
+                    auto arg_anchor = arg.anchor();
+                    if (sc_value_type(arg) == TYPE_ValueRef) {
+                        newvalues.push_back(
+                            ref(arg_anchor, Quote::from(ref(arg_anchor, Quote::from(arg)))));
+                    } else {
+                        newvalues.push_back(
+                            ref(arg_anchor, Quote::from(arg)));
+                    }
+                }
+                auto outargs = build_quoted_argument_list(anchor, newvalues);
+                if (sc_string_count(keydocstr)) {
+                    tmp = ref(anchor,
+                        CallTemplate::from(g_sc_scope_bind_with_docstring, { tmp, vkey, outargs,
+                            ref(anchor, ConstPointer::string_from(keydocstr)) }));
+                } else {
+                    tmp = ref(anchor,
+                        CallTemplate::from(g_sc_scope_bind, { tmp, vkey, outargs }));
                 }
             }
-            auto outargs = build_quoted_argument_list(anchor, newvalues);
-            block->append(ref(anchor,
-                CallTemplate::from(g_sc_scope_bind, { tmp, vkey, outargs })));
-            block->append(ref(anchor,
-                CallTemplate::from(g_sc_scope_set_docstring, { tmp, vkey,
-                    ref(anchor, ConstPointer::string_from(keydocstr)) })));
+            block->append(tmp);
         }
+
+        it = sc_scope_next(scope, it._2);
     }
     //ss << "===" << std::endl;
 

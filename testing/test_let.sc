@@ -69,7 +69,7 @@ do
             locals;
     static-assert scope.x
 
-# ASSERT OK: no attribute 'x in scope
+# ASSERT OK: no attribute 'z in scope
 test-compiler-error
     do
         let scope =
@@ -89,7 +89,7 @@ test-error
                 locals;
         '@ scope 'z
 
-# too many arguments on right hand side
+# ASSERT OK: excess argument is not bound to a name
 test-compiler-error
     do
         let a = (1 + 2) + 3

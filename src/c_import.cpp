@@ -61,7 +61,7 @@ public:
 
     typedef std::unordered_map<Symbol, const Type *, Symbol::Hash> NamespaceMap;
 
-    Scope *dest;
+    const Scope *dest;
     clang::ASTContext *Context;
     Result<void> ok;
     std::unordered_map<clang::RecordDecl *, const Type *> record_defined;
@@ -89,7 +89,7 @@ public:
         return anchor_from_location(SM, loc);
     }
 
-    void SetContext(clang::ASTContext * ctx, Scope *_dest) {
+    void SetContext(clang::ASTContext * ctx, const Scope *_dest) {
         Context = ctx;
         dest = _dest;
     }
@@ -271,12 +271,13 @@ public:
 
                 if (name != SYM_Unnamed) {
                     const Anchor *anchor = anchorFromLocation(rd->getSourceRange().getBegin());
-                    ScopeEntry target;
+                    ValueRef tmp; const String *tmp2;
                     auto _name = ConstInt::symbol_from(name);
                     // don't overwrite names already bound
-                    if (!dest->lookup(_name, target)) {
-                        dest->bind(_name,
-                            ref(anchor, ConstPointer::type_from(struct_type)));
+                    if (!dest->lookup(_name, tmp, tmp2)) {
+                        dest = Scope::bind_from(_name,
+                            ref(anchor, ConstPointer::type_from(struct_type)),
+                            nullptr, dest);
                     }
                 }
             } else {
@@ -322,7 +323,7 @@ public:
 
                 auto _name = ConstInt::symbol_from(name);
                 tni->bind(name, value);
-                dest->bind(_name, value);
+                dest = Scope::bind_from(_name, value, nullptr, dest);
             }
         }
 
@@ -619,17 +620,23 @@ public:
     }
 
     void exportType(Symbol name, const Type *type, const Anchor *anchor) {
-        dest->bind(ConstInt::symbol_from(name), ref(anchor, ConstPointer::type_from(type)));
+        dest = Scope::bind_from(ConstInt::symbol_from(name),
+            ref(anchor, ConstPointer::type_from(type)),
+            nullptr, dest);
     }
 
     void exportExtern(Symbol name, const Type *type, const Anchor *anchor) {
-        dest->bind(ConstInt::symbol_from(name), ref(anchor, Global::from(type, name)));
+        dest = Scope::bind_from(ConstInt::symbol_from(name),
+            ref(anchor, Global::from(type, name)),
+            nullptr, dest);
     }
 
     void exportExternRef(Symbol name, const Type *type, const Anchor *anchor) {
         auto val = ref(anchor, Global::from(type, name));
         auto conv = ref(anchor, PureCast::from(ptr_to_ref(val->get_type()).assert_ok(), val));
-        dest->bind(ConstInt::symbol_from(name), conv);
+        dest = Scope::bind_from(
+            ConstInt::symbol_from(name), conv,
+            nullptr, dest);
     }
 
     bool TraverseRecordDecl(clang::RecordDecl *rd) {
@@ -742,10 +749,10 @@ public:
 // see ASTConsumers.h for more utilities
 class EmitLLVMOnlyAction : public clang::EmitLLVMOnlyAction {
 public:
-    Scope *dest;
+    const Scope *dest;
     Result<void> result;
 
-    EmitLLVMOnlyAction(Scope *dest_);
+    EmitLLVMOnlyAction(const Scope *dest_);
 
     std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance &CI,
         clang::StringRef InFile) override;
@@ -776,11 +783,12 @@ public:
                 return false;
             }
         }
+        act.dest = visitor.dest;
         return true;
     }
 };
 
-EmitLLVMOnlyAction::EmitLLVMOnlyAction(Scope *dest_) :
+EmitLLVMOnlyAction::EmitLLVMOnlyAction(const Scope *dest_) :
     clang::EmitLLVMOnlyAction((llvm::LLVMContext *)LLVMGetGlobalContext()),
     dest(dest_)
 {
@@ -799,7 +807,7 @@ static std::vector<LLVMModuleRef> llvm_c_modules;
 
 static void add_c_macro(clang::Preprocessor & PP,
     const clang::IdentifierInfo * II,
-    clang::MacroDirective * MD, Scope *scope, std::list< std::pair<Symbol, Symbol> > &aliases) {
+    clang::MacroDirective * MD, const Scope *&scope, std::list< std::pair<Symbol, Symbol> > &aliases) {
     if(!II->hasMacroDefinition())
         return;
     clang::MacroInfo * MI = MD->getMacroInfo();
@@ -833,7 +841,10 @@ static void add_c_macro(clang::Preprocessor & PP,
         const String *value = String::from(svalue.c_str(), svalue.size());
         const Anchor *anchor = anchor_from_location(PP.getSourceManager(),
             MI->getDefinitionLoc());
-        scope->bind(ConstInt::symbol_from(name), ref(anchor, ConstPointer::string_from(value)));
+
+        scope = Scope::bind_from(
+            ConstInt::symbol_from(name), ref(anchor, ConstPointer::string_from(value)),
+            nullptr, scope);
         return;
     }
 
@@ -866,7 +877,7 @@ static void add_c_macro(clang::Preprocessor & PP,
         } else {
             val = ConstReal::from(TYPE_F64, V);
         }
-        scope->bind(ConstInt::symbol_from(name), ref(anchor, val));
+        scope = Scope::bind_from(ConstInt::symbol_from(name), ref(anchor, val), nullptr, scope);
     } else {
         llvm::APInt Result(64,0);
         Literal.GetIntegerValue(Result);
@@ -880,15 +891,15 @@ static void add_c_macro(clang::Preprocessor & PP,
                 i = -i;
             val = ConstInt::from((Literal.isLongLong?TYPE_I64:TYPE_I32), i);
         }
-        scope->bind(ConstInt::symbol_from(name), ref(anchor, val));
+        scope = Scope::bind_from(ConstInt::symbol_from(name), ref(anchor, val), nullptr, scope);
     }
 }
 
-SCOPES_RESULT(Scope *) import_c_module (
+SCOPES_RESULT(const Scope *) import_c_module (
     const std::string &path, const std::vector<std::string> &args,
     const char *buffer) {
     using namespace clang;
-    SCOPES_RESULT_TYPE(Scope *);
+    SCOPES_RESULT_TYPE(const Scope *);
     Timer sum_clang_time(TIMER_ImportC);
 
     std::vector<const char *> aargs;
@@ -934,12 +945,13 @@ SCOPES_RESULT(Scope *) import_c_module (
     LLVMModuleRef M = NULL;
 
 
-    Scope *result = Scope::from();
+    const Scope *result = Scope::from(nullptr, nullptr);
 
     // Create and execute the frontend to generate an LLVM bitcode module.
     std::unique_ptr<EmitLLVMOnlyAction> Act(new EmitLLVMOnlyAction(result));
     if (compiler.ExecuteAction(*Act)) {
         SCOPES_CHECK_RESULT(Act->result);
+        result = Act->dest;
 
         clang::Preprocessor & PP = compiler.getPreprocessor();
         PP.getDiagnostics().setClient(new IgnoringDiagConsumer(), true);
@@ -957,8 +969,11 @@ SCOPES_RESULT(Scope *) import_c_module (
             auto sz = todo.size();
             for (auto it = todo.begin(); it != todo.end();) {
                 ValueRef value;
-                if (result->lookup(ConstInt::symbol_from(it->second), value)) {
-                    result->bind(ConstInt::symbol_from(it->first), value);
+                const String *doc;
+                if (result->lookup(ConstInt::symbol_from(it->second), value, doc)) {
+                    result = Scope::bind_from(
+                        ConstInt::symbol_from(it->first), value,
+                        doc, result);
                     auto oldit = it++;
                     todo.erase(oldit);
                 } else {

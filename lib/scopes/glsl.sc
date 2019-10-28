@@ -190,7 +190,7 @@ inline make-sampler (prefix return-type postfix dim arrayed ms coords)
             Image return-type dim 0 arrayed ms 1 'Unknown unnamed
     typedef (.. prefix "sampler" postfix) < super : storage
 
-let scope = (Scope)
+local scope = (Scope)
 
 do
     let srcpostfixes... =
@@ -218,24 +218,28 @@ do
                     let dstprefix = (va@ k dstprefixes...)
                     let srcname = (Symbol (.. srcprefix srcpostfix))
                     let dstname = (Symbol (.. dstprefix dstpostfix))
-                    'bind scope dstname srcname
+                    scope =
+                        'bind scope dstname srcname
                 va-range (va-countof srcprefixes...)
         va-range (va-countof srcpostfixes...)
 
     build-dims
         inline (postfix dim arrayed ms coords)
             let T = (make-gsampler postfix dim arrayed ms coords)
-            'bind scope (Symbol ('string T)) T
+            scope =
+                'bind scope (Symbol ('string T)) T
 
 build-rtypes
     inline (prefix return-type)
         build-dims
             inline (postfix dim arrayed ms coords)
-                'bind scope (Symbol (.. prefix "image" postfix))
-                    inline (format)
-                        Image return-type dim 0 arrayed ms 2 format unnamed
+                scope =
+                    'bind scope (Symbol (.. prefix "image" postfix))
+                        inline (format)
+                            Image return-type dim 0 arrayed ms 2 format unnamed
                 let samplerT = (make-sampler prefix return-type postfix dim arrayed ms coords)
-                'bind scope (Symbol ('string samplerT)) samplerT
+                scope =
+                    'bind scope (Symbol ('string samplerT)) samplerT
 
 inline gen-xvar-sugar (name f)
     fn parse-layout (layout)

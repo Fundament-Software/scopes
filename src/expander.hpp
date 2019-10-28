@@ -20,9 +20,9 @@ struct Anchor;
 struct Template;
 struct List;
 
-SCOPES_RESULT(sc_valueref_list_scope_tuple_t) expand(const ValueRef &expr, const List *next, Scope *scope = nullptr);
-SCOPES_RESULT(TemplateRef) expand_module(const Anchor *anchor, const List *expr, Scope *scope = nullptr);
-SCOPES_RESULT(TemplateRef) expand_inline(const Anchor *anchor, const TemplateRef &astscope, const List *expr, Scope *scope = nullptr);
+SCOPES_RESULT(sc_valueref_list_scope_tuple_t) expand(const ValueRef &expr, const List *next, const Scope *scope = nullptr);
+SCOPES_RESULT(TemplateRef) expand_module(const Anchor *anchor, const List *expr, const Scope *scope = nullptr);
+SCOPES_RESULT(TemplateRef) expand_inline(const Anchor *anchor, const TemplateRef &astscope, const List *expr, const Scope *scope = nullptr);
 
 } // namespace scopes
 

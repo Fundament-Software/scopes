@@ -12,7 +12,6 @@
 #include "ordered_map.hpp"
 
 #include <vector>
-#include <unordered_map>
 
 namespace scopes {
 
@@ -23,26 +22,30 @@ namespace scopes {
 struct Value;
 struct String;
 
-struct ScopeEntry {
-    ValueRef expr;
+struct ScopeMapEntry {
+    ValueRef value;
     const String *doc;
 };
 
 struct Scope {
 public:
-    typedef OrderedMap<const Const *, ScopeEntry> Map;
+    typedef OrderedMap<ConstRef, ScopeMapEntry, ConstRef::Hash> Map;
+
 protected:
-    Scope(Scope *_parent = nullptr, Map *_map = nullptr);
+    Scope(const ConstRef &name, const ValueRef &value, const String *doc, const Scope *next);
+    Scope(const String *doc, const Scope *parent);
 
+    mutable const Map *map;
 public:
-    Scope *parent;
-    Map *map;
-    bool borrowed;
+    ConstRef name;
+    ValueRef value;
     const String *doc;
-    const String *next_doc;
+    const Scope *next;
+    const Scope *start;
 
-    void set_doc(const String *str);
-    void clear_doc();
+    const Scope *parent() const;
+    const String *header_doc() const;
+    bool is_header() const;
 
     size_t count() const;
 
@@ -50,29 +53,24 @@ public:
 
     size_t levelcount() const;
 
-    void ensure_not_borrowed();
-
-    void bind_with_doc(const ConstRef &name, const ScopeEntry &entry);
-
-    void bind(const ConstRef &name, const ValueRef &value);
-
-    void del(const ConstRef &name);
+    const Map &table() const;
 
     std::vector<Symbol> find_closest_match(Symbol name) const;
-
     std::vector<Symbol> find_elongations(Symbol name) const;
 
-    bool lookup(const ConstRef &name, ScopeEntry &dest, size_t depth = -1) const;
-
+    bool lookup(const ConstRef &name, ValueRef &dest, const String *&doc, size_t depth = -1) const;
     bool lookup(const ConstRef &name, ValueRef &dest, size_t depth = -1) const;
 
-    bool lookup_local(const ConstRef &name, ScopeEntry &dest) const;
+    bool lookup_local(const ConstRef &name, ValueRef &dest, const String *&doc) const;
 
     bool lookup_local(const ConstRef &name, ValueRef &dest) const;
 
-    StyledStream &stream(StyledStream &ss);
+    StyledStream &stream(StyledStream &ss) const;
 
-    static Scope *from(Scope *_parent = nullptr, Scope *_borrow = nullptr);
+    static const Scope *reparent_from(const Scope *content, const Scope *parent);
+    static const Scope *bind_from(const ConstRef &name, const ValueRef &value, const String *doc, const Scope *next);
+    static const Scope *unbind_from(const ConstRef &name, const Scope *next);
+    static const Scope *from(const String *doc, const Scope *parent);
 };
 
 } // namespace scopes

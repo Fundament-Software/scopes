@@ -32,7 +32,7 @@ SCOPES_COMPILER_FILE_KIND()
 };
 
 SCOPES_RESULT(void) compile_object(const String *triple,
-    CompilerFileKind kind, const String *path, Scope *scope, uint64_t flags);
+    CompilerFileKind kind, const String *path, const Scope *scope, uint64_t flags);
 SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags);
 
 } // namespace scopes

@@ -100,8 +100,8 @@ static void init_values_arrayT(std::vector< T * > &dest, int numvalues, const sc
 
 //------------------------------------------------------------------------------
 
-static Scope *globals = nullptr;
-static Scope *original_globals = Scope::from();
+static const Scope *globals = nullptr;
+static const Scope *original_globals = Scope::from(nullptr, nullptr);
 
 //------------------------------------------------------------------------------
 
@@ -122,7 +122,7 @@ sc_valueref_raises_t convert_result(const Result<ConstRef> &_result) CRESULT;
 sc_type_raises_t convert_result(const Result<const Type *> &_result) CRESULT;
 sc_string_raises_t convert_result(const Result<const String *> &_result) CRESULT;
 
-sc_scope_raises_t convert_result(const Result<Scope *> &_result) CRESULT;
+sc_scope_raises_t convert_result(const Result<const Scope *> &_result) CRESULT;
 
 sc_bool_raises_t convert_result(const Result<bool> &_result) CRESULT;
 sc_int_raises_t convert_result(const Result<int> &_result) CRESULT;
@@ -200,12 +200,12 @@ sc_rawstring_i32_array_tuple_t sc_launch_args() {
     return {(int)scopes_argc, scopes_argv};
 }
 
-sc_valueref_list_scope_raises_t sc_expand(sc_valueref_t expr, const sc_list_t *next, sc_scope_t *scope) {
+sc_valueref_list_scope_raises_t sc_expand(sc_valueref_t expr, const sc_list_t *next, const sc_scope_t *scope) {
     using namespace scopes;
     return convert_result(expand(expr, next, scope));
 }
 
-sc_valueref_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
+sc_valueref_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, const sc_scope_t *scope) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(TypedValueRef);
     auto module_result = SCOPES_C_GET_RESULT(expand_module(anchor, expr, scope));
@@ -218,7 +218,7 @@ sc_valueref_raises_t sc_prove(sc_valueref_t expr) {
     return convert_result(prove(expr));
 }
 
-sc_valueref_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope) {
+sc_valueref_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, const sc_scope_t *scope) {
     using namespace scopes;
     //const Anchor *anchor = expr->anchor();
     //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
@@ -288,7 +288,7 @@ const sc_string_t *sc_default_target_triple() {
 }
 
 sc_void_raises_t sc_compile_object(const sc_string_t *target_triple,
-    int file_kind, const sc_string_t *path, sc_scope_t *table, uint64_t flags) {
+    int file_kind, const sc_string_t *path, const sc_scope_t *table, uint64_t flags) {
     using namespace scopes;
     return convert_result(compile_object(target_triple, (CompilerFileKind)file_kind, path, table, flags));
 }
@@ -445,17 +445,17 @@ bool sc_is_directory(const sc_string_t *path) {
 // globals
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_scope_t *sc_get_globals() {
+const sc_scope_t *sc_get_globals() {
     using namespace scopes;
     return globals;
 }
 
-sc_scope_t *sc_get_original_globals() {
+const sc_scope_t *sc_get_original_globals() {
     using namespace scopes;
     return original_globals;
 }
 
-void sc_set_globals(sc_scope_t *s) {
+void sc_set_globals(const sc_scope_t *s) {
     using namespace scopes;
     globals = s;
 }
@@ -656,7 +656,7 @@ uint64_t sc_hashbytes (const char *data, size_t size) {
 sc_scope_raises_t sc_import_c(const sc_string_t *path,
     const sc_string_t *content, const sc_list_t *arglist) {
     using namespace scopes;
-    SCOPES_RESULT_TYPE(Scope *);
+    SCOPES_RESULT_TYPE(const Scope *);
     std::vector<std::string> args;
     while (arglist) {
         if (arglist->at.isa<ConstPointer>()) {
@@ -700,19 +700,28 @@ sc_void_raises_t sc_load_object(const sc_string_t *path) {
 // Scope
 ////////////////////////////////////////////////////////////////////////////////
 
-void sc_scope_bind(sc_scope_t *scope, sc_valueref_t sym, sc_valueref_t value) {
+const sc_scope_t *sc_scope_bind(const sc_scope_t *scope, sc_valueref_t key, sc_valueref_t value) {
     using namespace scopes;
     // ignore null values; this can happen when such a value is explicitly
     // created on the console
-    if (!value) return;
-    scope->bind(sym.cast<Const>(), value);
+    if (!value) return scope;
+    return Scope::bind_from(key.cast<Const>(), value, nullptr, scope);
 }
 
-sc_valueref_raises_t sc_scope_at(sc_scope_t *scope, sc_valueref_t key) {
+const sc_scope_t *sc_scope_bind_with_docstring(const sc_scope_t *scope, sc_valueref_t key, sc_valueref_t value, const sc_string_t *doc) {
+    using namespace scopes;
+    // ignore null values; this can happen when such a value is explicitly
+    // created on the console
+    if (!value) return scope;
+    return Scope::bind_from(key.cast<Const>(), value, doc, scope);
+}
+
+sc_valueref_raises_t sc_scope_at(const sc_scope_t *scope, sc_valueref_t key) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(ValueRef);
     ValueRef result;
-    bool ok = scope->lookup(SCOPES_C_GET_RESULT(extract_constant(key)), result);
+    const String *doc;
+    bool ok = scope->lookup(SCOPES_C_GET_RESULT(extract_constant(key)), result, doc);
     if (!ok) {
         if (try_get_const_type(key) == TYPE_Symbol) {
             auto sym = extract_symbol_constant(key).assert_ok();
@@ -724,7 +733,7 @@ sc_valueref_raises_t sc_scope_at(sc_scope_t *scope, sc_valueref_t key) {
     return convert_result(result);
 }
 
-sc_valueref_raises_t sc_scope_local_at(sc_scope_t *scope, sc_valueref_t key) {
+sc_valueref_raises_t sc_scope_local_at(const sc_scope_t *scope, sc_valueref_t key) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(ValueRef);
     ValueRef result;
@@ -740,95 +749,87 @@ sc_valueref_raises_t sc_scope_local_at(sc_scope_t *scope, sc_valueref_t key) {
     return convert_result(result);
 }
 
-const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_valueref_t key) {
+const sc_string_t *sc_scope_module_docstring(const sc_scope_t *scope) {
     using namespace scopes;
-    if ((try_get_const_type(key) == TYPE_Symbol) && (key.cast<ConstInt>()->value == SYM_Unnamed)) {
-        if (scope->doc) return scope->doc;
-    } else {
-        ScopeEntry entry;
-        if (scope->lookup(key.cast<Const>(), entry) && entry.doc) {
-            return entry.doc;
-        }
+    const String *doc = scope->header_doc();
+    if (doc) return doc;
+    return Symbol(SYM_Unnamed).name();
+}
+
+const sc_string_t *sc_scope_docstring(const sc_scope_t *scope, sc_valueref_t key) {
+    using namespace scopes;
+    ValueRef result;
+    const String *doc;
+    if (scope->lookup(key.cast<Const>(), result, doc) && doc) {
+        return doc;
     }
     return Symbol(SYM_Unnamed).name();
 }
 
-void sc_scope_set_docstring(sc_scope_t *scope, sc_valueref_t key, const sc_string_t *str) {
+const sc_scope_t *sc_scope_new() {
     using namespace scopes;
-    if ((try_get_const_type(key) == TYPE_Symbol) && (key.cast<ConstInt>()->value == SYM_Unnamed)) {
-        if (str && !str->count)
-            str = nullptr;
-        scope->doc = str;
-    } else {
-        ScopeEntry entry;
-        auto _key = key.cast<Const>();
-        if (!scope->lookup_local(_key, entry)) {
-            return;
-            /*
-            location_error(
-                String::from("attempting to set a docstring for a non-local name"));
-            */
-        }
-        entry.doc = str;
-        scope->bind_with_doc(_key, entry);
-    }
+    return Scope::from(nullptr, nullptr);
 }
 
-sc_scope_t *sc_scope_new() {
+const sc_scope_t *sc_scope_new_with_docstring(const sc_string_t *doc) {
     using namespace scopes;
-    return Scope::from();
+    return Scope::from(doc, nullptr);
 }
 
-sc_scope_t *sc_scope_clone(sc_scope_t *clone) {
+const sc_scope_t *sc_scope_reparent(const sc_scope_t *scope, const sc_scope_t *parent) {
     using namespace scopes;
-    return Scope::from(nullptr, clone);
+    return Scope::reparent_from(scope, parent);
 }
 
-sc_scope_t *sc_scope_new_subscope(sc_scope_t *scope) {
+const sc_scope_t *sc_scope_unparent(const sc_scope_t *scope) {
     using namespace scopes;
-    return Scope::from(scope);
+    return Scope::reparent_from(scope, nullptr);
 }
 
-sc_scope_t *sc_scope_clone_subscope(sc_scope_t *scope, sc_scope_t *clone) {
+const sc_scope_t *sc_scope_new_subscope(const sc_scope_t *scope) {
     using namespace scopes;
-    return Scope::from(scope, clone);
+    return Scope::from(nullptr, scope);
 }
 
-sc_scope_t *sc_scope_get_parent(sc_scope_t *scope) {
+const sc_scope_t *sc_scope_new_subscope_with_docstring(const sc_scope_t *scope, const sc_string_t *doc) {
     using namespace scopes;
-    return scope->parent;
+    return Scope::from(doc, scope);
 }
 
-void sc_scope_unbind(sc_scope_t *scope, sc_valueref_t key) {
+const sc_scope_t *sc_scope_get_parent(const sc_scope_t *scope) {
     using namespace scopes;
-    scope->del(key.cast<Const>());
+    return scope->parent();
 }
 
-sc_valueref_valueref_i32_tuple_t sc_scope_next(sc_scope_t *scope, int index) {
+const sc_scope_t *sc_scope_unbind(const sc_scope_t *scope, sc_valueref_t key) {
     using namespace scopes;
-    auto &&map = *scope->map;
+    return Scope::unbind_from(key.cast<Const>(), scope);
+}
+
+sc_valueref_valueref_i32_tuple_t sc_scope_next(const sc_scope_t *scope, int index) {
+    using namespace scopes;
+    auto &&map = scope->table();
     int count = map.keys.size();
     index++;
     while ((size_t)index < count) {
         auto &&value = map.values[index];
-
-        if (value.expr) {
-            return { ref(unknown_anchor(), const_cast<Const *>(map.keys[index])), value.expr, index };
+        if (value.value) {
+            return { map.keys[index], value.value, index };
         }
         index++;
     }
     return { g_none, g_none, -1 };
 }
 
-sc_valueref_i32_tuple_t sc_scope_next_deleted(sc_scope_t *scope, int index) {
+sc_valueref_i32_tuple_t sc_scope_next_deleted(const sc_scope_t *scope, int index) {
     using namespace scopes;
-    auto &&map = *scope->map;
+    auto &&map = scope->table();
     int count = map.keys.size();
     index++;
     while ((size_t)index < count) {
         auto &&value = map.values[index];
-        if (!value.expr) {
-            return { ref(unknown_anchor(), const_cast<Const *>(map.keys[index])), index };
+        if (!value.value) {
+            return { map.keys[index], index };
         }
         index++;
     }
@@ -2185,11 +2186,14 @@ namespace scopes {
 //------------------------------------------------------------------------------
 
 static void bind_extern(Symbol globalsym, Symbol externsym, const Type *T) {
-    globals->bind(ConstInt::symbol_from(globalsym), ref(builtin_anchor(), Global::from(T, externsym, GF_NonWritable)));
+    globals = Scope::bind_from(ConstInt::symbol_from(globalsym),
+        ref(builtin_anchor(), Global::from(T, externsym, GF_NonWritable)),
+        nullptr, globals);
 }
 
 static void bind_new_value(Symbol sym, const ValueRef &value) {
-    globals->bind(ConstInt::symbol_from(sym), ref(builtin_anchor(), value));
+    globals = Scope::bind_from(ConstInt::symbol_from(sym),
+        ref(builtin_anchor(), value), nullptr, globals);
 }
 
 static void bind_symbol(Symbol sym, Symbol value) {
@@ -2358,15 +2362,18 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_at, TYPE_ValueRef, TYPE_Scope, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_scope_local_at, TYPE_ValueRef, TYPE_Scope, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_get_docstring, TYPE_String, TYPE_Scope, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_set_docstring, _void, TYPE_Scope, TYPE_ValueRef, TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_bind, _void, TYPE_Scope, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_module_docstring, TYPE_String, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_docstring, TYPE_String, TYPE_Scope, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_bind, TYPE_Scope, TYPE_Scope, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_bind_with_docstring, TYPE_Scope, TYPE_Scope, TYPE_ValueRef, TYPE_ValueRef, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_new, TYPE_Scope);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_clone, TYPE_Scope, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_new_with_docstring, TYPE_Scope, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_reparent, TYPE_Scope, TYPE_Scope, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_unparent, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_new_subscope, TYPE_Scope, TYPE_Scope);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_clone_subscope, TYPE_Scope, TYPE_Scope, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_new_subscope_with_docstring, TYPE_Scope, TYPE_Scope, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_parent, TYPE_Scope, TYPE_Scope);
-    DEFINE_EXTERN_C_FUNCTION(sc_scope_unbind, _void, TYPE_Scope, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_unbind, TYPE_Scope, TYPE_Scope, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_next, arguments_type({TYPE_ValueRef, TYPE_ValueRef, TYPE_I32}), TYPE_Scope, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_next_deleted, arguments_type({TYPE_ValueRef, TYPE_I32}), TYPE_Scope, TYPE_I32);
 
@@ -2562,6 +2569,8 @@ SCOPES_GLOBAL_FLAGS()
     bind_new_value(Symbol("typename-flag-plain"),
         ConstInt::from(TYPE_U32, (uint32_t)TNF_Plain));
 
+    bind_new_value(Symbol("unknown-anchor"), ConstPointer::anchor_from(unknown_anchor()));
+
 #define T(NAME, VALUE, SNAME) \
     bind_new_value(Symbol(SNAME), \
         ConstInt::from(TYPE_U64, (uint64_t)NAME));
@@ -2591,6 +2600,11 @@ SCOPES_BARRIER_KIND()
 #undef T1
 #undef T2
 #undef T2T
+
+    // make fast
+    globals->table();
+
+    original_globals = globals;
 
     linenoiseSetCompletionCallback(prompt_completion_cb);
 

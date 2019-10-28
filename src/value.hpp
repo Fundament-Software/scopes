@@ -1261,7 +1261,7 @@ struct ConstPointer : Const {
     static ConstPointerRef closure_from(const Closure *closure);
     static ConstPointerRef string_from(const String *str);
     static ConstPointerRef list_from(const List *list);
-    static ConstPointerRef scope_from(Scope *scope);
+    static ConstPointerRef scope_from(const Scope *scope);
     static ConstPointerRef anchor_from(const Anchor *anchor);
 
     const void *value;
@@ -1443,13 +1443,13 @@ struct Unquote : UntypedValue {
 struct CompileStage : UntypedValue {
     static bool classof(const Value *T);
 
-    CompileStage(const Anchor *anchor, const List *next, Scope *env);
+    CompileStage(const Anchor *anchor, const List *next, const Scope *env);
 
-    static CompileStageRef from(const Anchor *anchor, const List *next, Scope *env);
+    static CompileStageRef from(const Anchor *anchor, const List *next, const Scope *env);
 
     const Anchor *anchor;
     const List *next;
-    Scope *env;
+    const Scope *env;
 };
 
 //------------------------------------------------------------------------------

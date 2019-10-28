@@ -2,22 +2,21 @@
 
 using import testing
 
-let scope =
-    sugar-eval sugar-scope
-
 """"a docstring for x
 let x = 5
 
 """"a docstring for y
 let y = 6
 
+let scope =
+    sugar-eval sugar-scope
 test
     ('docstring scope 'x) == "a docstring for x\n"
 test
     ('docstring scope 'y) == "a docstring for y\n"
-print ('docstring scope unnamed)
+print ('module-docstring scope)
 test
-    ('docstring scope unnamed) == "a module docstring\n"
+    ('module-docstring scope) == "a module docstring\n"
 
 let scope =
     do

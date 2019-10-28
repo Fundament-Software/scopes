@@ -217,6 +217,7 @@ namespace scopes {
     T(KW_ASTUnquote, "spice-unquote") \
     T(KW_ASTUnquoteArguments, "spice-unquote-arguments") \
     T(KW_Let, "let") \
+    T(KW_IndirectLet, "indirect-let") \
     T(KW_If, "if") \
     T(KW_Switch, "switch") \
     T(FN_GetSyntaxScope, "__this-scope") \

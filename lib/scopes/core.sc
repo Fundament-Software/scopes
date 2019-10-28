@@ -584,8 +584,8 @@ do
                     if (sc_value_is_constant key)
                         if (sc_value_is_pure value)
                             let self = (unbox-pointer self selftype)
-                            fset self key value
-                            return `()
+                            let result = (fset self key value)
+                            return `result
                         else
                             error "value argument must be constant"
                     else
@@ -593,23 +593,11 @@ do
                 else
                     error "scope must be constant"
 
-    inline gen-key-scope-define-internal (selftype fset)
-        box-spice-macro
-            fn "define-internal-symbol" (args)
-                let self key value = (get-key-value-scope-args args)
-                if (sc_value_is_constant self)
-                    if (sc_value_is_constant key)
-                        let self = (unbox-pointer self selftype)
-                        fset self key value
-                        return `()
-                error "scope and key must be constant"
-
     # quick assignment of type attributes
     sc_type_set_symbol type 'set-symbol (gen-key-type-set type sc_type_set_symbol)
     sc_type_set_symbol type 'define-symbol (gen-key-type-define type sc_type_set_symbol)
     sc_type_set_symbol Scope 'bind (gen-key-scope-set Scope sc_scope_bind)
     sc_type_set_symbol Scope 'define (gen-key-scope-define Scope sc_scope_bind)
-    sc_type_set_symbol Scope 'define-internal (gen-key-scope-define-internal Scope sc_scope_bind)
 
 # static pointer type constructor
 sc_type_set_symbol pointer '__typecall
@@ -953,14 +941,14 @@ run-stage; # 3
 
 'define-symbol Scope 'bind-symbols
     inline "bind-symbols" (self values...)
-        va-lfold none
-            inline (key value)
+        va-lfold self
+            inline (key value self)
                 'bind self key value
             values...
 'define-symbol Scope 'define-symbols
     inline "define-symbols" (self values...)
-        va-lfold none
-            inline (key value)
+        va-lfold self
+            inline (key value self)
                 'define self key value
             values...
 
@@ -993,9 +981,13 @@ run-stage; # 3
     local@ = sc_scope_local_at
     next = sc_scope_next
     next-deleted = sc_scope_next_deleted
-    docstring = sc_scope_get_docstring
-    set-docstring = sc_scope_set_docstring
+    docstring = sc_scope_docstring
+    module-docstring = sc_scope_module_docstring
     parent = sc_scope_get_parent
+    unparent = sc_scope_unparent
+    reparent = sc_scope_reparent
+    bind-with-docstring = sc_scope_bind_with_docstring
+    unbind = sc_scope_unbind
 
 'define-symbols string
     join = sc_string_join
@@ -2121,28 +2113,17 @@ inline floordiv (a b)
     __typecall =
         box-spice-macro
             fn "scope-typecall" (args)
-                """"There are four ways to create a new Scope:
+                """"There are two ways to create a new Scope:
                     ``Scope``
                         creates an empty scope without parent
                     ``Scope parent``
                         creates an empty scope descending from ``parent``
-                    ``Scope none clone``
-                        duplicate ``clone`` without a parent
-                    ``Scope parent clone``
-                        duplicate ``clone``, but descending from ``parent`` instead
                 let argc = ('argcount args)
-                verify-count argc 1 3
+                verify-count argc 1 2
                 switch argc
                 case 1 `(sc_scope_new)
-                case 2 `(sc_scope_new_subscope [ ('getarg args 1) ])
                 default
-                    # argc == 3
-                    let parent = ('getarg args 1)
-                    if (type== ('typeof parent) Nothing)
-                        `(sc_scope_clone [ ('getarg args 2) ])
-                    else
-                        `(sc_scope_clone_subscope
-                            [(sc_extract_argument_list_new args 1)])
+                    `(sc_scope_new_subscope [ ('getarg args 1) ])
 
 #---------------------------------------------------------------------------
 # nothing type
@@ -2631,8 +2612,8 @@ fn expand-define-infix (args scope order)
         if (== ('typeof func) Nothing) token
         else
             as func Symbol
-    'bind scope `[(get-ifx-symbol token)]
-        `[(cons prec (cons order (cons func '())))]
+    let scope = ('bind scope `[(get-ifx-symbol token)]
+        `[(cons prec (cons order (cons func '())))])
     return none scope
 
 inline make-expand-define-infix (order)
@@ -2941,8 +2922,8 @@ fn va-option-branch (args)
     paths to their contents. When a module is first imported, its contents
     are cached in this table. Subsequent imports of the same module will be
     resolved to these cached contents.
-let package = (Scope)
-'bind-symbols package
+let package = (sc_typename_type "scopes.package" typename)
+'set-symbols package
     path =
         Value
             list
@@ -2957,10 +2938,9 @@ fn clone-scope-contents (a b)
         piecewise with the cloned scopes as parents
     let parent = ('parent a)
     if (== parent (nullof Scope))
-        return (Scope b a)
-    Scope
+        return ('reparent a b)
+    'reparent a
         this-function parent b
-        a
 
 'set-symbols Scope
     __.. = (box-pointer (simple-binary-op clone-scope-contents))
@@ -3126,11 +3106,6 @@ let
                 return none
                     as scope Scope
 
-'define-internal (__this-scope) `list-handler-symbol
-    box-pointer (static-typify list-handler list Scope)
-'define-internal (__this-scope) `symbol-handler-symbol
-    box-pointer (static-typify symbol-handler list Scope)
-
 inline select-op-macro (sop uop fop numargs)
     inline scalar-type (T)
         let ST = ('storageof T)
@@ -3195,6 +3170,13 @@ let not =
                 `[(not (unbox-integer value bool))]
             else
                 `(not value)
+
+let list-handler =
+    box-pointer (static-typify list-handler list Scope)
+let symbol-handler =
+    box-pointer (static-typify symbol-handler list Scope)
+indirect-let list-handler-symbol = list-handler
+indirect-let symbol-handler-symbol = symbol-handler
 
 run-stage; # 5
 
@@ -3407,10 +3389,12 @@ define for
                     _ it (cons sxat params)
             let generator-expr body = (decons it)
             let subscope = (Scope scope)
+            let generator-expr-anchor = ('anchor generator-expr)
+            let generator-expr _next subscope = (sc_expand generator-expr '() subscope)
             spice-quote
                 let start valid? at next =
-                    (as [(sc_expand generator-expr '() subscope)] Generator);
-            return
+                    (as generator-expr Generator);
+            let result =
                 cons
                     spice-quote start valid? at next # order expressions
                         loop (it... = (start))
@@ -3421,7 +3405,7 @@ define for
                                         'tag
                                             spice-quote
                                                 repeat (next it...)
-                                            'anchor generator-expr
+                                            generator-expr-anchor
                                 spice-unquote
                                     let expr =
                                         loop (params expr = params (list '= args...))
@@ -3430,13 +3414,14 @@ define for
                                             let param next = (decons params)
                                             _ next (cons param expr)
                                     let expr = (cons let expr)
-                                    'bind subscope 'continue continue
+                                    let subscope =
+                                        'bind subscope 'continue continue
                                     sc_expand (cons do expr body) '() subscope
                                 continue;
                             else
                                 break;
                     next-expr
-                scope
+            return result scope
 
 #---------------------------------------------------------------------------
 # hashing
@@ -3618,17 +3603,15 @@ fn load-module (module-name module-path opts...)
             hide-traceback;
             sc_parse_from_path module-path
     let eval-scope =
-        va-option scope opts...
-            do
-                let newscope = (Scope (sc_get_globals))
-                'set-docstring newscope unnamed ""
-                newscope
-    'bind-symbols eval-scope
-        main-module? =
-            va-option main-module? opts... false
-        module-path = module-path
-        module-dir = module-dir
-        module-name = module-name
+        'bind-symbols
+            va-option scope opts...
+                do
+                    sc_scope_new_subscope_with_docstring (sc_get_globals) ""
+            main-module? =
+                va-option main-module? opts... false
+            module-path = module-path
+            module-dir = module-dir
+            module-name = module-name
     hide-traceback;
     exec-module expr (Scope eval-scope)
 
@@ -3640,7 +3623,6 @@ fn patterns-from-namestr (base-dir namestr)
             .. base-dir "?.sc"
             .. base-dir "?/init.sc"
     else
-        let package = ((fn () package))
         ('@ package 'path) as list
 
 inline slice (value start end)
@@ -3649,7 +3631,6 @@ inline slice (value start end)
 fn require-from (base-dir name)
     #assert-typeof name Symbol
     let namestr = (dots-to-slashes (name as string))
-    let package = ((fn () package))
     let modules = (('@ package 'modules) as Scope)
     let all-patterns = (patterns-from-namestr base-dir namestr)
     loop (patterns = all-patterns)
@@ -3677,12 +3658,16 @@ fn require-from (base-dir name)
             except (err)
                 if (not (sc_is_file module-path))
                     repeat patterns
-                'bind modules module-path-sym incomplete
+                let modules =
+                    'bind modules module-path-sym incomplete
+                'set-symbol package 'modules modules
                 let content =
                     do
                         hide-traceback;
                         load-module (name as string) module-path
-                'bind modules module-path-sym content
+                let modules =
+                    'bind modules module-path-sym content
+                'set-symbol package 'modules modules
                 return content
         if (('typeof content) == type)
             if (content == incomplete)
@@ -3712,8 +3697,8 @@ let import =
                 do
                     hide-traceback;
                     require-from module-dir name
-            'bind scope key module
-            _ module scope
+            _ module
+                'bind scope key module
 
 #---------------------------------------------------------------------------
 # using
@@ -3721,7 +3706,7 @@ let import =
 
 fn merge-scope-symbols (source target filter)
     fn process-keys (source target filter)
-        loop (last-index = -1)
+        loop (last-index target = -1 target)
             let key value index = ('next source last-index)
             if (index < 0)
                 break target
@@ -3733,8 +3718,10 @@ fn merge-scope-symbols (source target filter)
                             do
                                 let keystr = (key as Symbol as string)
                                 'match? filter keystr
-                    'bind target key value
-                repeat index
+                    repeat index
+                        'bind target key value
+                else
+                    repeat index target
     fn filter-contents (source target filter)
         let parent = ('parent source)
         if (parent == null)
@@ -4766,8 +4753,8 @@ fn next-head? (next)
         if (('typeof expr) == list)
             let at = ('@ (expr as list))
             if (('typeof at) == Symbol)
-                return (at as Symbol)
-    unnamed
+                return (at as Symbol) ('anchor at)
+    _ unnamed unknown-anchor
 
 inline gen-match-block-parser (handle-case)
     sugar-block-scope-macro
@@ -4775,17 +4762,15 @@ inline gen-match-block-parser (handle-case)
             let expr next = (decons topexpr)
             let expr = (expr as list)
             let head arg argrest = (decons expr 2)
-            let arg argrest = (sc_expand arg argrest scope)
+            let arg argrest scope = (sc_expand arg argrest scope)
             let outnext = (alloca-array list 1)
             let outexpr next =
                 spice-quote
                     label ok-label
-                        inline return-ok (args...)
-                            merge ok-label args...
                         spice-unquote
                             let outexpr = (sc_expression_new)
                             loop (next = next)
-                                let head = (next-head? next)
+                                let head head-anchor = (next-head? next)
                                 switch head
                                 case 'case
                                     let expr next = (decons next)
@@ -4799,21 +4784,33 @@ inline gen-match-block-parser (handle-case)
                                                 let token = arg
                                                 spice-unquote
                                                     let newscope = (Scope scope)
-                                                    let unpack-expr =
+                                                    let unpack-expr newscope =
                                                         handle-case fail-case token newscope cond
                                                     let body =
-                                                        sc_expand (cons do body) '() newscope
+                                                        try
+                                                            hide-traceback;
+                                                            sc_expand (cons do body) '() newscope
+                                                        except (err)
+                                                            hide-traceback;
+                                                            error@+ err head-anchor "while expanding case"
                                                     spice-quote
                                                         unpack-expr
-                                                        return-ok body
+                                                        spice-unquote
+                                                            'tag `(merge ok-label body) head-anchor
                                     repeat next
                                 case 'default
                                     let expr next = (decons next)
                                     let expr = (expr as list)
                                     let head body = (decons expr)
                                     let body =
-                                        sc_expand (cons do body) '() scope
-                                    sc_expression_append outexpr `(return-ok body)
+                                        try
+                                            hide-traceback;
+                                            sc_expand (cons do body) '() scope
+                                        except (err)
+                                            hide-traceback;
+                                            error@+ err head-anchor "while expanding default case"
+                                    sc_expression_append outexpr
+                                        'tag `(merge ok-label body) head-anchor
                                     store next outnext
                                     break outexpr
                                 default
@@ -4822,12 +4819,21 @@ inline gen-match-block-parser (handle-case)
             return (cons outexpr (load outnext)) scope
 
 fn gen-sugar-matcher (failfunc expr scope params)
-    returning Value
+    returning Value Scope
     let params = (params as list)
     let paramcount = (countof params)
     let outexpr = (sc_expression_new)
-    loop (i rest next varargs = 0 params expr false)
-        if (not (empty? rest))
+    loop (i rest next varargs scope = 0 params expr false scope)
+        if (empty? rest)
+            return
+                spice-quote
+                    if (not (check-count (sc_list_count expr)
+                            [(? varargs (sub paramcount 1) paramcount)]
+                            [(? varargs -1 paramcount)]))
+                        failfunc;
+                    outexpr
+                scope
+        else
             let paramv rest = (decons rest)
             let T = ('typeof paramv)
             if (T == Symbol)
@@ -4845,8 +4851,8 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                 sc_list_decons next
                         _ arg next
                 sc_expression_append outexpr arg
-                'bind scope param arg
-                repeat (i + 1) rest next (| varargs variadic?)
+                let scope = ('bind scope param arg)
+                repeat (i + 1) rest next (| varargs variadic?) scope
             elseif (T == string)
                 let str = (paramv as string)
                 sc_expression_append outexpr
@@ -4856,7 +4862,7 @@ fn gen-sugar-matcher (failfunc expr scope params)
                             failfunc;
                         if ((arg as string) != str)
                             failfunc;
-                repeat (i + 1) rest next varargs
+                repeat (i + 1) rest next varargs scope
             elseif (T == list)
                 let param = (paramv as list)
                 let head head-rest = (decons param)
@@ -4871,7 +4877,7 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                 failfunc;
                             if ((arg as Symbol) != sym)
                                 failfunc;
-                    repeat (i + 1) rest next varargs
+                    repeat (i + 1) rest next varargs scope
                 elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
                     let exprT = (decons mid-rest)
                     let exprT = (sc_expand exprT '() scope)
@@ -4888,8 +4894,8 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                     arg as exprT
                                 else
                                     failfunc;
-                    'bind scope param arg
-                    repeat (i + 1) rest next varargs
+                    let scope = ('bind scope param arg)
+                    repeat (i + 1) rest next varargs scope
                 elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'is))
                     # check that argument is of constant type, but don't unbox
                     let exprT = (decons mid-rest)
@@ -4904,8 +4910,8 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                 sc_list_decons next
                             if (not (('constant? arg) and (('typeof arg) == exprT)))
                                 failfunc;
-                    'bind scope param arg
-                    repeat (i + 1) rest next varargs
+                    let scope = ('bind scope param arg)
+                    repeat (i + 1) rest next varargs scope
                 else
                     sc_expression_append outexpr
                         spice-quote
@@ -4916,18 +4922,13 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                 else
                                     arg as list
                             spice-unquote
-                                this-function failfunc arg scope param
-                    repeat (i + 1) rest next varargs
+                                let expr scope =
+                                    this-function failfunc arg scope param
+                                expr
+                    repeat (i + 1) rest next varargs scope
             else
                 hide-traceback;
                 error@ ('anchor paramv) "while parsing pattern" "unsupported pattern"
-        return
-            spice-quote
-                if (not (check-count (sc_list_count expr)
-                        [(? varargs (sub paramcount 1) paramcount)]
-                        [(? varargs -1 paramcount)]))
-                    failfunc;
-                outexpr
 
 define sugar-match
     gen-match-block-parser gen-sugar-matcher
@@ -4938,17 +4939,19 @@ define sugar
     inline wrap-sugar-macro (f)
         sugar-block-scope-macro
             fn (topexpr scope)
-                let new-expr new-next = (f topexpr scope)
+                let new-expr new-next new-scope = (f topexpr scope)
                 let x next = (decons topexpr)
                 let anchor = ('anchor x)
-                let new-expr =('tag `new-expr anchor)
-                return
+                let new-expr = ('tag `new-expr anchor)
+                _
                     static-branch (none? new-next)
                         inline ()
                             cons new-expr next
                         inline ()
                             cons new-expr new-next
-                    scope
+                    static-branch (none? new-scope)
+                        inline () scope
+                        inline () new-scope
 
     sugar-block-scope-macro
         fn "expand-sugar" (topexpr scope)
@@ -4971,29 +4974,34 @@ define sugar
                                     merge fail-label
                                 spice-unquote
                                     let subscope = (Scope scope)
-                                    'bind-symbols subscope
-                                        next-expr = next-expr
-                                        sugar-scope = sugar-scope
-                                        expr-head = head
-                                        expression = _expr
-                                    let unpack-expr =
+                                    let subscope =
+                                        'bind-symbols subscope
+                                            next-expr = next-expr
+                                            sugar-scope = sugar-scope
+                                            expr-head = head
+                                            expression = _expr
+                                    let unpack-expr subscope =
                                         gen-sugar-matcher fail-case expr subscope params
                                     let body =
                                         sc_expand (cons do body) '() subscope
                                     spice-quote
                                         unpack-expr
-                                        return-ok body
+                                        spice-unquote
+                                            'tag `(return-ok body) unknown-anchor
                             hide-traceback;
                             error
                                 .. "syntax error: pattern does not match format " (repr params)
+            let wrapped =
+                qq
+                    [wrap-sugar-macro func];
+            let wrapped =
+                'tag `wrapped ('anchor head)
             let outexpr =
                 if (('typeof name) == Symbol)
-                    qq
-                        [let name] =
-                            [wrap-sugar-macro func];
-                else
-                    qq
-                        [wrap-sugar-macro func];
+                    Value
+                        qq
+                            [let name] = [wrapped]
+                else wrapped
             return (cons outexpr next) scope
 
 #-------------------------------------------------------------------------------
@@ -5022,7 +5030,7 @@ fn uncomma (l)
         fn process (l)
             raising Error
             if (empty? l)
-                return (nullof Anchor) '() '()
+                return unknown-anchor '() '()
             let at next = (decons l)
             let anchor current total = (this-function next)
             let anchor = ('anchor at)
@@ -5101,32 +5109,34 @@ define spice
 fn gen-match-matcher
 
 fn gen-or-matcher (failfunc expr scope params)
-    spice-quote
-        label or-ok
-            spice-unquote
-                loop (prefix params = `[] params)
-                    let at params = (decons params)
-                    if (empty? params)
-                        break
+    return
+        spice-quote
+            label or-ok
+                spice-unquote
+                    loop (prefix params = `[] params)
+                        let at params = (decons params)
+                        if (empty? params)
+                            break
+                                spice-quote
+                                    prefix
+                                    spice-unquote
+                                        let unpack-expr =
+                                            gen-match-matcher failfunc expr
+                                                \ (Scope scope) at
+                                        spice-quote unpack-expr (merge or-ok)
+                        repeat
                             spice-quote
-                                prefix
-                                spice-unquote
-                                    let unpack-expr =
-                                        gen-match-matcher failfunc expr
-                                            \ (Scope scope) at
-                                    spice-quote unpack-expr (merge or-ok)
-                    repeat
-                        spice-quote
-                            label or-fail
-                                inline fail-case ()
-                                    merge or-fail
-                                prefix
-                                spice-unquote
-                                    let unpack-expr =
-                                        gen-match-matcher fail-case expr
-                                            \ (Scope scope) at
-                                    spice-quote unpack-expr (merge or-ok)
-                        params
+                                label or-fail
+                                    inline fail-case ()
+                                        merge or-fail
+                                    prefix
+                                    spice-unquote
+                                        let unpack-expr =
+                                            gen-match-matcher fail-case expr
+                                                \ (Scope scope) at
+                                        spice-quote unpack-expr (merge or-ok)
+                            params
+        scope
 
 fn gen-match-matcher (failfunc expr scope cond)
     """"features:
@@ -5136,7 +5146,7 @@ fn gen-match-matcher (failfunc expr scope cond)
         TODO:
         (: x T) -> ((typeof input) == T), let x = input
         <unknown symbol> -> unpack as symbol
-    returning Value
+    returning Value Scope
     let condT = ('typeof cond)
     if (condT == list)
         let cond-anchor = ('anchor cond)
@@ -5157,9 +5167,11 @@ fn gen-match-matcher (failfunc expr scope cond)
         error (.. "unsupported pattern: " (repr cond))
     let cond =
         sc_expand cond '() scope
-    spice-quote
-        if (expr != cond)
-            failfunc;
+    return
+        spice-quote
+            if (expr != cond)
+                failfunc;
+        scope
 
 #-------------------------------------------------------------------------------
 
@@ -5647,11 +5659,17 @@ sugar fn... (name...)
             init-overloaded-function
                 typename [(fn-name as string)] OverloadedFunction
     let bodyscope = (Scope sugar-scope)
-    sugar-match name...
-    case (name as Symbol;)
-        'bind bodyscope fn-name outtype
-    default;
+    let bodyscope =
+        sugar-match name...
+        case (name as Symbol;)
+            'bind bodyscope fn-name outtype
+        default bodyscope
     loop (next outargs = next-expr (sc_argument_list_new 0 null))
+        let next-anchor =
+            if (empty? next) unknown-anchor
+            else
+                let at = (decons next)
+                'anchor at
         sugar-match next
         case (('case 'using body...) rest...)
             let obj = (sc_expand (cons do body...) '() sugar-scope)
@@ -5664,13 +5682,21 @@ sugar fn... (name...)
             let scope = (Scope bodyscope)
             repeat rest...
                 loop
-                    expr types defaults =
+                    expr types defaults scope =
                         uncomma (condv as list)
                         sc_argument_list_new 0 null
                         sc_argument_list_new 0 null
+                        scope
                     sugar-match expr
                     case ()
-                        let body = (sc_expand (cons do body...) '() scope)
+                        #hide-traceback;
+                        let body =
+                            try
+                                hide-traceback;
+                                sc_expand (cons do body...) '() scope
+                            except (err)
+                                hide-traceback;
+                                error@+ err next-anchor "while expanding case"
                         sc_template_set_body tmpl body
                         let atypes = `(Arguments types)
                         break
@@ -5690,55 +5716,57 @@ sugar fn... (name...)
                                 error "variadic parameter must be in last place"
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
-                        'bind scope arg param
                         repeat rest...
                             sc_argument_list_join_values types
                                 ? ('variadic? arg) Variadic Unknown
                             sc_argument_list_join_values defaults nodefault
+                            'bind scope arg param
                     case (((arg as Symbol) '= def) rest...)
                         if ('variadic? arg)
                             error "variadic parameter can not have default value"
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
-                        'bind scope arg param
                         let def = (sc_expand def '() sugar-scope)
                         repeat rest...
                             sc_argument_list_join_values types Unknown
                             sc_argument_list_join_values defaults def
+                            'bind scope arg param
                     case (((arg as Symbol) ': T '= def) rest...)
                         if ('variadic? arg)
                             error "a typed parameter can't be variadic"
                         let T = (sc_expand T '() sugar-scope)
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
-                        'bind scope arg param
                         let def = (sc_expand def '() sugar-scope)
                         repeat rest...
                             sc_argument_list_join_values types T
                             sc_argument_list_join_values defaults def
+                            'bind scope arg param
                     case (((arg as Symbol) ': T) rest...)
                         if ('variadic? arg)
                             error "a typed parameter can't be variadic"
                         let T = (sc_expand T '() sugar-scope)
                         let param = (sc_parameter_new arg)
                         sc_template_append_parameter tmpl param
-                        'bind scope arg param
                         repeat rest...
                             sc_argument_list_join_values types T
                             sc_argument_list_join_values defaults nodefault
+                            'bind scope arg param
                     default
                         let at = (decons expr)
                         hide-traceback;
                         error@ ('anchor at) "while parsing pattern"
                             "syntax: (parameter-name[: type], ...)"
         default
-            sugar-match name...
-            case (name as Symbol;)
-                'bind sugar-scope fn-name outtype
-            default;
+            let sugar-scope =
+                sugar-match name...
+                case (name as Symbol;)
+                    'bind sugar-scope fn-name outtype
+                default sugar-scope
             return
                 `(finalize-overloaded-fn outtype outargs)
                 next
+                sugar-scope
 
 let inline... = fn...
 
@@ -6029,8 +6057,8 @@ define-sugar-macro decorate-let
                 cons param out
 
 define-sugar-scope-macro sugar-eval
-    let subscope = (Scope sugar-scope)
-    'bind subscope 'sugar-scope sugar-scope
+    let subscope =
+        'bind (Scope sugar-scope) 'sugar-scope sugar-scope
     let at next = (decons args)
     return
         exec-module ('tag `args ('anchor at)) subscope
@@ -6185,13 +6213,23 @@ sugar static-match (cond)
 #-------------------------------------------------------------------------------
 
 sugar unlet ((name as Symbol) names...)
-    sc_scope_unbind sugar-scope name
-    for name in names...
-        let name = (name as Symbol)
+    do
         hide-traceback;
         '@ sugar-scope name
-        sc_scope_unbind sugar-scope name
-    `()
+    let scope =
+        'unbind sugar-scope name
+    let start valid? at next = ((names... as Generator))
+    loop (scope it... = scope (start))
+        if (valid? it...)
+            let name = (at it...)
+            let name = (name as Symbol)
+            hide-traceback;
+            '@ scope name
+            let scope =
+                'unbind scope name
+            repeat scope (next it...)
+        else
+            break `() next-expr scope
 
 #-------------------------------------------------------------------------------
 # fold iteration
@@ -6259,7 +6297,8 @@ sugar fold ((binding...) 'for expr...)
                                 cons let ('rjoin foldparams (list '= state...))
                             let expr1 = ('tag `expr1 anchor)
                             let expr2 = ('tag `expr2 anchor)
-                            'bind subscope 'continue continue
+                            let subscope =
+                                'bind subscope 'continue continue
                             let result = (sc_expand (cons ('tag `do anchor) expr1 expr2 body) '() subscope)
                             result
                     repeat (va-append-va (inline () newstate...) (next it...))
@@ -6293,14 +6332,14 @@ define append-to-scope
             let docstr = ('getarg args 2)
             let values = ('getarglist args 3)
             let constant-scope? = ('constant? packedscope)
-            if ((('typeof key) == Symbol) and (key as Symbol == unnamed))
+            #if ((('typeof key) == Symbol) and (key as Symbol == unnamed))
                 'set-docstring (packedscope as Scope) key (docstr as string)
                 return packedscope
             if (constant-scope? & (stage-constant? values))
                 let scope = (packedscope as Scope)
-                'bind scope key values
-                'set-docstring scope key (docstr as string)
-                return packedscope
+                let scope =
+                    'bind-with-docstring scope key values (docstr as string)
+                return `scope
             # for non-constant values, we need to create a new scope
             let packedscope =
                 if constant-scope? `(Scope [(packedscope as Scope)])
@@ -6317,16 +6356,11 @@ define append-to-scope
                         else
                             `(store `arg (getelementptr outargs i))
                 sc_expression_append block
-                    `('bind packedscope key (sc_argument_list_new acount outargs))
-                sc_expression_append block
-                    `('set-docstring packedscope key docstr)
-                sc_expression_append block packedscope
+                    `('bind-with-docstring packedscope key (sc_argument_list_new acount outargs) docstr)
                 block
             else
                 spice-quote
-                    'bind packedscope key values
-                    'set-docstring packedscope key docstr
-                    packedscope
+                    'bind-with-docstring packedscope key values docstr
 
 """"Export locals as a chain of up to two new scopes: a scope that contains
     all the constant values in the immediate scope, and a scope that contains
@@ -6381,12 +6415,15 @@ define append-to-type
                         T
 
 sugar typedef+ (T body...)
+    let anchor = ('anchor expr-head)
+    let body =
+        qq [do]
+            unquote-splice body...
+            [fold-locals] this-type [append-to-type]
     qq [do]
         [let] this-type = [T]
         [let] super-type = ([superof T])
-        [do]
-            unquote-splice body...
-            [fold-locals] this-type [append-to-type]
+        [('tag `body anchor)]
         this-type
 
 """"a type declaration syntax; when the name is a string, the type is declared
@@ -7149,10 +7186,6 @@ run-stage; # 12
 
 #-------------------------------------------------------------------------------
 
-set-globals! (__this-scope)
-
-#-------------------------------------------------------------------------------
-
 # the main loop must stay in core.sc to make sure that it remains
     accessible even when there's no module loading support (for whatever reason)
 
@@ -7176,6 +7209,10 @@ fn print-logo ()
     io-write! "  http://scopes.rocks"; io-write! "\n";
     io-write! (default-styler style-comment "///"); io-write! "  "
     io-write! (default-styler style-function "\\\\\\"); io-write! "\n"
+
+#-------------------------------------------------------------------------------
+
+set-globals! (__this-scope)
 
 #-------------------------------------------------------------------------------
 # main
@@ -7237,12 +7274,11 @@ fn run-main ()
             .. compiler-dir "/lib/scopes/console.sc"
         else sourcepath
     let scope =
-        Scope (globals)
-    'set-docstring scope unnamed ""
-    'bind-symbols scope
-        script-launch-args =
-            fn ()
-                return sourcepath argc argv
+        'bind-symbols
+            sc_scope_new_subscope_with_docstring (globals) ""
+            script-launch-args =
+                fn ()
+                    return sourcepath argc argv
     do
         hide-traceback;
         load-module "" sourcepath

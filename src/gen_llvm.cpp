@@ -2536,30 +2536,29 @@ struct LLVMIRGenerator {
     }
 
     // for generating object files
-    SCOPES_RESULT(LLVMModuleRef) generate(const String *name, Scope *table) {
+    SCOPES_RESULT(LLVMModuleRef) generate(const String *name, const Scope *table) {
         SCOPES_RESULT_TYPE(LLVMModuleRef);
 
         setup_generate(name->data);
 
         std::vector<LLVMValueRef> exported_globals;
 
-        Scope *t = table;
+        const Scope *t = table;
         while (t) {
-            int count = t->map->keys.size();
-            auto &&keys = t->map->keys;
-            auto &&values = t->map->values;
-            for (int i = 0; i < count; ++i) {
-                ValueRef val = values[i].expr;
-                if (!val) continue;
-                auto &&key = keys[i];
-                if (key->get_type() != TYPE_Symbol) continue;
-                Symbol name = Symbol::wrap(cast<ConstInt>(key)->value);
-                FunctionRef fn = SCOPES_GET_RESULT(extract_function_constant(val));
-                func_export_table.insert({fn.unref(), name});
-                LLVMValueRef func = SCOPES_GET_RESULT(ref_to_value(ValueIndex(fn)));
-                exported_globals.push_back(func);
+            auto it = sc_scope_next(t, -1);
+            while (it._2 != -1) {
+                auto key = it._0.cast<Const>();
+                auto val = it._1;
+                if (key->get_type() == TYPE_Symbol) {
+                    Symbol name = Symbol::wrap(key.cast<ConstInt>()->value);
+                    FunctionRef fn = SCOPES_GET_RESULT(extract_function_constant(val));
+                    func_export_table.insert({fn.unref(), name});
+                    LLVMValueRef func = SCOPES_GET_RESULT(ref_to_value(ValueIndex(fn)));
+                    exported_globals.push_back(func);
+                }
+                it = sc_scope_next(t, it._2);
             }
-            t = t->parent;
+            t = t->parent();
         }
 
         SCOPES_CHECK_RESULT(process_functions());
@@ -2727,7 +2726,7 @@ public:
 #endif
 
 SCOPES_RESULT(void) compile_object(const String *triple,
-    CompilerFileKind kind, const String *path, Scope *scope, uint64_t flags) {
+    CompilerFileKind kind, const String *path, const Scope *scope, uint64_t flags) {
     SCOPES_RESULT_TYPE(void);
     Timer sum_compile_time(TIMER_Compile);
 #if SCOPES_COMPILE_WITH_DEBUG_INFO

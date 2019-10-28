@@ -20,7 +20,7 @@ struct Scope;
 // C BRIDGE (CLANG)
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(Scope *) import_c_module (
+SCOPES_RESULT(const Scope *) import_c_module (
     const std::string &path, const std::vector<std::string> &args,
     const char *buffer = nullptr);
 

@@ -17,91 +17,142 @@ namespace scopes {
 // SCOPE
 //------------------------------------------------------------------------------
 
-Scope::Scope(Scope *_parent, Map *_map) :
-    parent(_parent),
-    map(_map?_map:(new Map())),
-    borrowed(_map?true:false),
-    doc(nullptr),
-    next_doc(nullptr) {
-    if (_parent)
-        doc = _parent->doc;
-}
-
-void Scope::set_doc(const String *str) {
-    if (!doc) {
-        doc = str;
-        next_doc = nullptr;
-    } else {
-        next_doc = str;
+Scope::Scope(const String *_doc, const Scope *_parent) :
+    map(nullptr),
+    name(ConstRef()),
+    value(ValueRef()),
+    doc(_doc),
+    next(_parent),
+    start(this) {
+    if (!doc && next) {
+        doc = next->header_doc();
     }
 }
 
-void Scope::clear_doc() {
-    doc = nullptr;
+Scope::Scope(const ConstRef &_name, const ValueRef &_value, const String *_doc, const Scope *_next) :
+    map(nullptr),
+    name(_name),
+    value(_value),
+    doc(_doc),
+    next(_next) {
+    assert(_name);
+    assert(_next && _next->start);
+    start = _next->start;
+}
+
+const Scope *Scope::parent() const {
+    return start->next;
+}
+
+const String *Scope::header_doc() const {
+    return start->doc;
+}
+
+bool Scope::is_header() const {
+    return start == this;
 }
 
 size_t Scope::count() const {
-#if 0
-    return map->size();
-#else
     size_t count = 0;
-    for (auto &&k : map->values) {
-        if (!k.expr)
-            continue;
-        count++;
+    const Scope *self = this;
+    while (!self->is_header()) {
+        if (self->map) {
+            // skip ahead
+            count += self->map->keys.size();
+            break;
+        } else {
+            if (self->value) {
+                count++;
+            }
+            self = self->next;
+        }
     }
     return count;
-#endif
 }
 
 size_t Scope::totalcount() const {
-    const Scope *self = this;
     size_t count = 0;
+    const Scope *self = this;
     while (self) {
-        count += self->count();
-        self = self->parent;
+        if (self->map) {
+            // skip ahead
+            count += self->map->keys.size();
+            self = self->start->next;
+        } else {
+            if (self->value) {
+                count++;
+            }
+            self = self->next;
+        }
     }
     return count;
 }
 
 size_t Scope::levelcount() const {
-    const Scope *self = this;
     size_t count = 0;
+    const Scope *self = this;
     while (self) {
         count += 1;
-        self = self->parent;
+        self = self->parent();
     }
     return count;
 }
 
-void Scope::ensure_not_borrowed() {
-    if (!borrowed) return;
-    parent = Scope::from(parent, this);
-    map = new Map();
-    borrowed = false;
+const Scope::Map &Scope::table() const {
+    if (!map) {
+        auto map = new Map();
+        const Scope *self = this;
+        while (!self->is_header()) {
+            if (self->map) {
+                // copy all elements from map
+                size_t i = self->map->keys.size();
+                while (i-- > 0) {
+                    auto &&key = self->map->keys[i];
+                    auto &&entry = self->map->values[i];
+                    map->insert(key, entry);
+                }
+                break;
+            } else {
+                map->insert(self->name, { self->value, self->doc });
+                self = self->next;
+            }
+        }
+        map->flip();
+        this->map = map;
+    }
+    return *map;
 }
 
-void Scope::bind_with_doc(const ConstRef &name, const ScopeEntry &entry) {
-    ensure_not_borrowed();
-    map->replace(name.unref(), entry);
+const Scope *Scope::reparent_from(const Scope *content, const Scope *parent) {
+    auto &&map = content->table();
+    auto self = from(content->header_doc(), parent);
+    auto count = map.keys.size();
+    for (size_t i = 0; i < count; ++i) {
+        auto &&key = map.keys[i];
+        auto &&entry = map.values[i];
+        self = bind_from(key, entry.value, entry.doc, self);
+    }
+    // can reuse the map because the content is the same
+    self->map = &map;
+    return self;
 }
 
-void Scope::bind(const ConstRef &name, const ValueRef &value) {
+const Scope *Scope::bind_from(const ConstRef &name, const ValueRef &value, const String *doc, const Scope *next) {
     assert(value);
-    ScopeEntry entry = { value, next_doc };
-    bind_with_doc(name, entry);
-    next_doc = nullptr;
+    return new Scope(name, value, doc, next);
 }
 
-void Scope::del(const ConstRef &name) {
-    ensure_not_borrowed();
+const Scope *Scope::unbind_from(const ConstRef &name, const Scope *next) {
     // check if value is contained
     ValueRef dest;
-    if (lookup(name, dest)) {
-        ScopeEntry entry = { ValueRef(), nullptr };
-        // if yes, bind to nullpointer to mark it as deleted
-        bind_with_doc(name, entry);
+    if (next->lookup(name, dest)) {
+        return new Scope(name, ValueRef(), nullptr, next);
     }
+    return next;
+}
+
+const Scope *Scope::from(const String *doc, const Scope *parent) {
+    return new Scope(doc, parent);
 }
 
 std::vector<Symbol> Scope::find_closest_match(Symbol name) const {
@@ -111,28 +162,25 @@ std::vector<Symbol> Scope::find_closest_match(Symbol name) const {
     size_t best_dist = (size_t)-1;
     const Scope *self = this;
     do {
-        int count = self->map->keys.size();
-        auto &&keys = self->map->keys;
-        auto &&values = self->map->values;
-        for (int i = 0; i < count; ++i) {
-            auto &&key = keys[i];
-            if (key->get_type() != TYPE_Symbol)
-                continue;
-            Symbol sym = Symbol::wrap(cast<ConstInt>(key)->value);
-            if (done.count(sym))
-                continue;
-            if (values[i].expr) {
-                size_t dist = distance(s, sym.name());
-                if (dist == best_dist) {
-                    best_syms.push_back(sym);
-                } else if (dist < best_dist) {
-                    best_dist = dist;
-                    best_syms = { sym };
+        if (!self->is_header()) {
+            auto &&key = self->name;
+            if (key->get_type() == TYPE_Symbol) {
+                Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value);
+                if (!done.count(sym)) {
+                    if (self->value) {
+                        size_t dist = distance(s, sym.name());
+                        if (dist == best_dist) {
+                            best_syms.push_back(sym);
+                        } else if (dist < best_dist) {
+                            best_dist = dist;
+                            best_syms = { sym };
+                        }
+                    }
+                    done.insert(sym);
                 }
             }
-            done.insert(sym);
         }
-        self = self->parent;
+        self = self->next;
     } while (self);
     std::sort(best_syms.begin(), best_syms.end());
     return best_syms;
@@ -145,69 +193,64 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
     std::vector<Symbol> found;
     const Scope *self = this;
     do {
-        int count = self->map->keys.size();
-        auto &&keys = self->map->keys;
-        auto &&values = self->map->values;
-        for (int i = 0; i < count; ++i) {
-            auto &&key = keys[i];
-            if (key->get_type() != TYPE_Symbol)
-                continue;
-            Symbol sym = Symbol::wrap(cast<ConstInt>(key)->value);
-            if (done.count(sym))
-                continue;
-            if (values[i].expr) {
-                if (sym.name()->count >= s->count &&
-                        (sym.name()->substr(0, s->count) == s))
-                    found.push_back(sym);
+        if (!self->is_header()) {
+            auto &&key = self->name;
+            if (key->get_type() == TYPE_Symbol) {
+                Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value);
+                if (!done.count(sym)) {
+                    if (self->value) {
+                        if (sym.name()->count >= s->count &&
+                                (sym.name()->substr(0, s->count) == s))
+                            found.push_back(sym);
+                    }
+                    done.insert(sym);
+                }
             }
-            done.insert(sym);
         }
-        self = self->parent;
+        self = self->next;
     } while (self);
     std::sort(found.begin(), found.end(), [](Symbol a, Symbol b){
                 return a.name()->count < b.name()->count; });
     return found;
 }
 
-bool Scope::lookup(const ConstRef &name, ScopeEntry &dest, size_t depth) const {
+bool Scope::lookup(const ConstRef &name, ValueRef &dest, const String *&doc, size_t depth) const {
     const Scope *self = this;
     do {
-        auto idx = self->map->find_index(name.unref());
-        if (idx >= 0) {
-            auto &&entry = self->map->values[idx];
-            if (entry.expr) {
-                dest = entry;
-                return true;
-            } else {
-                return false;
+        if (self->is_header()) {
+            if (!depth)
+                break;
+            depth = depth - 1;
+        } else {
+            if (self->name == name) {
+                if (self->value) {
+                    dest = self->value;
+                    doc = self->doc;
+                    return true;
+                } else {
+                    return false;
+                }
             }
         }
-        if (!depth)
-            break;
-        depth = depth - 1;
-        self = self->parent;
+        self = self->next;
     } while (self);
     return false;
 }
 
 bool Scope::lookup(const ConstRef &name, ValueRef &dest, size_t depth) const {
-    ScopeEntry entry;
-    if (lookup(name, entry, depth)) {
-        dest = entry.expr;
-        return true;
-    }
-    return false;
+    const String *doc;
+    return lookup(name, dest, doc, depth);
 }
 
-bool Scope::lookup_local(const ConstRef & name, ScopeEntry &dest) const {
-    return lookup(name, dest, 0);
+bool Scope::lookup_local(const ConstRef &name, ValueRef &dest, const String *&doc) const {
+    return lookup(name, dest, doc, 0);
 }
 
 bool Scope::lookup_local(const ConstRef & name, ValueRef &dest) const {
     return lookup(name, dest, 0);
 }
 
-StyledStream &Scope::stream(StyledStream &ss) {
+StyledStream &Scope::stream(StyledStream &ss) const {
     size_t totalcount = this->totalcount();
     size_t count = this->count();
     size_t levelcount = this->levelcount();
@@ -217,13 +260,9 @@ StyledStream &Scope::stream(StyledStream &ss) {
     return ss;
 }
 
-Scope *Scope::from(Scope *_parent, Scope *_borrow) {
-    return new Scope(_parent, _borrow?(_borrow->map):nullptr);
-}
-
 //------------------------------------------------------------------------------
 
-StyledStream& operator<<(StyledStream& ost, Scope *scope) {
+StyledStream& operator<<(StyledStream& ost, const Scope *scope) {
     scope->stream(ost);
     return ost;
 }

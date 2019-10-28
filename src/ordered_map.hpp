@@ -9,11 +9,26 @@
 
 #include <vector>
 #include <unordered_map>
+#include <algorithm>
 
 namespace scopes {
 
 template<typename KeyType, typename ValueType, typename KeyHash = std::hash<KeyType> >
 struct OrderedMap {
+    // fails if value has already been inserted
+    bool insert(const KeyType &key, const ValueType &value) {
+        auto it = _key_index.find(key);
+        if (it == _key_index.end()) {
+            // new insertion
+            int index = keys.size();
+            keys.push_back(key);
+            values.push_back(value);
+            _key_index.insert({ key, index });
+            return true;
+        }
+        return false;
+    }
+
     void replace(const KeyType &key, const ValueType &value) {
         auto it = _key_index.find(key);
         if (it == _key_index.end()) {
@@ -25,6 +40,7 @@ struct OrderedMap {
         } else {
             // update
             int index = it->second;
+            keys[index] = key;
             values[index] = value;
         }
     }
@@ -34,6 +50,16 @@ struct OrderedMap {
         if (it == _key_index.end())
             return -1;
         return it->second;
+    }
+
+    // reverse order in-place
+    void flip() {
+        std::reverse(keys.begin(), keys.end());
+        std::reverse(values.begin(), values.end());
+        int lastindex = keys.size() - 1;
+        for (auto &&it : _key_index) {
+            it.second = lastindex - it.second;
+        }
     }
 
     std::vector<KeyType> keys;

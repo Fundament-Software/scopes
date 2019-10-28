@@ -24,20 +24,21 @@ do
 test (not (isvar? X))
 
 do
-    let d = (Scope)
-    'bind d 'x 6
+    let d =
+        'bind (Scope)
+            x = 6
 
-    let e = (Scope)
-    'bind e 'x 5
-    let f = (Scope e)
-    'bind f 'x 4
+    let e =
+        'bind (Scope) 'x 5
+    let f =
+        'bind (Scope e) 'x 4
 
-    let a = (Scope)
-    'bind a 'x 3
-    let b = (Scope a)
-    'bind b 'x 2
-    let c = (Scope b)
-    'bind c 'x 1
+    let a =
+        'bind (Scope) 'x 3
+    let b =
+        'bind (Scope a) 'x 2
+    let c =
+        'bind (Scope b) 'x 1
 
     let a = (.. c f d)
 

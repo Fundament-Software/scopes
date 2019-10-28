@@ -103,7 +103,7 @@ typedef struct sc_bool_string_tuple_ { bool _0; const sc_string_t *_1; } sc_bool
 typedef struct sc_bool_valueref_tuple_ { bool _0; sc_valueref_t _1; } sc_bool_valueref_tuple_t;
 
 typedef struct sc_valueref_list_tuple_ { sc_valueref_t _0; const sc_list_t *_1; } sc_valueref_list_tuple_t;
-typedef struct sc_valueref_list_scope_tuple_ { sc_valueref_t _0; const sc_list_t *_1; sc_scope_t *_2; } sc_valueref_list_scope_tuple_t;
+typedef struct sc_valueref_list_scope_tuple_ { sc_valueref_t _0; const sc_list_t *_1; const sc_scope_t *_2; } sc_valueref_list_scope_tuple_t;
 
 typedef struct sc_valueref_valueref_i32_tuple_ { sc_valueref_t _0; sc_valueref_t _1; int _2; } sc_valueref_valueref_i32_tuple_t;
 typedef struct sc_valueref_i32_tuple_ { sc_valueref_t _0; int _1; } sc_valueref_i32_tuple_t;
@@ -119,7 +119,7 @@ typedef struct sc_rawstring_i32_array_tuple_ { int _0; char **_1; } sc_rawstring
 
 typedef struct sc_type_type_tuple_ { const sc_type_t *_0; const sc_type_t *_1; } sc_type_type_tuple_t;
 
-typedef struct sc_list_scope_tuple_ { const sc_list_t *_0; sc_scope_t *_1; } sc_list_scope_tuple_t;
+typedef struct sc_list_scope_tuple_ { const sc_list_t *_0; const sc_scope_t *_1; } sc_list_scope_tuple_t;
 
 // raising types
 
@@ -130,7 +130,7 @@ typedef struct sc_void_raises_ { bool ok; sc_error_t *except; } sc_void_raises_t
 SCOPES_TYPEDEF_RESULT_RAISES(sc_valueref_raises, sc_valueref_t);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_string_raises, const sc_string_t *);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_size_raises, size_t);
-SCOPES_TYPEDEF_RESULT_RAISES(sc_scope_raises, sc_scope_t *);
+SCOPES_TYPEDEF_RESULT_RAISES(sc_scope_raises, const sc_scope_t *);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_int_raises, int32_t);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_symbol_raises, sc_symbol_t);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_type_raises, const sc_type_t *);
@@ -142,7 +142,7 @@ SCOPES_TYPEDEF_RESULT_RAISES(sc_list_scope_raises, sc_list_scope_tuple_t);
 // prototypes
 
 typedef sc_valueref_raises_t (*sc_ast_macro_func_t)(sc_valueref_t);
-typedef sc_list_scope_raises_t (*sc_syntax_wildcard_func_t)(const sc_list_t *, sc_scope_t *);
+typedef sc_list_scope_raises_t (*sc_syntax_wildcard_func_t)(const sc_list_t *, const sc_scope_t *);
 
 
 
@@ -159,8 +159,8 @@ SCOPES_LIBEXPORT int sc_cache_misses();
 
 // compiler
 
-SCOPES_LIBEXPORT sc_valueref_list_scope_raises_t sc_expand(sc_valueref_t expr, const sc_list_t *next, sc_scope_t *scope);
-SCOPES_LIBEXPORT sc_valueref_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope);
+SCOPES_LIBEXPORT sc_valueref_list_scope_raises_t sc_expand(sc_valueref_t expr, const sc_list_t *next, const sc_scope_t *scope);
+SCOPES_LIBEXPORT sc_valueref_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, const sc_scope_t *scope);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_prove(sc_valueref_t expr);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_typify(const sc_closure_t *f, int numtypes, const sc_type_t **typeargs);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_typify_template(sc_valueref_t f, int numtypes, const sc_type_t **typeargs);
@@ -168,9 +168,9 @@ SCOPES_LIBEXPORT sc_valueref_raises_t sc_compile(sc_valueref_t srcl, uint64_t fl
 SCOPES_LIBEXPORT sc_string_raises_t sc_compile_spirv(sc_symbol_t target, sc_valueref_t srcl, uint64_t flags);
 SCOPES_LIBEXPORT sc_string_raises_t sc_compile_glsl(int version, sc_symbol_t target, sc_valueref_t srcl, uint64_t flags);
 SCOPES_LIBEXPORT const sc_string_t *sc_default_target_triple();
-SCOPES_LIBEXPORT sc_void_raises_t sc_compile_object(const sc_string_t *target_triple, int file_kind, const sc_string_t *path, sc_scope_t *table, uint64_t flags);
+SCOPES_LIBEXPORT sc_void_raises_t sc_compile_object(const sc_string_t *target_triple, int file_kind, const sc_string_t *path, const sc_scope_t *table, uint64_t flags);
 SCOPES_LIBEXPORT void sc_enter_solver_cli ();
-SCOPES_LIBEXPORT sc_valueref_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, sc_scope_t *scope);
+SCOPES_LIBEXPORT sc_valueref_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, const sc_scope_t *scope);
 SCOPES_LIBEXPORT sc_rawstring_i32_array_tuple_t sc_launch_args();
 
 // value
@@ -296,9 +296,9 @@ SCOPES_LIBEXPORT bool sc_is_directory(const sc_string_t *path);
 
 // globals
 
-SCOPES_LIBEXPORT sc_scope_t *sc_get_globals();
-SCOPES_LIBEXPORT sc_scope_t *sc_get_original_globals();
-SCOPES_LIBEXPORT void sc_set_globals(sc_scope_t *s);
+SCOPES_LIBEXPORT const sc_scope_t *sc_get_globals();
+SCOPES_LIBEXPORT const sc_scope_t *sc_get_original_globals();
+SCOPES_LIBEXPORT void sc_set_globals(const sc_scope_t *s);
 
 // error handling
 
@@ -330,19 +330,23 @@ SCOPES_LIBEXPORT sc_void_raises_t sc_load_object(const sc_string_t *path);
 
 // lexical scopes
 
-SCOPES_LIBEXPORT void sc_scope_bind(sc_scope_t *scope, sc_valueref_t key, sc_valueref_t value);
-SCOPES_LIBEXPORT sc_valueref_raises_t sc_scope_at(sc_scope_t *scope, sc_valueref_t key);
-SCOPES_LIBEXPORT sc_valueref_raises_t sc_scope_local_at(sc_scope_t *scope, sc_valueref_t key);
-SCOPES_LIBEXPORT const sc_string_t *sc_scope_get_docstring(sc_scope_t *scope, sc_valueref_t key);
-SCOPES_LIBEXPORT void sc_scope_set_docstring(sc_scope_t *scope, sc_valueref_t key, const sc_string_t *str);
-SCOPES_LIBEXPORT sc_scope_t *sc_scope_new();
-SCOPES_LIBEXPORT sc_scope_t *sc_scope_clone(sc_scope_t *clone);
-SCOPES_LIBEXPORT sc_scope_t *sc_scope_new_subscope(sc_scope_t *scope);
-SCOPES_LIBEXPORT sc_scope_t *sc_scope_clone_subscope(sc_scope_t *scope, sc_scope_t *clone);
-SCOPES_LIBEXPORT sc_scope_t *sc_scope_get_parent(sc_scope_t *scope);
-SCOPES_LIBEXPORT void sc_scope_unbind(sc_scope_t *scope, sc_valueref_t sym);
-SCOPES_LIBEXPORT sc_valueref_valueref_i32_tuple_t sc_scope_next(sc_scope_t *scope, int index);
-SCOPES_LIBEXPORT sc_valueref_i32_tuple_t sc_scope_next_deleted(sc_scope_t *scope, int index);
+SCOPES_LIBEXPORT const sc_scope_t *sc_scope_bind(const sc_scope_t *scope, sc_valueref_t key, sc_valueref_t value);
+SCOPES_LIBEXPORT const sc_scope_t *sc_scope_bind_with_docstring(const sc_scope_t *scope, sc_valueref_t key, sc_valueref_t value, const sc_string_t *doc);
+SCOPES_LIBEXPORT sc_valueref_raises_t sc_scope_at(const sc_scope_t *scope, sc_valueref_t key);
+SCOPES_LIBEXPORT sc_valueref_raises_t sc_scope_local_at(const sc_scope_t *scope, sc_valueref_t key);
+SCOPES_LIBEXPORT const sc_string_t *sc_scope_module_docstring(const sc_scope_t *scope);
+SCOPES_LIBEXPORT const sc_string_t *sc_scope_docstring(const sc_scope_t *scope, sc_valueref_t key);
+SCOPES_LIBEXPORT void sc_scope_set_docstring(const sc_scope_t *scope, sc_valueref_t key, const sc_string_t *str);
+SCOPES_LIBEXPORT const sc_scope_t *sc_scope_new();
+SCOPES_LIBEXPORT const sc_scope_t *sc_scope_new_with_docstring(const sc_string_t *doc);
+SCOPES_LIBEXPORT const sc_scope_t *sc_scope_reparent(const sc_scope_t *scope, const sc_scope_t *parent);
+SCOPES_LIBEXPORT const sc_scope_t *sc_scope_unparent(const sc_scope_t *scope);
+SCOPES_LIBEXPORT const sc_scope_t *sc_scope_new_subscope(const sc_scope_t *scope);
+SCOPES_LIBEXPORT const sc_scope_t *sc_scope_new_subscope_with_docstring(const sc_scope_t *scope, const sc_string_t *doc);
+SCOPES_LIBEXPORT const sc_scope_t *sc_scope_get_parent(const sc_scope_t *scope);
+SCOPES_LIBEXPORT const sc_scope_t *sc_scope_unbind(const sc_scope_t *scope, sc_valueref_t sym);
+SCOPES_LIBEXPORT sc_valueref_valueref_i32_tuple_t sc_scope_next(const sc_scope_t *scope, int index);
+SCOPES_LIBEXPORT sc_valueref_i32_tuple_t sc_scope_next_deleted(const sc_scope_t *scope, int index);
 
 // symbols
 
