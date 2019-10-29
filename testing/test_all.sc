@@ -82,6 +82,7 @@ test-modules
     .test_try
     .test_tuple_array
     .test_typedef
+    .test_typed_symbol
     .test_union
     .test_using
     .test_utf8

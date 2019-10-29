@@ -154,6 +154,7 @@ let
     ellipsis-symbol = (sc_symbol_new "...")
     list-handler-symbol = (sc_symbol_new "#list")
     symbol-handler-symbol = (sc_symbol_new "#symbol")
+    typed-symbol-handler-symbol = (sc_symbol_new "#typed-symbol")
 
 # execute until here and treat the remainder as a new translation unit
 run-stage; # 1
@@ -1907,12 +1908,13 @@ fn string@ (self i)
 
 fn dispatch-and-or (args flip)
     let argc = ('argcount args)
-    verify-count argc 2 2
-    let cond elsef =
+    verify-count argc 2 -1
+    let elsef cond =
         'getarg args 0
         'getarg args 1
+    let thenargs =
+        'getarglist args 1
     let call-elsef = `(elsef)
-
     let condT = ('typeof cond)
     let conv = (imply-converter condT bool ('constant? cond))
     let condbool =
@@ -1924,18 +1926,18 @@ fn dispatch-and-or (args flip)
         if ('constant? condbool)
             let value = (unbox-integer condbool bool)
             return
-                if (bxor value flip) cond
+                if (bxor value flip) thenargs
                 else call-elsef
     elseif flip
         return call-elsef
     else
-        return cond
+        return thenargs
     let ifval = (sc_if_new)
     if flip
         sc_if_append_then_clause ifval condbool call-elsef
-        sc_if_append_else_clause ifval cond
+        sc_if_append_else_clause ifval thenargs
     else
-        sc_if_append_then_clause ifval condbool cond
+        sc_if_append_then_clause ifval condbool thenargs
         sc_if_append_else_clause ifval call-elsef
     ifval
 
@@ -2787,6 +2789,16 @@ fn symbol-handler (topexpr env)
         let expr =
             split-dotted-symbol sxname
         return (cons expr next) env
+    label skip
+        let handler =
+            try ('@ env `typed-symbol-handler-symbol)
+            except (err)
+                merge skip
+        return
+            cons
+                'tag `(handler sxname env) ('anchor sxname)
+                next
+            env
     return topexpr env
 
 fn quasiquote-list
@@ -2844,7 +2856,7 @@ fn expand-and-or (expr f)
         if (empty? head)
             return result
         let at next = ('decons head)
-        _ `[(list f at (list inline '() result))] next
+        _ `[(list f (list inline '() result) at)] next
 
 inline make-expand-and-or (f)
     fn (expr)
@@ -5794,6 +5806,22 @@ sugar from (src 'let params...)
                     quotify params...
 
 define zip (spice-macro (fn (args) (ltr-multiop args `zip 2)))
+
+sugar chain-typed-symbol-handler (handler)
+    spice default-handler (symbol env)
+        hide-traceback;
+        '@ (env as Scope) symbol
+    let handler =
+        sc_expand handler '() sugar-scope
+    let next-handler =
+        try ('@ sugar-scope typed-symbol-handler-symbol)
+        except (err) `default-handler
+    let handler =
+        spice-quote
+            inline "#hidden" (symbol env)
+                handler next-handler symbol env
+    return `() next-expr
+        'bind sugar-scope typed-symbol-handler-symbol handler
 
 run-stage; # 9
 
