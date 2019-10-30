@@ -94,6 +94,53 @@ inline imap (gen f)
             f (at it...)
         next
 
+inline ipair (gen N)
+    """"generate one variadic argument from N generated arguments
+    static-assert (constant? N)
+    let start valid at next = ((gen as Generator))
+    let start... = (start)
+    let lsize = (va-countof start...)
+    let range... = (va-range N)
+    Generator
+        inline () start...
+        inline (it...)
+            va-lfold
+                inline () it...
+                inline "#hidden" (key value it)
+                    let it... = (it)
+                    if (not (valid it...))
+                        return false
+                    inline () (next it...)
+                range...
+            true
+        inline (it...)
+            let result =
+                va-lfold
+                    inline ()
+                        _
+                            inline () it...
+                            inline () ()
+                    inline "#hidden" (key value it)
+                        let it vals = (it)
+                        let it... = (it)
+                        let vals... = (vals)
+                        inline ()
+                            _
+                                inline () (next it...)
+                                inline ()
+                                    va-append-va (inline () (at it...)) vals...
+                    range...
+            let it vals = (result)
+            vals;
+        inline (it...)
+            call
+                va-lfold
+                    inline () it...
+                    inline "#hidden" (key value it)
+                        let it... = (it)
+                        inline () (next it...)
+                    range...
+
 # when generator a is exhausted, continue with generator b
     both generators must yield the same value type
 inline join (a b)
@@ -219,7 +266,7 @@ inline cat (coll)
 sugar --> (expr ...)
     """"Expands a processing chain into nested expressions so that each expression
         is passed as tailing argument to the following expression.
-        
+
         `__` can be used as a placeholder token to position the previous expression.
 
         example:
@@ -229,14 +276,14 @@ sugar --> (expr ...)
             g
             h 2 __
             k
-        
+
         expands to
 
         k
             h 2
                 g
                     f x
-    
+
     fn placeholder? (elem)
         (('typeof elem) == Symbol) and (elem as Symbol == '__)
 
@@ -247,7 +294,7 @@ sugar --> (expr ...)
             case list
                 let prev-outp = outp
                 let expr = (expr as list)
-                let outp found = 
+                let outp found =
                     fold (outp found = '() false) for elem in expr
                         if (placeholder? elem)
                             if found
