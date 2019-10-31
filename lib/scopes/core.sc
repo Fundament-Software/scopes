@@ -2111,6 +2111,7 @@ inline floordiv (a b)
                     'getarg args 0
                     'getarg args 1
                 let self = (unbox-pointer self Scope)
+                hide-traceback;
                 return (sc_scope_at self key)
     __typecall =
         box-spice-macro
@@ -3561,7 +3562,10 @@ fn exec-module (expr eval-scope)
                 tostring `[(sc_anchor_lineno expr-anchor)]
         sc_template_set_name wrapf (Symbol path)
         let wrapf = (sc_typify_template wrapf 0 (undef TypeArrayPointer))
-        let f = (sc_compile wrapf compile-flag-cache)
+        let f =
+            do
+                hide-traceback;
+                sc_compile wrapf compile-flag-cache
         if (('typeof f) == StageFunctionType)
             let fptr = (f as StageFunctionType)
             let result =
@@ -3624,8 +3628,13 @@ fn load-module (module-name module-path opts...)
             module-path = module-path
             module-dir = module-dir
             module-name = module-name
-    hide-traceback;
-    exec-module expr (Scope eval-scope)
+    try
+        hide-traceback;
+        exec-module expr (Scope eval-scope)
+    except (err)
+        hide-traceback;
+        error@+ err unknown-anchor
+            "while loading module " .. module-path
 
 fn patterns-from-namestr (base-dir namestr)
     # if namestr starts with a slash (because it started with a dot),
@@ -3643,7 +3652,6 @@ inline slice (value start end)
 fn require-from (base-dir name)
     #assert-typeof name Symbol
     let namestr = (dots-to-slashes (name as string))
-    let modules = (('@ package 'modules) as Scope)
     let all-patterns = (patterns-from-namestr base-dir namestr)
     loop (patterns = all-patterns)
         if (empty? patterns)
@@ -3665,21 +3673,22 @@ fn require-from (base-dir name)
         if (empty? module-path)
             repeat patterns
         let module-path-sym = (Symbol module-path)
+        fn get-modules () (('@ package 'modules) as Scope)
+        fn get-modules-path (symbol) ('@ (get-modules) symbol)
+        fn set-modules-path (symbol value)
+            'set-symbol package 'modules
+                'bind (get-modules) symbol value
         let content =
-            try ('@ modules module-path-sym)
+            try (get-modules-path module-path-sym)
             except (err)
                 if (not (sc_is_file module-path))
                     repeat patterns
-                let modules =
-                    'bind modules module-path-sym incomplete
-                'set-symbol package 'modules modules
+                set-modules-path module-path-sym incomplete
                 let content =
                     do
                         hide-traceback;
                         load-module (name as string) module-path
-                let modules =
-                    'bind modules module-path-sym content
-                'set-symbol package 'modules modules
+                set-modules-path module-path-sym content
                 return content
         if (('typeof content) == type)
             if (content == incomplete)
