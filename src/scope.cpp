@@ -19,6 +19,7 @@ namespace scopes {
 
 Scope::Scope(const String *_doc, const Scope *_parent) :
     map(nullptr),
+    index(0),
     name(ConstRef()),
     value(ValueRef()),
     doc(_doc),
@@ -38,6 +39,7 @@ Scope::Scope(const ConstRef &_name, const ValueRef &_value, const String *_doc, 
     assert(_name);
     assert(_next && _next->start);
     start = _next->start;
+    index = _next->index + 1;
 }
 
 const Scope *Scope::parent() const {
@@ -53,37 +55,15 @@ bool Scope::is_header() const {
 }
 
 size_t Scope::count() const {
-    size_t count = 0;
-    const Scope *self = this;
-    while (!self->is_header()) {
-        if (self->map) {
-            // skip ahead
-            count += self->map->keys.size();
-            break;
-        } else {
-            if (self->value) {
-                count++;
-            }
-            self = self->next;
-        }
-    }
-    return count;
+    return index;
 }
 
 size_t Scope::totalcount() const {
     size_t count = 0;
     const Scope *self = this;
     while (self) {
-        if (self->map) {
-            // skip ahead
-            count += self->map->keys.size();
-            self = self->start->next;
-        } else {
-            if (self->value) {
-                count++;
-            }
-            self = self->next;
-        }
+        count += self->index;
+        self = self->parent();
     }
     return count;
 }
@@ -102,7 +82,7 @@ const Scope::Map &Scope::table() const {
     if (!map) {
         auto map = new Map();
         const Scope *self = this;
-        while (!self->is_header()) {
+        while (true) {
             if (self->map) {
                 // copy all elements from map
                 size_t i = self->map->keys.size();
@@ -112,9 +92,11 @@ const Scope::Map &Scope::table() const {
                     map->insert(key, entry);
                 }
                 break;
-            } else {
+            } else if (!self->is_header()) {
                 map->insert(self->name, { self->value, self->doc });
                 self = self->next;
+            } else {
+                break;
             }
         }
         map->flip();
@@ -126,14 +108,17 @@ const Scope::Map &Scope::table() const {
 const Scope *Scope::reparent_from(const Scope *content, const Scope *parent) {
     auto &&map = content->table();
     auto self = from(content->header_doc(), parent);
+    #if 0
     auto count = map.keys.size();
     for (size_t i = 0; i < count; ++i) {
         auto &&key = map.keys[i];
         auto &&entry = map.values[i];
         self = bind_from(key, entry.value, entry.doc, self);
     }
+    #endif
     // can reuse the map because the content is the same
     self->map = &map;
+    self->index = map.keys.size();
     return self;
 }
 
@@ -162,7 +147,29 @@ std::vector<Symbol> Scope::find_closest_match(Symbol name) const {
     size_t best_dist = (size_t)-1;
     const Scope *self = this;
     do {
-        if (!self->is_header()) {
+        if (self->map) {
+            size_t count = self->map->keys.size();
+            for (size_t i = 0; i < count; ++i) {
+                auto &&key = self->map->keys[i];
+                if (key->get_type() == TYPE_Symbol) {
+                    Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value);
+                    if (!done.count(sym)) {
+                        auto &&value = self->map->values[i];
+                        if (value.value) {
+                            size_t dist = distance(s, sym.name());
+                            if (dist == best_dist) {
+                                best_syms.push_back(sym);
+                            } else if (dist < best_dist) {
+                                best_dist = dist;
+                                best_syms = { sym };
+                            }
+                        }
+                        done.insert(sym);
+                    }
+                }
+            }
+            self = self->start;
+        } else if (!self->is_header()) {
             auto &&key = self->name;
             if (key->get_type() == TYPE_Symbol) {
                 Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value);
@@ -193,7 +200,25 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
     std::vector<Symbol> found;
     const Scope *self = this;
     do {
-        if (!self->is_header()) {
+        if (self->map) {
+            size_t count = self->map->keys.size();
+            for (size_t i = 0; i < count; ++i) {
+                auto &&key = self->map->keys[i];
+                if (key->get_type() == TYPE_Symbol) {
+                    Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value);
+                    if (!done.count(sym)) {
+                        auto &&value = self->map->values[i];
+                        if (value.value) {
+                            if (sym.name()->count >= s->count &&
+                                    (sym.name()->substr(0, s->count) == s))
+                                found.push_back(sym);
+                        }
+                        done.insert(sym);
+                    }
+                }
+            }
+            self = self->start;
+        } else if (!self->is_header()) {
             auto &&key = self->name;
             if (key->get_type() == TYPE_Symbol) {
                 Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value);
@@ -217,6 +242,21 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
 bool Scope::lookup(const ConstRef &name, ValueRef &dest, const String *&doc, size_t depth) const {
     const Scope *self = this;
     do {
+        if (self->map) {
+            int i = self->map->find_index(name);
+            if (i != -1) {
+                auto &&value = self->map->values[i];
+                if (value.value) {
+                    dest = value.value;
+                    doc = value.doc;
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+            self = self->start;
+            //if (self->parent()) self->parent()->table();
+        }
         if (self->is_header()) {
             if (!depth)
                 break;

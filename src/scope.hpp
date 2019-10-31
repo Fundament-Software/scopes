@@ -36,6 +36,7 @@ protected:
     Scope(const String *doc, const Scope *parent);
 
     mutable const Map *map;
+    mutable size_t index;
 public:
     ConstRef name;
     ValueRef value;
