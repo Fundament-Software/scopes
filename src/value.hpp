@@ -295,6 +295,7 @@ struct Template : UntypedValue {
     bool _is_inline;
     const String *docstring;
     int recursion;
+    SCOPES_DEFINITION_ANCHOR_API()
 };
 
 //------------------------------------------------------------------------------

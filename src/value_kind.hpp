@@ -110,8 +110,8 @@ namespace scopes {
     SCOPES_TYPED_VALUE_KIND() \
 
 
-#define SCOPES_DEFINED_VALUES()
-
+#define SCOPES_DEFINED_VALUES() \
+    T(Template)
 
 enum ValueKind {
 #define T(NAME, BNAME, CLASS) \

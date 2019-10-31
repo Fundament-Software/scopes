@@ -215,7 +215,7 @@ struct Expander {
         }
         if (setup.inlined)
             func->set_inline();
-        //func->set_def_anchor(anchor);
+        func->set_def_anchor(anchor);
         /*
         if (setup.quoted)
             result = ast_quote(func);
@@ -1199,6 +1199,7 @@ struct Expander {
 
                 SCOPES_ERROR(SyntaxUndeclaredIdentifier, name, env);
             }
+            // update anchor to lookup position
             return ref(anchor, result);
         } else {
             if (verbose) {

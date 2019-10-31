@@ -96,6 +96,9 @@ inline imap (gen f)
 
 inline ipair (gen N)
     """"generate one variadic argument from N generated arguments
+    let N =
+        static-if (none? N) 2
+        else N
     static-assert (constant? N)
     let start valid at next = ((gen as Generator))
     let start... = (start)
