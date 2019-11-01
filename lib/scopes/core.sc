@@ -6130,7 +6130,7 @@ sugar fold-locals (args...)
     let block = (sc_expression_new)
     sc_expression_append block init
     let anchor = ('anchor expression)
-    let scope-docstr = ('docstring scope unnamed)
+    let scope-docstr = ('module-docstring scope)
     let init =
         if (empty? scope-docstr) init
         else

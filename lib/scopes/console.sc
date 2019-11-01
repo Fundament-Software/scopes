@@ -159,7 +159,7 @@ fn read-eval-print-loop ()
             let x = (x as i32)
             let tmp = (Symbol "#result...")
             let key = (key as Symbol)
-            if (key == unnamed) # module docstring
+            if (key == unnamed)
                 return x
             if (key == tmp)
                 return x
@@ -189,15 +189,15 @@ fn read-eval-print-loop ()
             scope
 
         sugar fold-imports ((eval-scope as Scope))
-            let stmt =
-                qq [fold-locals] [eval-scope] [append-to-scope]
-            loop (scope output = sugar-scope '())
+            loop (scope outscope = sugar-scope `eval-scope)
                 if (scope == eval-scope)
-                    break (cons embed output)
+                    break outscope
                 if (scope == null)
-                    break (cons embed output)
+                    break outscope
+                let stmt =
+                    qq [fold-locals] [outscope] [append-to-scope]
                 let expr = (sc_expand stmt '() scope)
-                repeat ('parent scope) (cons expr output)
+                repeat ('parent scope) expr
 
         spice print-bound-names (key vals...)
             let outargs =
