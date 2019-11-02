@@ -415,6 +415,7 @@ SCOPES_LIBEXPORT sc_type_raises_t sc_type_storage(const sc_type_t *T);
 SCOPES_LIBEXPORT bool sc_type_is_opaque(const sc_type_t *T);
 SCOPES_LIBEXPORT bool sc_type_is_plain(const sc_type_t *T);
 SCOPES_LIBEXPORT bool sc_type_is_superof(const sc_type_t *super, const sc_type_t *T);
+SCOPES_LIBEXPORT bool sc_type_compatible(const sc_type_t *have, const sc_type_t *need);
 SCOPES_LIBEXPORT bool sc_type_is_default_suffix(const sc_type_t *T);
 SCOPES_LIBEXPORT const sc_string_t *sc_type_string(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_symbol_valueref_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key);

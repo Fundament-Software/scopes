@@ -1782,6 +1782,11 @@ bool sc_type_is_superof(const sc_type_t *super, const sc_type_t *T) {
     return false;
 }
 
+bool sc_type_compatible(const sc_type_t *have, const sc_type_t *need) {
+    using namespace scopes;
+    return types_compatible(need, have);
+}
+
 bool sc_type_is_default_suffix(const sc_type_t *T) {
     using namespace scopes;
     return is_default_suffix(T);
@@ -2411,6 +2416,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_opaque, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_plain, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_superof, TYPE_Bool, TYPE_Type, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_compatible, TYPE_Bool, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_default_suffix, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_string, TYPE_String, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_next, arguments_type({TYPE_Symbol, TYPE_ValueRef}), TYPE_Type, TYPE_Symbol);

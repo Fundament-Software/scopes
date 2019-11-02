@@ -13,6 +13,7 @@
 #include "type/qualify_type.hpp"
 #include "dyn_cast.inc"
 #include "qualifier.inc"
+#include "qualifiers.hpp"
 
 #include <memory.h>
 #include <algorithm>
@@ -330,24 +331,27 @@ bool is_returning_value(const Type *T) {
     return is_returning(T) && (T != empty_arguments_type());
 }
 
-SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT) {
-    SCOPES_RESULT_TYPE(bool);
+bool types_compatible(const Type *paramT, const Type *argT) {
     if (paramT == argT)
         return true;
+    if (has_qualifier<ReferQualifier>(paramT) && has_qualifier<ReferQualifier>(argT)) {
+        auto pa = get_qualifier<ReferQualifier>(argT);
+        auto pb = get_qualifier<ReferQualifier>(paramT);
+        if (types_compatible(strip_qualifier<ReferQualifier>(paramT), strip_qualifier<ReferQualifier>(argT))
+            && pointer_flags_compatible(pb->flags, pa->flags)
+            && pointer_storage_classes_compatible(pb->storage_class, pa->storage_class))
+            return true;
+    }
     if (!is_opaque(argT)) {
-        argT = SCOPES_GET_RESULT(storage_type(argT));
+        argT = storage_type(argT).assert_ok();
     }
     if (!is_opaque(paramT)) {
-        paramT = SCOPES_GET_RESULT(storage_type(paramT));
+        paramT = storage_type(paramT).assert_ok();
     }
     if (isa<PointerType>(paramT) && isa<PointerType>(argT)) {
         auto pa = cast<PointerType>(argT);
         auto pb = cast<PointerType>(paramT);
-        auto scls = pb->storage_class;
-        if (scls == SYM_Unnamed) {
-            scls = pa->storage_class;
-        }
-        if (SCOPES_GET_RESULT(types_compatible(pb->element_type, pa->element_type))
+        if (types_compatible(pb->element_type, pa->element_type)
             && pointer_flags_compatible(pb->flags, pa->flags)
             && pointer_storage_classes_compatible(pb->storage_class, pa->storage_class))
             return true;

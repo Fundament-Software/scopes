@@ -3228,7 +3228,7 @@ repeat:
             Ta = strip_lifetime(Ta);
         }
         Ta = strip_qualifier<KeyQualifier>(Ta);
-        if (SCOPES_GET_RESULT(types_compatible(Tb, Ta))) {
+        if (types_compatible(Tb, Ta)) {
             continue;
         }
         SCOPES_ERROR(ParameterTypeMismatch, Tb, Ta);

@@ -185,7 +185,7 @@ const Type *superof(const Type *T);
 void stream_type_name(StyledStream &ss, const Type *T);
 bool is_returning(const Type *T);
 bool is_returning_value(const Type *T);
-SCOPES_RESULT(bool) types_compatible(const Type *paramT, const Type *argT);
+bool types_compatible(const Type *paramT, const Type *argT);
 bool all_plain(const Types &types);
 // can be copied implicitly, without needing a copy constructor
 bool is_plain(const Type *T);

@@ -2482,7 +2482,7 @@ let coerce-call-arguments =
                         else
                             let paramT = ('element@ fT i)
                             let outarg =
-                                if (== argT paramT) arg
+                                if (sc_type_compatible argT paramT) arg
                                 else
                                     ('tag `(imply arg paramT) ('anchor arg))
                             sc_call_append_argument outargs outarg
