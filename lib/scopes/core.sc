@@ -3011,6 +3011,36 @@ let
     unqualified = (make-const-type-property-function sc_strip_qualifiers)
     qualifiersof = (make-const-value-property-function sc_value_qualified_type)
     keyof = (make-const-type-property-function sc_type_key)
+    uniqueof =
+        spice-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 2 2
+                let T = ('getarg args 0)
+                let index = (as ('getarg args 1) i32)
+                let T =
+                    if (== ('typeof T) type)
+                        as T type
+                    else
+                        'qualified-typeof T
+                `[(sc_unique_type T index)]
+    viewof =
+        spice-macro
+            fn (args)
+                let argc = ('argcount args)
+                verify-count argc 1 -1
+                let T = ('getarg args 0)
+                let T =
+                    if (== ('typeof T) type)
+                        as T type
+                    else
+                        'qualified-typeof T
+                let T = (sc_view_type T -1)
+                loop (T i = T 1)
+                    if (== i argc)
+                        break `T
+                    let index = (as ('getarg args i) i32)
+                    repeat (sc_view_type T index) (add i 1)
     returnof =
         make-const-type-property-function
             fn (T)
