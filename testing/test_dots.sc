@@ -1,4 +1,6 @@
 
+using import testing
+
 # test if dots expand correctly in expression list
 let k =
     'bind (Scope) 'x true
@@ -9,11 +11,11 @@ fn X ()
     if k.x true
     else false
 
-assert (X)
+test (X)
 
 fn split-test (expr)
     let a b = (symbol-handler (list expr) (__this-scope))
-    '@ a
+    a
 
 let a =
     tupleof
@@ -23,56 +25,56 @@ let a =
 
 report a.b.c
 
-assert
+test
     ==
         split-test '...
-        '...
-assert
+        '(...)
+test
     ==
         split-test 'args.
-        'args.
-assert
+        '(args.)
+test
     ==
         split-test 'args..
-        'args..
-assert
+        '(args..)
+test
     ==
         split-test 'args...
-        'args...
-assert
+        '(args...)
+test
     ==
         split-test '.args
-        '.args
-assert
+        '(.args)
+test
     ==
         split-test '..args
-        '..args
-assert
+        '(..args)
+test
     ==
         split-test '...args
-        '...args
+        '(...args)
 
-assert
+test
     ==
-        split-test 'a.b.c
+        '@ (split-test 'a.b.c)
         '(. a.b c)
-assert
+test
     ==
         split-test 'a..b..c
-        'a..b..c
-assert
+        '(a..b..c)
+test
     ==
         split-test 'a...b...c
-        'a...b...c
-assert
+        '(a...b...c)
+test
     ==
-        split-test '.a.b.c.
+        '@ (split-test '.a.b.c.)
         '(. .a.b c.)
-assert
+test
     ==
         split-test '..a..b..c..
-        '..a..b..c..
-assert
+        '(..a..b..c..)
+test
     ==
         split-test '...a...b...c...
-        '...a...b...c...
+        '(...a...b...c...)
