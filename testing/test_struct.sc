@@ -203,5 +203,24 @@ do
 
     print val.x val.y val.z
 
+# test pointer and references to forward declared struct
+do
+    struct ForwardDecl
+
+    let ptr =
+        mutable (pointer ForwardDecl)
+
+    test ('readable? ptr)
+    test ('writable? ptr)
+
+    let ref =
+        mutable &ForwardDecl
+
+    let ptr = ('refer->pointer-type ref)
+    test ('readable? ptr)
+    test ('writable? ptr)
+
+
+
 
 none

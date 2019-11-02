@@ -86,6 +86,7 @@ bool PointerType::is_writable() const {
 //------------------------------------------------------------------------------
 
 uint64_t required_flags_for_element_type(const Type *element_type) {
+    element_type = strip_qualifiers(element_type);
     if (isa<TypenameType>(element_type)
         && !cast<TypenameType>(element_type)->is_complete())
         return 0;
