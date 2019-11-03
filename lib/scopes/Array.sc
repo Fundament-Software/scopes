@@ -17,12 +17,6 @@ let llvm.memcpy.p0i8.p0i8.i64 =
     extern 'llvm.memcpy.p0i8.p0i8.i64
         function void (mutable rawstring) rawstring i64 bool
 
-fn swap (a b)
-    let tmp = (deref (dupe b))
-    assign (dupe a) b
-    assign tmp a
-    return;
-
 fn iParent (i)
     (i - 1:i64) // 2
 

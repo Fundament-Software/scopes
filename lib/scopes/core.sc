@@ -42,6 +42,13 @@ let square-list = spice-unquote-arguments
 # first we alias u64 to the integer type that can hold a pointer
 let intptr = u64
 
+fn swap (a b)
+    """"safely exchanges the contents of two references
+    let tmp = (deref (dupe b))
+    assign (dupe a) b
+    assign tmp a
+    return;
+
 # pointer comparison as a template function, because we'll compare pointers of many types
 fn ptrcmp!= (t1 t2)
     icmp!= (ptrtoint t1 intptr) (ptrtoint t2 intptr)
