@@ -6873,7 +6873,7 @@ fn constructor (cls args...)
         let v =
             if (('pointer? ET) and ('refer? ('qualified-typeof v)))
                 `(imply (reftoptr v) ET)
-            else `(imply v ET)
+            else ('tag `(imply v ET) ('anchor arg))
         store v (getelementptr fields k)
         i + 1
     let block = (sc_expression_new)
@@ -6905,7 +6905,8 @@ fn constructor (cls args...)
                 success ::
             else
                 load (getelementptr fields i)
-        let result = `(insertvalue result elem i)
+        let field = ('getarg struct-fields i)
+        let result = ('tag `(insertvalue result elem i) ('anchor field))
         _ (i + 1) result
 
 'set-symbols Struct

@@ -9,7 +9,7 @@
     support for defining structs via enum sugar
 
 sugar struct (name body...)
-    fn define-field-runtime (T name field-type default-value)
+    fn define-field-runtime (T anchor name field-type default-value)
         let fields = ('@ T '__fields__)
         let default-anchor = ('anchor default-value)
         let field-type = (field-type as type)
@@ -35,7 +35,7 @@ sugar struct (name body...)
             sc_key_type (name as Symbol) (field-type as type)
         if (('typeof default-value) != Nothing)
             'set-symbol FT 'Default default-value
-        let FT = `FT
+        let FT = ('tag `FT anchor)
         let fields =
             sc_argument_list_join_values fields FT
         sc_type_set_symbol T '__fields__ fields
@@ -44,11 +44,12 @@ sugar struct (name body...)
     spice define-field (struct-type name field-type default-value...)
         if (not ('constant? struct-type))
             error "struct-type must be constant"
+        let anchor = ('anchor struct-type)
         let T = (struct-type as type)
         let default-value =
             if (('argcount default-value...) == 0) `none
             else default-value...
-        define-field-runtime T name field-type default-value
+        define-field-runtime T anchor name field-type default-value
 
     spice finalize-struct (T packed?)
         fn finalize-struct-runtime (T packed?)
