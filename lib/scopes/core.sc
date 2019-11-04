@@ -5286,7 +5286,10 @@ define va-map
                 inline (i)
                     let i = (i + 1)
                     let arg = ('getarg args i)
-                    let outarg = (sc_prove `(f arg))
+                    let outarg =
+                        do
+                            hide-traceback;
+                            sc_prove ('tag `(f arg) ('anchor arg))
                     _ (('typeof outarg) != void) outarg
 
 """".. spice:: (va-range a (? b))
@@ -7079,7 +7082,7 @@ fn nested-union-field-accessor (qcls name)
                 `(op self)
             else
                 # produces a useful error message
-                `(extractvalue self name)
+                'tag `(extractvalue self name) ('anchor name)
     __typecall =
         spice "CStruct-typecall" (cls args...)
             if ((cls as type) == CStruct)
