@@ -3775,7 +3775,8 @@ fn merge-scope-symbols (source target filter)
                         and (('typeof key) == Symbol)
                             do
                                 let keystr = (key as Symbol as string)
-                                'match? filter keystr
+                                let ok = ('match? filter keystr)
+                                ok
                     repeat index
                         'bind target key value
                 else

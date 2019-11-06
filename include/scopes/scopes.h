@@ -101,6 +101,7 @@ typedef struct sc_valueref_ { sc_value_t *_0; const sc_anchor_t *_1; } sc_valuer
 
 typedef struct sc_bool_string_tuple_ { bool _0; const sc_string_t *_1; } sc_bool_string_tuple_t;
 typedef struct sc_bool_valueref_tuple_ { bool _0; sc_valueref_t _1; } sc_bool_valueref_tuple_t;
+typedef struct sc_bool_i32_i32_tuple_ { bool _0; int32_t _1, _2; } sc_bool_i32_i32_tuple_t;
 
 typedef struct sc_valueref_list_tuple_ { sc_valueref_t _0; const sc_list_t *_1; } sc_valueref_list_tuple_t;
 typedef struct sc_valueref_list_scope_tuple_ { sc_valueref_t _0; const sc_list_t *_1; const sc_scope_t *_2; } sc_valueref_list_scope_tuple_t;
@@ -138,6 +139,7 @@ SCOPES_TYPEDEF_RESULT_RAISES(sc_bool_raises, bool);
 
 SCOPES_TYPEDEF_RESULT_RAISES(sc_valueref_list_scope_raises, sc_valueref_list_scope_tuple_t);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_list_scope_raises, sc_list_scope_tuple_t);
+SCOPES_TYPEDEF_RESULT_RAISES(sc_bool_i32_i32_raises, sc_bool_i32_i32_tuple_t);
 
 // prototypes
 
@@ -362,7 +364,7 @@ SCOPES_LIBEXPORT sc_symbol_t sc_symbol_style(sc_symbol_t name);
 SCOPES_LIBEXPORT const sc_string_t *sc_string_new(const char *ptr, size_t count);
 SCOPES_LIBEXPORT const sc_string_t *sc_string_new_from_cstr(const char *ptr);
 SCOPES_LIBEXPORT const sc_string_t *sc_string_join(const sc_string_t *a, const sc_string_t *b);
-SCOPES_LIBEXPORT sc_bool_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *text);
+SCOPES_LIBEXPORT sc_bool_i32_i32_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *text);
 SCOPES_LIBEXPORT size_t sc_string_count(const sc_string_t *str);
 SCOPES_LIBEXPORT sc_rawstring_size_t_tuple_t sc_string_buffer(const sc_string_t *str);
 SCOPES_LIBEXPORT const sc_string_t *sc_string_lslice(const sc_string_t *str, size_t offset);

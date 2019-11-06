@@ -111,6 +111,7 @@ static const Scope *original_globals = Scope::from(nullptr, nullptr);
 sc_void_raises_t convert_result(const Result<void> &_result) VOID_CRESULT;
 
 sc_valueref_list_scope_raises_t convert_result(const Result<sc_valueref_list_scope_tuple_t> &_result) CRESULT;
+sc_bool_i32_i32_raises_t convert_result(const Result<sc_bool_i32_i32_tuple_t> &_result) CRESULT;
 
 sc_valueref_raises_t convert_result(const Result<ValueRef> &_result) CRESULT;
 sc_valueref_raises_t convert_result(const Result<TypedValueRef> &_result) CRESULT;
@@ -894,9 +895,9 @@ const sc_string_t *sc_string_join(const sc_string_t *a, const sc_string_t *b) {
 namespace scopes {
     static std::unordered_map<const String *, regexp::Reprog *> pattern_cache;
 }
-sc_bool_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *text) {
+sc_bool_i32_i32_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *text) {
     using namespace scopes;
-    SCOPES_RESULT_TYPE(bool);
+    SCOPES_RESULT_TYPE(sc_bool_i32_i32_tuple_t);
     auto it = pattern_cache.find(pattern);
     regexp::Reprog *m = nullptr;
     if (it == pattern_cache.end()) {
@@ -911,7 +912,10 @@ sc_bool_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *
     } else {
         m = it->second;
     }
-    SCOPES_C_RETURN(regexp::regexec(m, text->data, nullptr, 0) == 0);
+    regexp::Resub sub;
+    bool ok = regexp::regexec(m, text->data, &sub, 0) == 0;
+    sc_bool_i32_i32_tuple_t result = {ok, (int)(sub.sub[0].sp - text->data), (int)(sub.sub[0].ep - text->data)};
+   SCOPES_C_RETURN(result);
 }
 
 size_t sc_string_count(const sc_string_t *str) {
@@ -2392,7 +2396,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_string_new, TYPE_String, native_ro_pointer_type(TYPE_I8), TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_new_from_cstr, TYPE_String, native_ro_pointer_type(TYPE_I8));
     DEFINE_EXTERN_C_FUNCTION(sc_string_join, TYPE_String, TYPE_String, TYPE_String);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_string_match, TYPE_Bool, TYPE_String, TYPE_String);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_string_match, arguments_type({TYPE_Bool, TYPE_I32, TYPE_I32}), TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_count, TYPE_USize, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_compare, TYPE_I32, TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_buffer, arguments_type({rawstring, TYPE_USize}), TYPE_String);
