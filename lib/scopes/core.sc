@@ -1727,7 +1727,7 @@ fn unary-operation (args symbol friendly-op-name)
         try ('@ T symbol)
         except (err)
             unary-op-error friendly-op-name T
-    `(f u)
+    'tag `(f u) ('anchor args)
 
 fn unary-or-balanced-binary-operation (args usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
     let argc = ('argcount args)
@@ -5316,7 +5316,7 @@ define va-range
             sc_argument_list_map_new count
                 inline (i)
                     let i = (i + a)
-                    `i
+                    'tag `i ('anchor args)
 
 """" (va-split n a...) -> (inline () a...[n .. (va-countof a...)-1]) a...[0 .. n-1]
 define va-split
@@ -7322,42 +7322,46 @@ fn run-main ()
     let parse-options = (alloca bool)
     store "" sourcepath
     store true parse-options
-    loop (i = 1)
-        if (i >= argc)
-            break;
-        let k = (i + 1)
-        let arg = (load (getelementptr argv i))
-        let arg = (sc_string_new_from_cstr arg)
-        if ((load parse-options) and ((@ arg 0:usize) == (char "-")))
-            if ((arg == "--help") or (arg == "-h"))
-                print-help exename
-            elseif ((== arg "--version") or (== arg "-v"))
-                print-version;
-            elseif ((== arg "--signal-abort") or (== arg "-s"))
-                set-signal-abort! true
-            elseif (== arg "--")
-                store false parse-options
-            else
-                print
-                    .. "unrecognized option: " arg
-                        \ ". Try --help for help."
-                exit 1
-        elseif ((load sourcepath) == "")
-            store arg sourcepath
-            # remainder is passed on to script
-            break;
-        k
+    let start-offset =
+        loop (i = 1)
+            if (i >= argc)
+                break i
+            let k = (i + 1)
+            let arg = (load (getelementptr argv i))
+            let arg = (sc_string_new_from_cstr arg)
+            if ((load parse-options) and ((@ arg 0:usize) == (char "-")))
+                if ((arg == "--help") or (arg == "-h"))
+                    print-help exename
+                elseif ((== arg "--version") or (== arg "-v"))
+                    print-version;
+                elseif ((== arg "--signal-abort") or (== arg "-s"))
+                    set-signal-abort! true
+                elseif (== arg "--")
+                    store false parse-options
+                else
+                    print
+                        .. "unrecognized option: " arg
+                            \ ". Try --help for help."
+                    exit 1
+            elseif ((load sourcepath) == "")
+                store arg sourcepath
+                # remainder is passed on to script
+                break k
+            k
     let sourcepath = (load sourcepath)
     let sourcepath =
         if (sourcepath == "")
             .. compiler-dir "/lib/scopes/console.sc"
         else sourcepath
+    let argc = (argc - start-offset)
+    let argv = (& (@ argv start-offset))
+    @@ spice-quote
+    fn script-launch-args ()
+        return sourcepath argc argv
     let scope =
         'bind-symbols
             sc_scope_new_subscope_with_docstring (globals) ""
-            script-launch-args =
-                fn ()
-                    return sourcepath argc argv
+            script-launch-args = script-launch-args
     do
         hide-traceback;
         load-module "" sourcepath
