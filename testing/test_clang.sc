@@ -72,3 +72,10 @@ include
     int y;
     } KK;
 
+# issue #54: support for `typeof` qualifier in imported C declarations
+include
+    import Test
+""""#define LE_MACRO (1 << 6)
+    typeof(LE_MACRO) get_value() { return LE_MACRO; }
+
+assert ((Test.get_value) == (1 << 6))

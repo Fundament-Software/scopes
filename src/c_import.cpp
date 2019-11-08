@@ -440,22 +440,28 @@ public:
         assert(Ty);
 
         switch (Ty->getTypeClass()) {
+        case clang::Type::TypeOfExpr: {
+            const TypeOfExprType *toet = cast<TypeOfExprType>(Ty);
+            if (toet->isSugared()) {
+                return _TranslateType(toet->desugar());
+            }
+        } break;
         case clang::Type::Attributed: {
-            const AttributedType *at = dyn_cast<AttributedType>(Ty);
+            const AttributedType *at = cast<AttributedType>(Ty);
             // we probably want to eventually handle some of the attributes
             // but for now, ignore any attribute
             return TranslateType(at->getEquivalentType());
         } break;
         case clang::Type::Elaborated: {
-            const ElaboratedType *et = dyn_cast<ElaboratedType>(Ty);
+            const ElaboratedType *et = cast<ElaboratedType>(Ty);
             return TranslateType(et->getNamedType());
         } break;
         case clang::Type::Paren: {
-            const ParenType *pt = dyn_cast<ParenType>(Ty);
+            const ParenType *pt = cast<ParenType>(Ty);
             return TranslateType(pt->getInnerType());
         } break;
         case clang::Type::Typedef: {
-            const TypedefType *tt = dyn_cast<TypedefType>(Ty);
+            const TypedefType *tt = cast<TypedefType>(Ty);
             TypedefNameDecl * td = tt->getDecl();
             auto it = typedefs.find(
                 Symbol(String::from_stdstring(td->getName().data())));
@@ -465,12 +471,12 @@ public:
             return it->second;
         } break;
         case clang::Type::Record: {
-            const RecordType *RT = dyn_cast<RecordType>(Ty);
+            const RecordType *RT = cast<RecordType>(Ty);
             RecordDecl * rd = RT->getDecl();
             return TranslateRecord(rd);
         }  break;
         case clang::Type::Enum: {
-            const clang::EnumType *ET = dyn_cast<clang::EnumType>(Ty);
+            const clang::EnumType *ET = cast<clang::EnumType>(Ty);
             EnumDecl * ed = ET->getDecl();
             return TranslateEnum(ed);
         } break;
