@@ -3604,7 +3604,9 @@ fn exec-module (expr eval-scope)
             do
                 hide-traceback;
                 sc_compile wrapf
-                    | compile-flag-cache compile-flag-O2
+                    compile-flag-cache
+                    # can't use this flag yet because it breaks code
+                    #| compile-flag-cache compile-flag-O2
         if (('typeof f) == StageFunctionType)
             let fptr = (f as StageFunctionType)
             let result =
