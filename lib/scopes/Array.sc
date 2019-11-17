@@ -167,6 +167,16 @@ typedef+ Array
         assign value dest
         dest
 
+    """"Construct a new element with arguments `args...` directly in a newly
+        assigned slot of array `self`. When the `array` is of `GrowingArray`
+        type, this operation will transparently resize the array's storage.
+    inline emplace-append-many (self size args...)
+        let dest = (append-slots self size)
+        for idx in (range size)
+            let value = (((typeof self) . ElementType) args...)
+            assign value (self._items @ idx)
+        dest
+
     """"Clear the array and reset its element count to zero. This will drop
         all elements that have been previously contained by the array.
     fn clear (self)
@@ -174,6 +184,20 @@ typedef+ Array
             __drop (self._items @ idx)
         self._count = 0:usize
         return;
+
+    """"Resize the array to the specified count. Items are apppend or removed
+        to meet the desired count.
+    fn resize (self count args...)
+        let count = (count as usize)
+        if (self._count < count)
+            let T = (typeof self)
+            delta := count - self._count
+            emplace-append-many self delta args...
+        else
+            offset := self._count - count
+            for idx in (range offset (deref self._count))
+                __drop (self._items @ idx)
+            self._count = count
 
     """"Implements support for freeing the array's memory when it goes out
         of scope.

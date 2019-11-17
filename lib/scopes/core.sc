@@ -3466,7 +3466,8 @@ define for
                                     let expr = (cons let expr)
                                     let subscope =
                                         'bind subscope 'continue continue
-                                    sc_expand (cons do expr body) '() subscope
+                                    let value = (sc_expand (cons do expr body) '() subscope)
+                                    'tag value ('anchor head)
                                 continue;
                             else
                                 break;
@@ -3602,7 +3603,8 @@ fn exec-module (expr eval-scope)
         let f =
             do
                 hide-traceback;
-                sc_compile wrapf compile-flag-cache
+                sc_compile wrapf
+                    | compile-flag-cache compile-flag-O2
         if (('typeof f) == StageFunctionType)
             let fptr = (f as StageFunctionType)
             let result =

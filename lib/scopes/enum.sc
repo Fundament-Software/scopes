@@ -23,6 +23,7 @@ typedef Enum
         let refer = ('refer? qcls)
         let ptrT = ('refer->pointer-type qcls)
         for arg in ('args handlers...)
+            let anchor = ('anchor arg)
             let key arg = ('dekey arg)
             if (key == unnamed)
                 sc_switch_append_default sw `(arg)
@@ -52,7 +53,7 @@ typedef Enum
                     if (ET < tuple)
                         `(unpack extracted)
                     else extracted
-                sc_switch_append_case sw lit `(arg extracted)
+                sc_switch_append_case sw lit ('tag `(arg extracted) anchor)
         sw
 
 fn define-field-runtime (T name field-type index-value)
@@ -387,15 +388,19 @@ sugar dispatch (value)
     loop (next outp = next-expr '())
         sugar-match next
         case (('case (name is Symbol) (args...) body...) rest...)
+            let anchor = ('anchor ('@ next))
+            let _inline = ('tag `inline anchor)
             repeat rest...
                 cons
                     qq [name] =
-                        [inline] "#hidden" [args...] (unquote-splice body...)
+                        [_inline] "#hidden" [args...] (unquote-splice body...)
                     outp
         case (('default body...) rest...)
+            let anchor = ('anchor ('@ next))
+            let _inline = ('tag `inline anchor)
             return
                 qq '__dispatch [value] (unquote-splice ('reverse outp))
-                    [inline] "#hidden" () (unquote-splice body...)
+                    [_inline] "#hidden" () (unquote-splice body...)
                 rest...
         default
             error "missing default case"
