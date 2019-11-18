@@ -206,7 +206,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
             classes[1] = ABI_CLASS_INTEGER;
             return 2;
         } else {
-            assert(false && "illegal type");
+            return 0;
         }
     } break;
     case TK_Real: {
