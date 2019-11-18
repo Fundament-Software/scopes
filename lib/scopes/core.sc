@@ -7139,6 +7139,10 @@ do
     'set-symbols CEnum
         __== = (simple-binary-op icmp==)
         __!= = (simple-binary-op icmp!=)
+        __> = (simple-binary-storage-op (_ >))
+        __< = (simple-binary-storage-op (_ <))
+        __>= = (simple-binary-storage-op (_ >=))
+        __<= = (simple-binary-storage-op (_ <=))
         __~ = (simple-unary-storage-op (_ ~))
         __neg = (simple-unary-storage-op (_ -))
         __+ = (simple-binary-storage-op (_ +))
