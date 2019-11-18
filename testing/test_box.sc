@@ -25,6 +25,7 @@ do
     test (k * 2 == 6)
 
     k = 12
+    test (k == 12)
 
     let q = ((Box.view k) * 2)
     test (q == 24)

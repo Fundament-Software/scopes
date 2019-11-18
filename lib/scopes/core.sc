@@ -1665,13 +1665,35 @@ fn balanced-binary-operator (symbol rsymbol lhsT rhsT lhs-static? rhs-static?)
                 return `(inline (lhs rhs) (op (conv lhs) rhs))
     return (sc_empty_argument_list)
 
+# right hand has same type as left hand
+fn balanced-lvalue-binary-operator (symbol lhsT rhsT rhs-static?)
+    """"for an operation performed on two argument types, of which only the
+        left type type can provide a suitable candidate, return a matching operator.
+        This function only works inside a spice macro.
+    # try the left type
+    let op = (binary-operator symbol lhsT rhsT)
+    if (operator-valid? op) (return op)
+    if (ptrcmp!= lhsT rhsT)
+        # asymmetrical types
+
+        # can we cast rhsT to lhsT?
+        let conv = (imply-converter rhsT lhsT rhs-static?)
+        if (operator-valid? conv)
+            # is symmetrical op supported for the left type?
+            let op = (binary-operator symbol lhsT lhsT)
+            if (operator-valid? op)
+                return `(inline (lhs rhs) (op lhs (conv rhs)))
+    return (sc_empty_argument_list)
+
 fn unary-op-error (friendly-op-name T)
+    hide-traceback;
     error
         'join "can't "
             'join friendly-op-name
                 'join " value of type " ('__repr (box-pointer T))
 
 fn binary-op-error (friendly-op-name lhsT rhsT)
+    hide-traceback;
     error
         'join "can't "
             'join friendly-op-name
@@ -1692,6 +1714,21 @@ fn balanced-binary-operation (args symbol rsymbol friendly-op-name)
         ('constant? lhs) ('constant? rhs))
     if (operator-valid? op)
         return ('tag `(op lhs rhs) ('anchor args))
+    hide-traceback;
+    binary-op-error friendly-op-name lhsT rhsT
+
+fn balanced-lvalue-binary-operation (args symbol friendly-op-name)
+    let argc = ('argcount args)
+    verify-count argc 2 2
+    let lhs rhs =
+        'getarg args 0
+        'getarg args 1
+    let lhsT = ('typeof lhs)
+    let rhsT = ('typeof rhs)
+    let op = (balanced-lvalue-binary-operator symbol lhsT rhsT ('constant? rhs))
+    if (operator-valid? op)
+        return ('tag `(op lhs rhs) ('anchor args))
+    hide-traceback;
     binary-op-error friendly-op-name lhsT rhsT
 
 # right hand has fixed type - this one doesn't need a dispatch step
@@ -1756,10 +1793,22 @@ inline unary-or-unbalanced-binary-op-dispatch (usymbol ufriendly-op-name symbol 
         args usymbol ufriendly-op-name symbol rtype friendly-op-name))
 
 inline balanced-binary-op-dispatch (symbol rsymbol friendly-op-name)
-    spice-macro (fn (args) (balanced-binary-operation args symbol rsymbol friendly-op-name))
+    spice-macro
+        fn (args)
+            hide-traceback;
+            balanced-binary-operation args symbol rsymbol friendly-op-name
+
+inline balanced-lvalue-binary-op-dispatch (symbol friendly-op-name)
+    spice-macro
+        fn (args)
+            hide-traceback;
+            balanced-lvalue-binary-operation args symbol friendly-op-name
 
 inline unbalanced-binary-op-dispatch (symbol rtype friendly-op-name)
-    spice-macro (fn (args) (unbalanced-binary-operation args symbol rtype friendly-op-name))
+    spice-macro
+        fn (args)
+            hide-traceback;
+            unbalanced-binary-operation args symbol rtype friendly-op-name
 
 inline spice-binary-op-macro (f)
     """"to be used for binary operators of which either type can
@@ -2208,7 +2257,7 @@ let
     << = (balanced-binary-op-dispatch '__<< '__r<< "apply left shift with")
     >> = (balanced-binary-op-dispatch '__>> '__r>> "apply right shift with")
     .. = (balanced-binary-op-dispatch '__.. '__r.. "join")
-    = = (balanced-binary-op-dispatch '__= '__r= "apply assignment with")
+    = = (balanced-lvalue-binary-op-dispatch '__= "apply assignment with")
     @ = (unary-or-unbalanced-binary-op-dispatch '__toref "dereference" '__@ integer "apply subscript operator with")
     getattr = (unbalanced-binary-op-dispatch '__getattr Symbol "get attribute from")
     lslice = (unbalanced-binary-op-dispatch '__lslice usize "apply left-slice operator with")
