@@ -2425,12 +2425,33 @@ let report =
                 print anchor args
                 view args
 
-'define-symbol integer '__typecall
-    inline (cls value)
-        static-branch (none? value)
-            inline () (nullof cls)
-            inline ()
-                as value cls
+fn extract-integer (value)
+    if (== ('kind value) value-kind-const-int)
+        return (sc_const_int_extract value)
+    error@ ('anchor value) "while extracting integer" "integer constant expected"
+
+'set-symbol integer '__typecall
+    box-pointer
+        spice-macro
+            fn (args)
+                raising Error
+                let cls = (as ('getarg args 0) type)
+                let argc = ('argcount args)
+                if (ptrcmp== cls integer)
+                    verify-count argc 2 3
+                    let size = ('getarg args 1)
+                    let size = (extract-integer size)
+                    let signed =
+                        if (== argc 2) false
+                        else (as ('getarg args 2) bool)
+                    `[(sc_integer_type (as size i32) signed)]
+                else
+                    verify-count argc 1 2
+                    if (== argc 1)
+                        `(nullof cls)
+                    else
+                        let value = ('getarg args 1)
+                        `(as value cls)
 
 'define-symbol real '__typecall
     inline (cls value)
@@ -2990,11 +3011,6 @@ inline make-const-type-property-function (func)
             let val = (extract-single-type-arg args)
             let val = (func val)
             `val
-
-fn extract-integer (value)
-    if (== ('kind value) value-kind-const-int)
-        return (sc_const_int_extract value)
-    error@ ('anchor value) "while extracting integer" "integer constant expected"
 
 let
     constant? =
