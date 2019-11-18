@@ -130,6 +130,7 @@ typedef std::vector<const Type *> Types;
     T(TYPE_F32, "f32") \
     T(TYPE_F64, "f64") \
     T(TYPE_F80, "f80") \
+    T(TYPE_F128, "f128") \
     \
     T(TYPE_List, "list") \
     T(TYPE_Anchor, "Anchor") \

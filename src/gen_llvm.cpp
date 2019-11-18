@@ -278,6 +278,8 @@ struct LLVMIRGenerator {
     static LLVMTypeRef f32T;
     static LLVMTypeRef f32x2T;
     static LLVMTypeRef f64T;
+    static LLVMTypeRef f80T;
+    static LLVMTypeRef f128T;
     static LLVMTypeRef rawstringT;
     static LLVMTypeRef noneT;
     static LLVMValueRef noneV;
@@ -592,6 +594,8 @@ struct LLVMIRGenerator {
         f32T = LLVMFloatType();
         f32x2T = LLVMVectorType(f32T, 2);
         f64T = LLVMDoubleType();
+        f80T = LLVMX86FP80Type();
+        f128T = LLVMFP128Type();
         noneV = LLVMConstStruct(nullptr, 0, false);
         noneT = LLVMTypeOf(noneV);
         rawstringT = LLVMPointerType(LLVMInt8Type(), 0);
@@ -759,6 +763,8 @@ struct LLVMIRGenerator {
             switch(cast<RealType>(type)->width) {
             case 32: return f32T;
             case 64: return f64T;
+            case 80: return f80T;
+            case 128: return f128T;
             default: break;
             }
             break;
@@ -2623,6 +2629,8 @@ LLVMTypeRef LLVMIRGenerator::i64T = nullptr;
 LLVMTypeRef LLVMIRGenerator::f32T = nullptr;
 LLVMTypeRef LLVMIRGenerator::f32x2T = nullptr;
 LLVMTypeRef LLVMIRGenerator::f64T = nullptr;
+LLVMTypeRef LLVMIRGenerator::f80T = nullptr;
+LLVMTypeRef LLVMIRGenerator::f128T = nullptr;
 LLVMTypeRef LLVMIRGenerator::rawstringT = nullptr;
 LLVMTypeRef LLVMIRGenerator::noneT = nullptr;
 LLVMValueRef LLVMIRGenerator::noneV = nullptr;

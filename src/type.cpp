@@ -461,6 +461,7 @@ void init_types() {
     TYPE_F32 = real_type(32);
     TYPE_F64 = real_type(64);
     TYPE_F80 = real_type(80);
+    TYPE_F128 = real_type(128);
 
     DEFINE_BASIC_TYPE("usize", size_t, TYPE_USize, TYPE_Integer, TYPE_U64);
 
