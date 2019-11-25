@@ -7,7 +7,7 @@
 # Scopes Console
 #-------------------------------------------------------------------------------
 
-fn read-eval-print-loop ()
+fn read-eval-print-loop (global-scope)
     fn repeat-string (n c)
         loop (i s = 0:usize "")
             if (i == n)
@@ -40,7 +40,6 @@ fn read-eval-print-loop ()
 
     print-logo;
 
-    let global-scope = (globals)
     let eval-scope = (Scope global-scope)
     let history-path =
         .. cache-dir "/console.history"
@@ -309,7 +308,7 @@ fn read-eval-print-loop ()
         repeat "" "" counter eval-scope
 
 if main-module?
-    read-eval-print-loop;
+    read-eval-print-loop (globals)
 
 do
     let read-eval-print-loop
