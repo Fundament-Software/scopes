@@ -8,7 +8,7 @@
 #-------------------------------------------------------------------------------
 
 fn... read-eval-print-loop
-case (global-scope, show-logo = false)
+case (global-scope, show-logo : bool = false, history-path : string = "")
     fn repeat-string (n c)
         loop (i s = 0:usize "")
             if (i == n)
@@ -43,11 +43,10 @@ case (global-scope, show-logo = false)
         print-logo;
 
     let eval-scope = (Scope global-scope)
-    let history-path =
-        .. cache-dir "/console.history"
 
     set-autocomplete-scope! eval-scope
-    sc_load_history history-path
+    if (not (empty? history-path))
+        sc_load_history history-path
 
     sugar help ((value as Symbol))
         let val =
@@ -132,7 +131,8 @@ case (global-scope, show-logo = false)
                         repeat-string promptlen "."
                     " "
                 preload
-        sc_save_history history-path
+        if (not (empty? history-path))
+            sc_save_history history-path
         if (not success)
             return;
         fn endswith-blank (s)
@@ -311,6 +311,7 @@ case (global-scope, show-logo = false)
 
 if main-module?
     read-eval-print-loop (globals) true
+        .. cache-dir "/console.history"
 
 do
     let read-eval-print-loop
