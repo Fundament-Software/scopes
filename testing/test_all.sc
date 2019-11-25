@@ -4,6 +4,7 @@ using import testing
 test-modules
     .test_abi
     .test_abs
+    .test_alignment
     .test_anchor
     .test_ansi_colors
     .test_array

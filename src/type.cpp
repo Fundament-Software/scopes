@@ -257,7 +257,7 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
         return size_of(cast<QualifyType>(T)->type);
     case TK_Integer: {
         const IntegerType *it = cast<IntegerType>(T);
-        return (it->width + 7) / 8;
+        return it->size;
     }
     case TK_Real: {
         const RealType *rt = cast<RealType>(T);
@@ -281,7 +281,7 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
         return align_of(cast<QualifyType>(T)->type);
     case TK_Integer: {
         const IntegerType *it = cast<IntegerType>(T);
-        return (it->width + 7) / 8;
+        return it->align;
     }
     case TK_Real: {
         const RealType *rt = cast<RealType>(T);
@@ -290,6 +290,7 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
         case 32: return 4;
         case 64: return 8;
         case 80: return 16;
+        case 128: return 16;
         default: break;
         }
     }

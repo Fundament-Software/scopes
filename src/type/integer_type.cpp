@@ -29,6 +29,13 @@ void IntegerType::stream_name(StyledStream &ss) const {
 
 IntegerType::IntegerType(size_t _width, bool _issigned)
     : Type(TK_Integer), width(_width), issigned(_issigned) {
+    auto bytes = (width + 7) / 8;
+    if (bytes <= 8) {
+        size = ceilpow2(bytes);
+    } else {
+        size = scopes::align(bytes, 8);
+    }
+    align = std::min(size, size_t(8));
 }
 
 static const Type *_Integer(size_t _width, bool _issigned) {

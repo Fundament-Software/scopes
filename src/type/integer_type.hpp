@@ -8,6 +8,7 @@
 #define SCOPES_INTEGER_HPP
 
 #include "../type.hpp"
+#include "../utils.hpp"
 
 namespace scopes {
 
@@ -22,6 +23,8 @@ struct IntegerType : Type {
     IntegerType(size_t _width, bool _issigned);
 
     size_t width;
+    size_t align;
+    size_t size;
     bool issigned;
 };
 
