@@ -4252,6 +4252,29 @@ inline range (a b c)
         inline (x) x
         inline (x) (x + step)
 
+inline rrange (a b c)
+    """"same as range, but iterates range in reverse; arguments are passed
+        in the same format, so rrange can act as a drop-in replacement for range.
+    let num-type = (typeof a)
+    let step =
+        static-branch (none? c)
+            inline () (1 as num-type)
+            inline () c
+    let from =
+        static-branch (none? b)
+            inline () (0 as num-type)
+            inline () a
+    let to =
+        static-branch (none? b)
+            inline () a
+            inline () b
+    let to = (((to - from + (step - 1)) // step) * step - step + from)
+    Generator
+        inline () to
+        inline (x) (x >= from)
+        inline (x) x
+        inline (x) (x - step)
+
 let parse-compile-flags =
     spice-macro
         fn (args)
