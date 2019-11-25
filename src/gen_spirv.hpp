@@ -17,7 +17,7 @@ namespace scopes {
 
 struct Function;
 
-SCOPES_RESULT(void) optimize_spirv(std::vector<unsigned int> &result, int opt_level);
+//SCOPES_RESULT(void) optimize_spirv(std::vector<unsigned int> &result, int opt_level);
 SCOPES_RESULT(const String *) compile_spirv(Symbol target, const FunctionRef &fn, uint64_t flags);
 SCOPES_RESULT(const String *) compile_glsl(int version, Symbol target, const FunctionRef &fn, uint64_t flags);
 

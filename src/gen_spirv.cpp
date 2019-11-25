@@ -178,13 +178,12 @@ static void format_spv_location(StyledStream &ss, const char* source,
     ss << ":" << Style_None << " ";
 }
 
-static SCOPES_RESULT(void) verify_spirv(std::vector<unsigned int> &contents) {
+static SCOPES_RESULT(void) verify_spirv(spv_target_env env, std::vector<unsigned int> &contents) {
     SCOPES_RESULT_TYPE(void);
-    spv_target_env target_env = SPV_ENV_UNIVERSAL_1_2;
     //spvtools::ValidatorOptions options;
 
     StyledString ss;
-    spvtools::SpirvTools tools(target_env);
+    spvtools::SpirvTools tools(env);
     tools.SetMessageConsumer([&ss](spv_message_level_t level, const char* source,
                                 const spv_position_t& position,
                                 const char* message) {
@@ -250,6 +249,7 @@ struct SPIRVGenerator {
     bool use_debug_info;
     FunctionRef active_function;
     int functions_generated;
+    spv_target_env env;
 
     spv::Id get_op_ex(Symbol name) {
         auto it = intrinsic_ops.find(name);
@@ -368,12 +368,13 @@ struct SPIRVGenerator {
     }
 #endif
 
-    SPIRVGenerator() :
+    SPIRVGenerator(spv_target_env _env) :
         builder('S' << 24 | 'C' << 16 | 'O' << 8 | 'P', &logger),
         entry_point(nullptr),
         glsl_ext_inst(0),
         use_debug_info(true),
-        functions_generated(0) {
+        functions_generated(0),
+        env(_env) {
         static_init();
         #if 0
         for (int i = 0; i < NumIntrinsics; ++i) {
@@ -2221,8 +2222,9 @@ struct SPIRVGenerator {
         case SYM_TargetFragment: {
             builder.addCapability(spv::CapabilityShader);
             entry_point = builder.addEntryPoint(spv::ExecutionModelFragment, func, "main");
-            execution_modes.insert({ spv::ExecutionModeOriginLowerLeft,
-                 nullptr });
+            // always use UpperLeft, to ensure 1:1 compatibility between vulkan and GL
+            execution_modes.insert({ spv::ExecutionModeOriginUpperLeft,
+                nullptr });
         } break;
         case SYM_TargetGeometry: {
             builder.addCapability(spv::CapabilityShader);
@@ -2253,7 +2255,7 @@ struct SPIRVGenerator {
 
         builder.dump(result);
 
-        SCOPES_CHECK_RESULT(verify_spirv(result));
+        SCOPES_CHECK_RESULT(verify_spirv(env, result));
 
         return {};
     }
@@ -2262,9 +2264,9 @@ struct SPIRVGenerator {
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(void) optimize_spirv(std::vector<unsigned int> &result, int opt_level) {
+SCOPES_RESULT(void) optimize_spirv(spv_target_env env, std::vector<unsigned int> &result, int opt_level) {
     SCOPES_RESULT_TYPE(void);
-    spvtools::Optimizer optimizer(SPV_ENV_UNIVERSAL_1_2);
+    spvtools::Optimizer optimizer(env);
     /*
     optimizer.SetMessageConsumer([](spv_message_level_t level, const char* source,
         const spv_position_t& position,
@@ -2329,7 +2331,7 @@ SCOPES_RESULT(void) optimize_spirv(std::vector<unsigned int> &result, int opt_le
         SCOPES_ERROR(CGenBackendOptimizationFailed);
     }
 
-    SCOPES_CHECK_RESULT(verify_spirv(result));
+    SCOPES_CHECK_RESULT(verify_spirv(env, result));
     return {};
 }
 
@@ -2339,7 +2341,8 @@ SCOPES_RESULT(const String *) compile_spirv(Symbol target, const FunctionRef &fn
 
     //SCOPES_CHECK_RESULT(fn->verify_compilable());
 
-    SPIRVGenerator ctx;
+    const spv_target_env env = SPV_ENV_VULKAN_1_1_SPIRV_1_4;
+    SPIRVGenerator ctx(env);
     if (flags & CF_NoDebugInfo) {
         ctx.use_debug_info = false;
     }
@@ -2347,8 +2350,10 @@ SCOPES_RESULT(const String *) compile_spirv(Symbol target, const FunctionRef &fn
     std::vector<unsigned int> result;
     {
         Timer generate_timer(TIMER_GenerateSPIRV);
-        SCOPES_CHECK_RESULT(ctx.generate(result, target, fn));
+        SCOPES_CHECK_RESULT(
+            ctx.generate(result, target, fn));
     }
+
 
     if (flags & CF_O3) {
         int level = 0;
@@ -2358,7 +2363,7 @@ SCOPES_RESULT(const String *) compile_spirv(Symbol target, const FunctionRef &fn
             level = 2;
         else if ((flags & CF_O3) == CF_O3)
             level = 3;
-        SCOPES_CHECK_RESULT(optimize_spirv(result, level));
+        SCOPES_CHECK_RESULT(optimize_spirv(env, result, level));
     }
 
     if (flags & CF_DumpModule) {
@@ -2379,7 +2384,9 @@ SCOPES_RESULT(const String *) compile_glsl(int version, Symbol target, const Fun
 
     //SCOPES_CHECK_RESULT(fn->verify_compilable());
 
-    SPIRVGenerator ctx;
+    const spv_target_env env = SPV_ENV_OPENGL_4_5;
+
+    SPIRVGenerator ctx(env);
     if (flags & CF_NoDebugInfo) {
         ctx.use_debug_info = false;
     }
@@ -2387,7 +2394,8 @@ SCOPES_RESULT(const String *) compile_glsl(int version, Symbol target, const Fun
     std::vector<unsigned int> result;
     {
         Timer generate_timer(TIMER_GenerateSPIRV);
-        SCOPES_CHECK_RESULT(ctx.generate(result, target, fn));
+        SCOPES_CHECK_RESULT(
+            ctx.generate(result, target, fn));
     }
 
     if (flags & CF_O3) {
@@ -2398,7 +2406,7 @@ SCOPES_RESULT(const String *) compile_glsl(int version, Symbol target, const Fun
             level = 2;
         else if ((flags & CF_O3) == CF_O3)
             level = 3;
-        SCOPES_CHECK_RESULT(optimize_spirv(result, level));
+        SCOPES_CHECK_RESULT(optimize_spirv(env, result, level));
     }
 
     if (flags & CF_DumpDisassembly) {
