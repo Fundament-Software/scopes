@@ -235,17 +235,36 @@ fn finalize-enum-runtime (T storage)
         'set-symbol T '__repr __repr
     else
         let index-type = (sc_integer_type width signed)
+        let numfields = ('argcount field-types)
+        inline drop-default ()
+        inline... drop-any
+        case (arg : Nothing,)
+        case (args...)
+            va-map __drop args...
+            ;
         # build repr function
         spice-quote
             inline __repr (self)
                 let val = (extractvalue self 0)
                 spice-unquote
                     build-repr-switch-case index-type val field-types false
-        # build match function
+            inline __drop (self)
+                #print "dropping option" self
+                '__dispatch self
+                    spice-unquote
+                        sc_argument_list_map_new (numfields + 1)
+                            inline (i)
+                                if (i == numfields)
+                                    # default field
+                                    `drop-default
+                                else
+                                    let field = (('getarg field-types i) as type)
+                                    let name = (('@ field 'Name) as Symbol)
+                                    sc_keyed_new name drop-any
         spice-quote
         'set-symbols T
             __repr = __repr
-        let numfields = ('argcount field-types)
+            __drop = __drop
         let fields = (alloca-array type numfields)
         for i in (range numfields)
             let field = (('getarg field-types i) as type)

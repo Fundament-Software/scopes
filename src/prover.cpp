@@ -2881,7 +2881,7 @@ repeat:
                     ctx.move(uq->id, call);
                 }
                 auto op = PtrToRef::from(_T);
-                if (is_movable(T)) {
+                if (is_unique(T)) {
                     op->hack_change_value(UNIQUETYPE1(op->get_type()));
                 } else {
                     op->hack_change_value(VIEWTYPE1(op->get_type(), _T));
@@ -2902,7 +2902,7 @@ repeat:
                     ctx.move(uq->id, call);
                 }
                 auto op = RefToPtr::from(_T);
-                if (is_movable(T)) {
+                if (is_unique(T)) {
                     op->hack_change_value(UNIQUETYPE1(op->get_type()));
                 } else {
                     op->hack_change_value(VIEWTYPE1(op->get_type(), _T));
