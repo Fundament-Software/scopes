@@ -405,6 +405,25 @@ sugar dispatch (value)
         default
             error "missing default case"
 
+run-stage;
+
+@@ memo
+inline Option (T)
+    enum (.. "Option<" (tostring T) ">")
+        None
+        Some : T
+
+        inline... __typecall
+        case (cls : type,)
+            this-type.None;
+        case (cls : type, value)
+            this-type.Some value
+
+        inline __rimply (other-cls cls)
+            static-if (imply? other-cls T)
+                inline (self)
+                    this-type.Some self
+
 do
-    let enum dispatch Enum
+    let enum dispatch Enum Option
     locals;
