@@ -6974,10 +6974,7 @@ fn constructor (cls args...)
                 "field is already initialized"
         let ET = (sc_type_element_at cls k)
         let ET = (sc_strip_qualifiers ET)
-        let v =
-            if (('pointer? ET) and ('refer? ('qualified-typeof v)))
-                `(imply (reftoptr v) ET)
-            else ('tag `(imply v ET) ('anchor arg))
+        let v = ('tag `(imply v ET) ('anchor arg))
         store v (getelementptr fields k)
         i + 1
     let block = (sc_expression_new)

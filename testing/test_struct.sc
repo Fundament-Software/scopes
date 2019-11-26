@@ -94,8 +94,8 @@ fn test-direct-self-reference ()
         dump this-type.__fields__
 
     local cell3 = (Cell 3 null)
-    local cell2 = (Cell 2 cell3)
-    local cell1 = (Cell 1 cell2)
+    local cell2 = (Cell 2 &cell3)
+    local cell1 = (Cell 1 &cell2)
 
     test
         cell1.next.next.at == 3
@@ -116,8 +116,8 @@ do
         next : CellPtr
 
     local cell3 = (Cell 3 null)
-    local cell2 = (Cell 2 cell3)
-    local cell1 = (Cell 1 cell2)
+    local cell2 = (Cell 2 &cell3)
+    local cell1 = (Cell 1 &cell2)
 
     test
         cell1.next.next.at == 3
@@ -221,6 +221,18 @@ do
     test ('writable? ptr)
 
 
+do
+    unlet T
+    struct T plain
+        tmp : i32
 
+    local k : (mutable pointer T)
+
+    struct Q plain
+        pT : (mutable pointer T)
+
+    local m =
+        Q
+            pT = k
 
 none
