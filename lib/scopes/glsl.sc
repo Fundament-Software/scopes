@@ -490,7 +490,9 @@ do
 
         gl_FragCoord = (ptrtoref (extern 'spirv.FragCoord vec4 (storage-class = 'Input)))
         gl_VertexID = (ptrtoref (extern 'spirv.VertexId i32 (storage-class = 'Input)))
+        gl_VertexIndex = (ptrtoref (extern 'spirv.VertexIndex i32 (storage-class = 'Input)))
         gl_InstanceID = (ptrtoref (extern 'spirv.InstanceId i32 (storage-class = 'Input)))
+        gl_InstanceIndex = (ptrtoref (extern 'spirv.InstanceIndex i32 (storage-class = 'Input)))
 
         gl_NumWorkGroups = (ptrtoref (extern 'spirv.NumWorkgroups uvec3 (storage-class = 'Input)))
         gl_WorkGroupID = (ptrtoref (extern 'spirv.WorkgroupId uvec3 (storage-class = 'Input)))
