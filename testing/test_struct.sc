@@ -198,7 +198,8 @@ do
 
     let val =
         Top
-            Sub 1 2
+            # constructor arguments without passing the type
+            typeinit 1 2
             3
 
     print val.x val.y val.z

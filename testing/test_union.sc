@@ -1,5 +1,6 @@
 
 using import struct
+using import testing
 
 do
     struct K union
@@ -9,12 +10,12 @@ do
     local x = (K)
 
     x.vals = (arrayof u8 0xa0 0xb0 0xc0 0xd0)
-    assert
+    test
         x.key == 0xd0c0b0a0:u32
 
     let x = (K)
-    assert (x.key == 0:u32)
-    assert ((x.vals @ 0) == 0:u8)
+    test (x.key == 0:u32)
+    test ((x.vals @ 0) == 0:u8)
 
 do
     # union within a struct
@@ -29,9 +30,32 @@ do
 
     local leaf = (Leaf)
     leaf.color.c = (arrayof u8 0xa0 0xb0 0xc0 0xd0)
-    assert
+    test
         leaf.color.rgba == 0xd0c0b0a0:u32
 
+do
+    # support for initializing member
+    struct U union
+        xy : (array f32 2)
+        field unnamed
+            struct "" plain
+                x : f32
+                y : f32
+
+    local u =
+        U
+            xy = (arrayof f32 123 321)
+    test (u.xy @ 0 == 123)
+    test (u.xy @ 1 == 321)
+    local u =
+        U
+            # not passing a key, so it's assigned to the unnamed field
+            # note how we use typeinit to get around the unnamed struct type
+            typeinit
+                x = 456.0
+                y = 654.0
+    test (u.xy @ 0 == 456.0)
+    test (u.xy @ 1 == 654.0)
 
 do
     # support for unnamed field access in plain unions

@@ -7185,8 +7185,16 @@ fn nested-union-field-accessor (qcls name)
 #-------------------------------------------------------------------------------
 
 typedef+ CUnion
-    inline __typecall (cls)
-        nullof cls
+    inline __typecall (cls value...)
+        local self = (nullof cls)
+        static-if (va-empty? value...)
+            # keep as-is
+        else
+            # initialize member
+            let key = (keyof value...)
+            let content = value...
+            (getattr self key) = content
+        self
 
     spice __getattr (self name)
         let op = (nested-union-field-accessor ('qualified-typeof self) (name as Symbol))
