@@ -438,8 +438,28 @@ inline Option (T)
         case (cls : type, value)
             this-type.Some value
 
+        inline __tobool (self)
+            dispatch self
+            case None () false
+            default true
+
+        inline pop (self f)
+            dispatch self
+            case Some (value)
+                let value = (dupe (deref value))
+                assign (this-type.None) self
+                f value
+            default;
+
+        inline __imply (cls other-cls)
+            static-if (T == bool)
+                __tobool
+
         inline __rimply (other-cls cls)
-            static-if (imply? other-cls T)
+            static-if (other-cls == Nothing)
+                inline ()
+                    this-type.None;
+            else (imply? other-cls T)
                 inline (self)
                     this-type.Some self
 
