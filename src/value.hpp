@@ -1200,16 +1200,23 @@ struct Function : Pure {
 struct ConstInt : Const {
     static bool classof(const Value *T);
 
-    ConstInt(const Type *type, uint64_t value);
+    ConstInt(const Type *type, const std::vector<uint64_t> &value);
 
     bool key_equal(const ConstInt *other) const;
     std::size_t hash() const;
 
     static ConstIntRef from(const Type *type, uint64_t value);
+    static ConstIntRef from(const Type *type, std::vector<uint64_t> value);
     static ConstIntRef symbol_from(Symbol value);
     static ConstIntRef builtin_from(Builtin value);
 
-    uint64_t value;
+    std::vector<uint64_t> words;
+
+    // return most significant word
+    uint64_t msw() const;
+
+    // assert and return single word
+    uint64_t value() const;
 };
 
 //------------------------------------------------------------------------------

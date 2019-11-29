@@ -257,6 +257,7 @@ SCOPES_LIBEXPORT sc_valueref_t sc_loop_arguments(sc_valueref_t loop);
 SCOPES_LIBEXPORT void sc_loop_set_body(sc_valueref_t loop, sc_valueref_t body);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_const_int_new(const sc_type_t *type, uint64_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_const_int_words_new(const sc_type_t *type, int numwords, uint64_t *words);
 SCOPES_LIBEXPORT sc_valueref_t sc_const_real_new(const sc_type_t *type, double value);
 SCOPES_LIBEXPORT sc_valueref_t sc_const_aggregate_new(const sc_type_t *type, int numconsts, sc_valueref_t *consts);
 SCOPES_LIBEXPORT sc_valueref_t sc_const_pointer_new(const sc_type_t *type, const void *pointer);

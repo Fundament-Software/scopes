@@ -469,6 +469,9 @@ formatters:
     T(RTIllegalSupertype, \
         "runtime: typename %0 can not be a supertype because it is not opaque", \
         PType) \
+    T(RTTypeBitcountMismatch, \
+        "runtime: provided word count (%1) does not match word count of type %0 (%2)", \
+        PType, int, int) \
 
 // main
 #define SCOPES_MAIN_ERROR_KIND() \

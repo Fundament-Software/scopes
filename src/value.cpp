@@ -680,7 +680,7 @@ PureRef PureCast::from(const Type *type, PureRef value) {
         switch (value->kind()) {
         case VK_ConstInt: {
             auto node = value.cast<ConstInt>();
-            result = ConstInt::from(type, node->value);
+            result = ConstInt::from(type, node->words);
         } break;
         case VK_ConstReal: {
             auto node = value.cast<ConstReal>();
@@ -1296,7 +1296,7 @@ static const Type *get_element_pointer_type(const Type *T, const TypedValues &in
         case TK_Tuple: {
             auto ti = cast<TupleType>(ST);
             assert(indices[i].isa<ConstInt>());
-            auto idx = indices[i].cast<ConstInt>()->value;
+            auto idx = indices[i].cast<ConstInt>()->msw();
             T = type_key(ti->type_at_index(idx).assert_ok())._1;
         } break;
         default: {
@@ -1624,25 +1624,60 @@ struct ConstSet {
 
 static ConstSet<ConstInt> constints;
 
-ConstInt::ConstInt(const Type *type, uint64_t _value)
-    : Const(VK_ConstInt, type), value(_value) {
+ConstInt::ConstInt(const Type *type, const std::vector<uint64_t> &_value)
+    : Const(VK_ConstInt, type), words(_value) {
+    assert(!_value.empty());
 }
 
 bool ConstInt::key_equal(const ConstInt *other) const {
-    return get_type() == other->get_type()
-        && value == other->value;
+    if (get_type() != other->get_type())
+        return false;
+    if (words.size() != other->words.size())
+        return false;
+    for (size_t i = 0; i < words.size(); ++i) {
+        if (words[i] != other->words[i])
+            return false;
+    }
+    return true;
 }
 
 std::size_t ConstInt::hash() const {
-    return hash2(std::hash<const Type *>{}(get_type()), std::hash<uint64_t>{}(value));
+    auto h = std::hash<const Type *>{}(get_type());
+    for (size_t i = 0; i < words.size(); ++i) {
+        h = hash2(h, std::hash<uint64_t>{}(words[i]));
+    }
+    return h;
 }
 
-ConstIntRef ConstInt::from(const Type *type, uint64_t value) {
+uint64_t ConstInt::value() const {
+    return words[0];
+}
+
+uint64_t ConstInt::msw() const {
+    return words.back();
+}
+
+ConstIntRef ConstInt::from(const Type *type, std::vector<uint64_t> values) {
     auto T = cast<IntegerType>(storage_type(type).assert_ok());
     // truncate value
     auto w = T->width;
     auto issigned = T->issigned;
-    if (w < 64) {
+    auto numwords = (w + 63) / 64;
+    if (values.size() > numwords) {
+        // truncate
+        values.resize(numwords);
+    } else {
+        // pad
+        uint64_t val = (!issigned || (int64_t(values.back()) >= 0ll))?0ull:-1ull;
+        while (values.size() < numwords) {
+            values.push_back(val);
+        }
+    }
+    assert(values.size() == numwords);
+    if (w % 64 != 0) {
+        w = w % 64;
+        // mask tail
+        auto &&value = values[numwords - 1];
         if (issigned) {
             int64_t intval = value;
             int shift = 64 - w;
@@ -1652,7 +1687,12 @@ ConstIntRef ConstInt::from(const Type *type, uint64_t value) {
             value = value & ~(-1ull << w);
         }
     }
-    return constints.from(type, value);
+    return constints.from(type, values);
+}
+
+ConstIntRef ConstInt::from(const Type *type, uint64_t value) {
+    std::vector<uint64_t> values = { value };
+    return from(type, values);
 }
 
 ConstIntRef ConstInt::symbol_from(Symbol value) {

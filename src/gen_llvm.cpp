@@ -2131,7 +2131,9 @@ struct LLVMIRGenerator {
     SCOPES_RESULT(LLVMValueRef) ConstInt_to_value(const ConstIntRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto T = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
-        return LLVMConstInt(T, node->value, false);
+        return LLVMConstIntOfArbitraryPrecision(T,
+                                              node->words.size(),
+                                              &node->words[0]);
     }
 
     SCOPES_RESULT(LLVMValueRef) ConstReal_to_value(const ConstRealRef &node) {
@@ -2556,7 +2558,7 @@ struct LLVMIRGenerator {
                 auto key = it._0.cast<Const>();
                 auto val = it._1;
                 if (key->get_type() == TYPE_Symbol) {
-                    Symbol name = Symbol::wrap(key.cast<ConstInt>()->value);
+                    Symbol name = Symbol::wrap(key.cast<ConstInt>()->value());
                     FunctionRef fn = SCOPES_GET_RESULT(extract_function_constant(val));
                     func_export_table.insert({fn.unref(), name});
                     LLVMValueRef func = SCOPES_GET_RESULT(ref_to_value(ValueIndex(fn)));

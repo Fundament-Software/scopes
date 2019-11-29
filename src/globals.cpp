@@ -1518,6 +1518,15 @@ sc_valueref_t sc_const_int_new(const sc_type_t *type, uint64_t value) {
     using namespace scopes;
     return ConstInt::from(type, value);
 }
+sc_valueref_t sc_const_int_words_new(const sc_type_t *type, int numwords, uint64_t *words) {
+    using namespace scopes;
+    std::vector<uint64_t> values;
+    values.resize(numwords);
+    for (int i = 0; i < numwords; ++i) {
+        values[i] = words[i];
+    }
+    return ConstInt::from(type, values);
+}
 sc_valueref_t sc_const_real_new(const sc_type_t *type, double value) {
     using namespace scopes;
     return ConstReal::from(type, value);
@@ -1538,7 +1547,7 @@ sc_valueref_raises_t sc_const_null_new(const sc_type_t *type) {
 }
 uint64_t sc_const_int_extract(const sc_valueref_t value) {
     using namespace scopes;
-    return value.cast<ConstInt>()->value;
+    return value.cast<ConstInt>()->msw();
 }
 double sc_const_real_extract(const sc_valueref_t value) {
     using namespace scopes;
@@ -2227,6 +2236,7 @@ void init_globals(int argc, char *argv[]) {
 
     const Type *rawstring = native_ro_pointer_type(TYPE_I8);
     const Type *TYPE_ValuePP = native_ro_pointer_type(TYPE_ValueRef);
+    const Type *TYPE_U64PP = native_ro_pointer_type(TYPE_U64);
     const Type *_void = empty_arguments_type();
     const Type *voidstar = native_ro_pointer_type(_void);
 
@@ -2321,6 +2331,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_loop_arguments, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_loop_set_body, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_new, TYPE_ValueRef, TYPE_Type, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_int_words_new, TYPE_ValueRef, TYPE_Type, TYPE_I32, TYPE_U64PP);
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_ValueRef, TYPE_Type, TYPE_F64);
     DEFINE_EXTERN_C_FUNCTION(sc_const_aggregate_new, TYPE_ValueRef, TYPE_Type, TYPE_I32, TYPE_ValuePP);
     DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_new, TYPE_ValueRef, TYPE_Type, voidstar);

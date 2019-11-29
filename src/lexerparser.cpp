@@ -504,11 +504,11 @@ SCOPES_RESULT(bool) LexerParser::select_integer_suffix() {
     else if (is_suffix(":usize")) { newtype = TYPE_USize; }
     else if (is_suffix(":f32")) {
         value = ref(value.anchor(),
-            ConstReal::from(TYPE_F32, (int64_t)value.cast<ConstInt>()->value));
+            ConstReal::from(TYPE_F32, (int64_t)value.cast<ConstInt>()->value()));
         return true;
     } else if (is_suffix(":f64")) {
         value = ref(value.anchor(),
-            ConstReal::from(TYPE_F64, (int64_t)value.cast<ConstInt>()->value));
+            ConstReal::from(TYPE_F64, (int64_t)value.cast<ConstInt>()->value()));
         return true;
     } else {
         SCOPES_TRACE_PARSER(this->anchor());
@@ -516,7 +516,7 @@ SCOPES_RESULT(bool) LexerParser::select_integer_suffix() {
             String::from(string, string_len));
     }
     value = ref(value.anchor(),
-        ConstInt::from(newtype, value.cast<ConstInt>()->value));
+        ConstInt::from(newtype, value.cast<ConstInt>()->value()));
     return true;
 }
 

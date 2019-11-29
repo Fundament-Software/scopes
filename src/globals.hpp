@@ -15,6 +15,7 @@ namespace scopes {
     T(g_none, "none") \
     T(g_sc_const_pointer_new, "sc_const_pointer_new") \
     T(g_sc_const_int_new, "sc_const_int_new") \
+    T(g_sc_const_int_words_new, "sc_const_int_words_new") \
     T(g_sc_const_real_new, "sc_const_real_new") \
     T(g_sc_const_aggregate_new, "sc_const_aggregate_new") \
     T(g_deref, "deref") \
@@ -35,6 +36,7 @@ namespace scopes {
     T(g_sext, "sext") \
     T(g_u64, "u64") \
     T(g_f64, "f64") \
+    T(g_alloca, "alloca") \
     T(g_alloca_array, "alloca-array") \
     T(g_sc_scope_new, "sc_scope_new") \
     T(g_sc_scope_new_subscope, "sc_scope_new_subscope") \

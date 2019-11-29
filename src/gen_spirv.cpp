@@ -2038,7 +2038,7 @@ struct SPIRVGenerator {
         //auto T = SCOPES_GET_RESULT(type_to_spirv_type(node->get_type()));
         auto it = cast<IntegerType>(TT);
         if (it->issigned) {
-            int64_t value = node->value;
+            int64_t value = node->msw();
             switch(it->width) {
             case 8: return builder.makeIntConstant(
                 builder.makeIntegerType(8, true), value);
@@ -2049,7 +2049,7 @@ struct SPIRVGenerator {
             default: break;
             }
         } else {
-            uint64_t value = node->value;
+            uint64_t value = node->msw();
             switch(it->width) {
             case 1: return builder.makeBoolConstant(value);
             case 8: return builder.makeIntConstant(

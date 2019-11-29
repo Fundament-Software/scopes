@@ -152,7 +152,7 @@ std::vector<Symbol> Scope::find_closest_match(Symbol name) const {
             for (size_t i = 0; i < count; ++i) {
                 auto &&key = self->map->keys[i];
                 if (key->get_type() == TYPE_Symbol) {
-                    Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value);
+                    Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value());
                     if (!done.count(sym)) {
                         auto &&value = self->map->values[i];
                         if (value.value) {
@@ -172,7 +172,7 @@ std::vector<Symbol> Scope::find_closest_match(Symbol name) const {
         } else if (!self->is_header()) {
             auto &&key = self->name;
             if (key->get_type() == TYPE_Symbol) {
-                Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value);
+                Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value());
                 if (!done.count(sym)) {
                     if (self->value) {
                         size_t dist = distance(s, sym.name());
@@ -205,7 +205,7 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
             for (size_t i = 0; i < count; ++i) {
                 auto &&key = self->map->keys[i];
                 if (key->get_type() == TYPE_Symbol) {
-                    Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value);
+                    Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value());
                     if (!done.count(sym)) {
                         auto &&value = self->map->values[i];
                         if (value.value) {
@@ -221,7 +221,7 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
         } else if (!self->is_header()) {
             auto &&key = self->name;
             if (key->get_type() == TYPE_Symbol) {
-                Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value);
+                Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value());
                 if (!done.count(sym)) {
                     if (self->value) {
                         if (sym.name()->count >= s->count &&

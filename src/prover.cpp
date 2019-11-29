@@ -1506,20 +1506,20 @@ SCOPES_RESULT(const String *) extract_string_constant(const ValueRef &value) {
 SCOPES_RESULT(Builtin) extract_builtin_constant(const ValueRef &value) {
     SCOPES_RESULT_TYPE(Builtin);
     ConstIntRef x = SCOPES_GET_RESULT(extract_typed_constant<ConstInt>(TYPE_Builtin, value));
-    return Builtin((KnownSymbol)x->value);
+    return Builtin((KnownSymbol)x->value());
 }
 
 SCOPES_RESULT(Symbol) extract_symbol_constant(const ValueRef &value) {
     SCOPES_RESULT_TYPE(Symbol);
     ConstIntRef x = SCOPES_GET_RESULT(extract_typed_constant<ConstInt>(TYPE_Symbol, value));
-    return Symbol::wrap(x->value);
+    return Symbol::wrap(x->value());
 }
 
 SCOPES_RESULT(uint64_t) extract_integer_constant(const ValueRef &value) {
     SCOPES_RESULT_TYPE(uint64_t);
     auto val = extract_constant<ConstInt, VK_ConstInt>(value);
     ConstIntRef x = SCOPES_GET_RESULT(val);
-    return x->value;
+    return x->value();
 }
 
 SCOPES_RESULT(ConstAggregateRef) extract_vector_constant(const ValueRef &value) {
@@ -2659,7 +2659,7 @@ repeat:
             std::vector<uint32_t> outmask;
             outmask.reserve(outcount);
             for (size_t i = 0; i < outcount; ++i) {
-                auto k = cast<ConstInt>(mask->values[i])->value;
+                auto k = cast<ConstInt>(mask->values[i])->msw();
                 SCOPES_CHECK_RESULT(verify_range(k, incount));
                 outmask.push_back(k);
             }

@@ -544,10 +544,32 @@ ValueRef wrap_value(const Type *T, const ValueRef &value) {
         } break;
         case TK_Integer: {
             auto ti = cast<IntegerType>(ST);
-            return REF(CallTemplate::from(g_sc_const_int_new, {
-                    REF(ConstPointer::type_from(T)),
-                    REF(CallTemplate::from(ti->issigned?g_sext:g_zext, { value,
-                    g_u64 })) }));
+            if (ti->width <= 64ull) {
+                return REF(CallTemplate::from(g_sc_const_int_new, {
+                        REF(ConstPointer::type_from(T)),
+                        REF(CallTemplate::from(ti->issigned?g_sext:g_zext, { value,
+                        g_u64 })) }));
+            } else {
+                // big integer
+                auto targettype = local_ro_pointer_type(TYPE_U64);
+                auto result = REF(Expression::unscoped_from());
+                auto mem = REF(CallTemplate::from(g_alloca, {
+                        REF(ConstPointer::type_from(T))
+                    }));
+                result->append(mem);
+                result->append(REF(CallTemplate::from(g_store, { value, mem })));
+                auto castmem =
+                    REF(CallTemplate::from(g_bitcast, { mem,
+                        REF(ConstPointer::type_from(targettype)) }));
+                result->append(castmem);
+                size_t numwords = (ti->width + 63ull) / 64ull;
+                result->append(REF(CallTemplate::from(g_sc_const_int_words_new, {
+                        REF(ConstPointer::type_from(T)),
+                        REF(ConstInt::from(TYPE_I32, numwords)),
+                        castmem
+                    })));
+                return result;
+            }
         } break;
         case TK_Real: {
             //auto ti = cast<RealType>(ST);

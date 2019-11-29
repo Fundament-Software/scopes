@@ -294,7 +294,7 @@ HANDLER(Call) {
     bool is_annotation = false;
     auto ptr = node->callee.dyn_cast<ConstInt>();
     if (ptr && (ptr->get_type() == TYPE_Builtin)
-        && (Symbol::wrap(ptr->value) == FN_Annotate)) {
+        && (Symbol::wrap(ptr->value()) == FN_Annotate)) {
         is_annotation = true;
     }
 
@@ -660,7 +660,7 @@ void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool nak
     if (naked && it->at.isa<ConstInt>()) {
         auto ci = it->at.cast<ConstInt>();
         if ((ci->get_type() == TYPE_Symbol)
-            && (Symbol::wrap(ci->value) == FN_Annotate)) {
+            && (Symbol::wrap(ci->value()) == FN_Annotate)) {
             ss << Style_Comment << "#" << Style_None;
             it = it->next;
             while (it) {
@@ -782,18 +782,22 @@ void walk(const ValueRef &e, int depth, int maxdepth, bool naked, bool types) {
             auto val = e.cast<ConstInt>();
             auto T = val->get_type();
             if ((T == TYPE_Builtin) || (T == TYPE_Symbol)) {
-                ss << Symbol::wrap(val->value);
+                ss << Symbol::wrap(val->value());
             } else {
                 auto TT = dyn_cast<IntegerType>(storage_type(T).assert_ok());
                 if (!TT) {
                     stream_illegal_value_type("ConstInt");
                 } else if (TT == TYPE_Bool) {
-                    ss << (bool)val->value;
+                    ss << (bool)val->value();
                 } else {
                     if (TT->issigned) {
-                        ss << (int64_t)val->value;
+                        ss << (int64_t)val->msw();
+                        if (val->words.size() > 1)
+                            ss << "...";
                     } else {
-                        ss << val->value;
+                        ss << val->msw();
+                        if (val->words.size() > 1)
+                            ss << "...";
                     }
                 }
             }

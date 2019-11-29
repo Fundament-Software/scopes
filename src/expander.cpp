@@ -55,7 +55,7 @@ static SCOPES_RESULT(void) verify_list_parameter_count(const char *context, cons
 static Symbol try_extract_symbol(const ValueRef &node) {
     auto ptr = node.dyn_cast<ConstInt>();
     if (ptr && (ptr->get_type() == TYPE_Symbol))
-        return Symbol::wrap(ptr->value);
+        return Symbol::wrap(ptr->value());
     return SYM_Unnamed;
 }
 
