@@ -48,16 +48,18 @@ do
     case (a : f32, b : f32)
         fdiv a b
     case (a : i32, b : i32)
-        div2 (f32 a) (f32 b)
+        this-function (f32 a) (f32 b)
     case (a : i32, b : f32)
-        div2 (f32 a) b
+        this-function (f32 a) b
     case (a : f32, b : i32)
-        div2 a (f32 b)
+        this-function a (f32 b)
 
-    test ((div2 4.0 2.0) == 2.0)
-    test ((div2 4   2  ) == 2.0)
-    test ((div2 4.0 2  ) == 2.0)
-    test ((div2 4   2.0) == 2.0)
+    fn unconst (x) x
+
+    test ((div2 (unconst 4.0) (unconst 2.0)) == 2.0)
+    test ((div2 (unconst 4  ) (unconst 2  )) == 2.0)
+    test ((div2 (unconst 4.0) (unconst 2  )) == 2.0)
+    test ((div2 (unconst 4  ) (unconst 2.0)) == 2.0)
 
 
 false

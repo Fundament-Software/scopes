@@ -5815,10 +5815,7 @@ sugar fn... (name...)
                 typename [(fn-name as string)] OverloadedFunction
     let bodyscope = (Scope sugar-scope)
     let bodyscope =
-        sugar-match name...
-        case (name as Symbol;)
-            'bind bodyscope fn-name outtype
-        default bodyscope
+        'bind bodyscope 'this-function outtype
     loop (next outargs = next-expr (sc_argument_list_new 0 null))
         let next-anchor =
             if (empty? next) unknown-anchor
