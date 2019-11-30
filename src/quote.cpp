@@ -461,10 +461,39 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
             }));
     } break;
     case TK_Integer: {
-        return REF(CallTemplate::from(g_itrunc, {
-                REF(CallTemplate::from(g_sc_const_int_extract, { value })),
-                REF(ConstPointer::type_from(T))
-            }));
+        auto ti = cast<IntegerType>(ST);
+        if (ti->width <= 64ull) {
+            return REF(CallTemplate::from(g_itrunc, {
+                    REF(CallTemplate::from(g_sc_const_int_extract, { value })),
+                    REF(ConstPointer::type_from(T))
+                }));
+        } else {
+            // big integer
+            auto result = REF(Expression::unscoped_from());
+            size_t numwords = (ti->width + 63ull) / 64ull;
+            auto mem = REF(CallTemplate::from(g_alloca_array, {
+                    REF(ConstPointer::type_from(TYPE_U64)),
+                    REF(ConstInt::from(TYPE_I32, numwords)),
+                }));
+            result->append(mem);
+            for (size_t i = 0; i < numwords; ++i) {
+                auto word = REF(CallTemplate::from(g_sc_const_int_extract_word, {
+                    value,
+                    REF(ConstInt::from(TYPE_I32, i)),
+                }));
+                result->append(word);
+                auto ptr = REF(CallTemplate::from(g_getelementptr, { mem,
+                    REF(ConstInt::from(TYPE_I32, i)) }));
+                result->append(ptr);
+                result->append(REF(CallTemplate::from(g_store, { word, ptr })));
+            }
+            auto castmem =
+                REF(CallTemplate::from(g_bitcast, { mem,
+                    REF(ConstPointer::type_from((local_ro_pointer_type(T)))) }));
+            result->append(castmem);
+            result->append(REF(CallTemplate::from(g_load, { castmem })));
+            return result;
+        }
     } break;
     case TK_Real: {
         return REF(CallTemplate::from(g_fptrunc, {

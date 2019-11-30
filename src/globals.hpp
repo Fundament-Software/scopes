@@ -27,6 +27,7 @@ namespace scopes {
     T(g_extractelement, "extractelement") \
     T(g_getelementref, "getelementref") \
     T(g_store, "store") \
+    T(g_load, "load") \
     T(g_move, "move") \
     T(g_view, "view") \
     T(g_copy, "copy") \
@@ -47,6 +48,7 @@ namespace scopes {
     T(g_itrunc, "itrunc") \
     T(g_sc_const_pointer_extract, "sc_const_pointer_extract") \
     T(g_sc_const_int_extract, "sc_const_int_extract") \
+    T(g_sc_const_int_extract_word, "sc_const_int_extract_word") \
     T(g_sc_const_real_extract, "sc_const_real_extract") \
     T(g_sc_const_extract_at, "sc_const_extract_at") \
     /*T(g_undef, "undef")*/ \
