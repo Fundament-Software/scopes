@@ -443,13 +443,10 @@ inline Option (T)
             case None () false
             default true
 
-        inline swap (self swapf)
-            dispatch self
-            case Some (value)
-                let value = (deref (dupe value))
-                assign (imply (swapf value) this-type) self
-            default
-                assign (imply (swapf) this-type) self
+        inline swap (self newvalue)
+            let value = (deref (dupe self))
+            assign (imply newvalue this-type) self
+            value
 
         inline __imply (cls other-cls)
             static-if (T == bool)
