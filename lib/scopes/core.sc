@@ -3378,10 +3378,6 @@ define-infix> 800 .
 define-infix> 800 @
 define-infix> 800 <-
 
-inline char (s)
-    let s sz = (sc_string_buffer s)
-    load s
-
 # (va-option key args... else-body)
 let va-option =
     sugar-macro
@@ -3634,12 +3630,13 @@ let incomplete = (typename "incomplete")
 
 run-stage; # 6
 
+let question-mark-char = 63:i8 # "?"
 fn make-module-path (pattern name)
     let sz = (countof pattern)
     loop (i start result = 0:usize 0:usize "")
         if (i == sz)
             return (.. result (rslice pattern start))
-        if ((@ pattern i) != (char "?"))
+        if ((@ pattern i) != question-mark-char)
             repeat (i + 1:usize) start result
         else
             repeat (i + 1:usize) (i + 1:usize)
@@ -3689,19 +3686,21 @@ fn exec-module (expr eval-scope)
                     fptr;
             break result
 
+let slash-char = 47:i8 # "/"
+let backslash-char = 92:i8 # "\"
 fn dots-to-slashes (pattern)
     let sz = (countof pattern)
     loop (i start result = 0:usize 0:usize "")
         if (i == sz)
             return (.. result (rslice pattern start))
         let c = (@ pattern i)
-        if (c == (char "/"))
+        if (c == slash-char)
             error
                 .. "no slashes permitted in module name: " pattern
-        elseif (c == (char "\\"))
+        elseif (c == backslash-char)
             error
                 .. "no slashes permitted in module name: " pattern
-        elseif (c != (char "."))
+        elseif (c != dot-char)
             repeat (i + 1:usize) start result
         elseif (icmp== (i + 1:usize) sz)
             error
@@ -3746,7 +3745,7 @@ fn load-module (module-name module-path opts...)
 fn patterns-from-namestr (base-dir namestr)
     # if namestr starts with a slash (because it started with a dot),
         we only search base-dir
-    if ((@ namestr 0:usize) == (char "/"))
+    if ((@ namestr 0:usize) == slash-char)
         list
             .. base-dir "?.sc"
             .. base-dir "?/init.sc"
@@ -3812,7 +3811,7 @@ let import =
                 loop (i start = start start)
                     if (i == sz)
                         return (Symbol (slice namestr start i))
-                    if ((@ namestr i) == (char "."))
+                    if ((@ namestr i) == dot-char)
                         if (i == start)
                             repeat (add i 1:usize) (add i 1:usize)
                     repeat (add i 1:usize) start
@@ -7413,6 +7412,7 @@ fn print-version ()
     print "Executable path:" compiler-path
     exit 0
 
+let minus-char = 45:i8 # "-"
 fn run-main ()
     let argc argv = (launch-args)
     let exename = (load (getelementptr argv 0))
@@ -7428,7 +7428,7 @@ fn run-main ()
             let k = (i + 1)
             let arg = (load (getelementptr argv i))
             let arg = (sc_string_new_from_cstr arg)
-            if ((load parse-options) and ((@ arg 0:usize) == (char "-")))
+            if ((load parse-options) and ((@ arg 0:usize) == minus-char))
                 if ((arg == "--help") or (arg == "-h"))
                     print-help exename
                 elseif ((== arg "--version") or (== arg "-v"))

@@ -122,6 +122,27 @@ inline decoder (coll)
     static-if (none? coll) _decoder
     else (_decoder coll)
 
+spice char (value)
+    using import itertools
+    let value =
+        match ('typeof value)
+        case Symbol (value as Symbol as string)
+        default (value as string)
+    local result = 0:i32
+    local stored = false
+    ->> value decoder
+        map
+            inline (cp)
+                if (cp < 0)
+                    error "illegal byte in UTF-8 stream"
+                if stored
+                    error "string contains more than one UTF-8 character"
+                result = cp
+                stored = true
+                ;
+        drain
+    result
+
 do
-    let encoder decoder
+    let encoder decoder char
     locals;

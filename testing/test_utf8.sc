@@ -40,3 +40,6 @@ let dststr =
 
 print dststr
 test (dststr == srcstr)
+
+
+print (UTF-8.char "?")
