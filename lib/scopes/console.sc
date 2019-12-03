@@ -22,7 +22,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
             if (i == len)
                 return s
             let c = (@ s i)
-            if (c != (char " "))
+            if (c != 32:i8)
                 let s = (sc_string_buffer s)
                 return (sc_string_new s i)
             repeat (i + 1:usize)
@@ -32,7 +32,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
         loop (i = 0:usize)
             if (i == len)
                 return true
-            if ((@ s i) != (char " "))
+            if ((@ s i) != 32:i8)
                 return false
             repeat (i + 1:usize)
 
@@ -139,7 +139,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
             let slen = (countof s)
             if (slen == 0:usize) false
             else
-                (@ s (slen - 1:usize)) == (char " ")
+                (@ s (slen - 1:usize)) == 32:i8
         let enter-multiline = (endswith-blank cmd)
         let terminated? =
             (blank? cmd) or
