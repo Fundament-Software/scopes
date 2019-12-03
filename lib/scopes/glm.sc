@@ -30,15 +30,20 @@ typedef vec-type < immutable
 typedef mat-type < immutable
 
 @@ memo
-inline construct-vec-type (element-type size)
+inline construct-gvec-type (size)
     static-assert ((typeof size) == i32)
     static-assert (size > 1)
+    typedef (.. "gvec" (tostring size)) < vec-type
+        let Count = size
+
+@@ memo
+inline construct-vec-type (element-type size)
+    let gvec-type = (construct-gvec-type size)
     let prefix = (element-prefix element-type)
+    let size = gvec-type.Count
     let VT = (vector element-type size)
-    typedef (.. prefix "vec" (tostring size)) < vec-type : VT
-        let
-            ElementType = element-type
-            Count = size
+    typedef (.. prefix "vec" (tostring size)) < gvec-type : VT
+        let ElementType = element-type
 
 inline construct-mat-type (element-type cols rows)
     static-assert ((typeof cols) == i32)
@@ -83,6 +88,10 @@ inline construct-mat-types (cols rows)
         construct-mat-type i32 cols rows
         construct-mat-type u32 cols rows
         construct-mat-type bool cols rows
+
+let gvec2 = (construct-gvec-type 2)
+let gvec3 = (construct-gvec-type 3)
+let gvec4 = (construct-gvec-type 4)
 
 let vec2 dvec2 ivec2 uvec2 bvec2 = (construct-vec-types 2)
 let vec3 dvec3 ivec3 uvec3 bvec3 = (construct-vec-types 3)
@@ -259,15 +268,16 @@ typedef+ vec-type
         / ((typeof self) 1) self
 
     fn do-rimply (vT T static?)
-        let ET = ('element@ T 0)
-        # can we cast vT to ET?
-        let conv = (imply-converter vT ET static?)
-        if (operator-valid? conv)
-            let sz = ('element-count T)
-            return
-                spice-quote
-                    inline (value)
-                        bitcast (vector.smear (conv value) sz) T
+        if (not ('opaque? T))
+            let ET = ('element@ T 0)
+            # can we cast vT to ET?
+            let conv = (imply-converter vT ET static?)
+            if (operator-valid? conv)
+                let sz = ('element-count T)
+                return
+                    spice-quote
+                        inline (value)
+                            bitcast (vector.smear (conv value) sz) T
         `()
 
     @@ spice-cast-macro
@@ -732,6 +742,7 @@ spice mix (a b x)
 
 do
     let vec-type mat-type
+    let gvec2 gvec3 gvec4
 
     let vec2 dvec2 ivec2 uvec2 bvec2
     let vec3 dvec3 ivec3 uvec3 bvec3
