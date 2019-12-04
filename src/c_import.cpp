@@ -222,18 +222,24 @@ public:
         return {};
     }
 
-    const Type *get_typename(Symbol name, CNamespaces::TypeMap &map, const Type *supertype) {
+    const Type *get_typename(Symbol prefix, Symbol name, CNamespaces::TypeMap &map, const Type *supertype) {
         if (name != SYM_Unnamed) {
             int it = map.find_index(name);
             if (it != -1) {
                 return (const Type *)map.values[it]->value;
             }
-            const Type *T = incomplete_typename_type(name.name(), supertype);
+        }
+        const Type *T = incomplete_typename_type(
+            String::join(String::from("<"),
+                String::join(
+                    String::join(prefix.name(), String::from(" ")),
+                    String::join(name.name(), String::from(">")))),
+            supertype);
+        if (name != SYM_Unnamed) {
             auto ok = map.insert(name, ConstPointer::type_from(T));
             assert(ok);
-            return T;
         }
-        return incomplete_typename_type(name.name(), supertype);
+        return T;
     }
 
     SCOPES_RESULT(const Type *) TranslateRecord(clang::RecordDecl *rd) {
@@ -259,8 +265,10 @@ public:
 
         const Type *struct_type = nullptr;
         const Type *super_type = TYPE_CStruct;
+        Symbol prefix = SYM_Struct;
         if (rd->isUnion()) {
             super_type = TYPE_CUnion;
+            prefix = SYM_Union;
         } else if (rd->isStruct()) {
         } else if (rd->isClass()) {
         } else {
@@ -278,7 +286,7 @@ public:
                 tm = &dest->classes;
             }
         }
-        struct_type = get_typename(name, *tm, super_type);
+        struct_type = get_typename(prefix, name, *tm, super_type);
         if (defn) {
             record_defined.insert({defn, struct_type});
             auto tni = cast<TypenameType>(struct_type);
@@ -308,7 +316,7 @@ public:
 
         Symbol name(String::from_stdstring(ed->getName()));
 
-        const Type *enum_type = get_typename(name, dest->enums, TYPE_CEnum);
+        const Type *enum_type = get_typename(SYM_Enum, name, dest->enums, TYPE_CEnum);
 
         if (defn) {
             enum_defined.insert({ed, enum_type});

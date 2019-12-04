@@ -59,6 +59,7 @@ vvv include
     struct X;
 
 # bug: attempting to use incomplete typename $4
+vvv bind Test2
 vvv include
 """"
     typedef struct {
@@ -72,6 +73,8 @@ vvv include
     int x;
     int y;
     } KK;
+
+print Test2.struct.X
 
 # issue #54: support for `typeof` qualifier in imported C declarations
 vvv bind Test
