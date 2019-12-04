@@ -2,7 +2,11 @@
 #let x = (unconst true)
 #global y = x
 
-include (import C) "stdio.h"
+let C = (include "stdio.h")
+let C =
+    do
+        using C.extern
+        locals;
 
 let i32x10 = (array i32 10)
 

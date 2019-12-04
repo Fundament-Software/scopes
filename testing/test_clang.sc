@@ -4,32 +4,35 @@ using import testing
 let
     TESTVAL = "-DTESTVAL2"
 
+vvv bind C
 include
-    filter "^(t.*|.*VAL)$"
     options "-DTESTVAL" TESTVAL
-""""#ifndef TESTVAL
-        #error "expected define"
-    #endif
-    #ifndef TESTVAL2
-        #error "expected define 2"
-    #endif
-    int testfunc (int x, int y) {
-        return x * y;
-    }
+    """"#ifndef TESTVAL
+            #error "expected define"
+        #endif
+        #ifndef TESTVAL2
+            #error "expected define 2"
+        #endif
+        int testfunc (int x, int y) {
+            return x * y;
+        }
 
-    #define DOUBLEVAL 1.0
-    #define FLOATVAL 1.0f
-    #define INTVAL 3
-    #define UINTVAL 3u
-    #define LONGVAL 3ll
-    #define ULONGVAL 0x3ull
+        #define DOUBLEVAL 1.0
+        #define FLOATVAL 1.0f
+        #define INTVAL 3
+        #define UINTVAL 3u
+        #define LONGVAL 3ll
+        #define ULONGVAL 0x3ull
 
-    // initialized global
-    int test_clang_global = 303;
-    // uninitialized global
-    int test_clang_global2;
+        // initialized global
+        int test_clang_global = 303;
+        // uninitialized global
+        int test_clang_global2;
 
-    // eof
+        // eof
+
+using C.extern filter "^(t.*)$"
+using C.define filter "^(.*VAL)$"
 
 test ((testfunc 2 3) == 6)
 
@@ -46,8 +49,7 @@ static-assert ((typeof LONGVAL) == i64)
 static-assert ((typeof ULONGVAL) == u64)
 
 # bug: forward declaration after definition
-include
-    import Test
+vvv include
 """"typedef struct X Y;
 
     struct X {
@@ -57,8 +59,7 @@ include
     struct X;
 
 # bug: attempting to use incomplete typename $4
-include
-    import Test
+vvv include
 """"
     typedef struct {
         int x;
@@ -73,9 +74,12 @@ include
     } KK;
 
 # issue #54: support for `typeof` qualifier in imported C declarations
-include
-    import Test
+vvv bind Test
+vvv include
 """"#define LE_MACRO (1 << 6)
     typeof(LE_MACRO) get_value() { return LE_MACRO; }
 
-assert ((Test.get_value) == (1 << 6))
+assert ((Test.extern.get_value) == (1 << 6))
+
+
+

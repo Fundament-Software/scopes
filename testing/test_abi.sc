@@ -6,8 +6,8 @@ using import testing
 
 #fn testfunc (x y)
     x * y
-include
-    import lib
+vvv bind lib
+vvv include
 """"// passing small structs by-value
     typedef struct _Vec2 {
         float x,y;
@@ -62,6 +62,11 @@ include
         return (q.a.x == 1.0f) && (q.a.y == 2.0f)
             && (q.b.x == 3.0f) && (q.b.y == 4.0f);
     }
+vvv bind lib
+do
+    using lib.typedef
+    using lib.extern
+    locals;
 
 fn testf1 ()
     lib.testfunc_ivec2_ivec2

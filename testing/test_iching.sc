@@ -1,17 +1,17 @@
 
 # use http://falutin.net/iching/ to learn more
 
-include
-    import C
-""""#include <stdlib.h>
-    #include <time.h>
+let C =
+    include
+        """"#include <stdlib.h>
+            #include <time.h>
 
-C.srand
+C.extern.srand
     u32
-        C.time null
+        C.extern.time null
 
 fn random ()
-    (C.rand) / (i32 C.RAND_MAX)
+    (C.extern.rand) / (i32 C.define.RAND_MAX)
 
 fn print-hexagram (hexagram moving)
     for i in (range 6)

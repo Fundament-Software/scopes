@@ -16,7 +16,8 @@ dump-spice
 #fn testfunc (x y)
     x * y
 
-include;
+vvv bind C
+vvv include
 """"
     typedef int (*testfunc)(int x, int y);
     int call_testfunc(testfunc f, int x, int y) {
@@ -27,7 +28,7 @@ fn testf (x y)
     + x y
 
 let z =
-    call_testfunc testf 2 3
+    C.extern.call_testfunc testf 2 3
 print z
 test (z == 5)
 

@@ -6833,38 +6833,33 @@ typedef+ Image
 #-------------------------------------------------------------------------------
 
 sugar include (args...)
-    fn gen-code (cfilename targetsym filter code opts)
+    fn gen-code (cfilename code opts)
         let scope =
             do
                 hide-traceback;
                 (sc_import_c cfilename code opts)
-        if (targetsym == unnamed)
-            if (empty? filter)
-                qq [using] [scope]
-            else
-                qq [using] [scope] filter [filter]
-        else
-            qq [let] [targetsym] = [scope]
+        `scope
 
     let modulename = (('@ sugar-scope 'module-path) as string)
-    loop (args targetsym filter modulename ext opts includestr = args... unnamed "" modulename ".c" '() "")
+    loop (args modulename ext opts includestr = args... modulename ".c" '() "")
         sugar-match args
-        case (('import (name as Symbol)) rest...)
+        #case (('import (name as Symbol)) rest...)
             if (targetsym != unnamed)
                 error "duplicate 'import'"
             if (not (empty? filter))
                 error "can't use filter with 'import'"
-            repeat rest... name filter (.. modulename "." (name as string)) ext opts includestr
-        case (('filter (pattern as string)) rest...)
+            repeat rest... (.. modulename "." (name as string)) ext opts includestr
+        #case (('filter (pattern as string)) rest...)
             if (not (empty? filter))
                 error "duplicate 'filter'"
             if (targetsym != unnamed)
                 error "can't use filter with 'import'"
-            repeat rest... targetsym pattern modulename ext opts includestr
+            repeat rest... modulename ext opts includestr
         case (('extern "C++") rest...)
             if (modulename == ".cpp")
+                hide-traceback;
                 error "duplicate 'extern \"C++\"'"
-            repeat rest... targetsym filter modulename ".cpp" opts includestr
+            repeat rest... modulename ".cpp" opts includestr
         case (('options opts...) rest...)
             let opts =
                 loop (outopts inopts = '() opts...)
@@ -6880,30 +6875,27 @@ sugar include (args...)
                     val as:= string
                     outopts := (cons val outopts)
                     repeat outopts next
-            repeat rest... targetsym filter modulename ext opts includestr
+            repeat rest... modulename ext opts includestr
         case ((s as string) rest...)
             if (not (empty? includestr))
-                error "duplicate include string"
-            repeat rest... targetsym filter modulename ext opts s
-        case ()
-            if (not (empty? includestr))
-                # simple include string
-                let includestr =
-                    "#include \"" .. includestr .. "\""
                 hide-traceback;
-                return
-                    gen-code (.. modulename ext) targetsym filter includestr opts
-                    next-expr
-            elseif (not (empty? next-expr))
-                # full source code
-                let code rest = (decons next-expr)
-                if (('typeof code) == string)
-                    hide-traceback;
-                    return
-                        gen-code (.. modulename ext) targetsym filter (code as string) opts
-                        rest
-            error "string block expected as next expression"
+                error "duplicate include string"
+            repeat rest... modulename ext opts s
+        case ()
+            let sz = (countof includestr)
+            if (sz == 0)
+                hide-traceback;
+                error "include string is empty"
+            let includestr =
+                if (includestr @ (sz - 1) == 10:i8)
+                    # code block
+                    includestr
+                else (.. "#include \"" includestr "\"")
+            return
+                gen-code (.. modulename ext) includestr opts
+                next-expr
         default
+            hide-traceback;
             error (.. "invalid syntax: " (repr args))
 
 # pointers

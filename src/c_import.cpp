@@ -20,6 +20,7 @@
 #include "dyn_cast.inc"
 #include "timer.hpp"
 #include "compiler_flags.hpp"
+#include "ordered_map.hpp"
 
 #include "scopes/scopes.h"
 
@@ -56,26 +57,28 @@ static const Anchor *anchor_from_location(clang::SourceManager &SM, clang::Sourc
     return unknown_anchor();
 }
 
+struct CNamespaces {
+    typedef OrderedMap<Symbol, ConstPointerRef, Symbol::Hash> TypeMap;
+    typedef OrderedMap<Symbol, PureRef, Symbol::Hash> PureMap;
+
+    TypeMap structs;
+    TypeMap unions;
+    TypeMap enums;
+    TypeMap typedefs;
+    TypeMap classes;
+    PureMap constants;
+    PureMap externs;
+};
+
 class CVisitor : public clang::RecursiveASTVisitor<CVisitor> {
 public:
-
-    typedef std::unordered_map<Symbol, const Type *, Symbol::Hash> NamespaceMap;
-
-    const Scope *dest;
+    CNamespaces *dest;
     clang::ASTContext *Context;
     Result<void> ok;
     std::unordered_map<clang::RecordDecl *, const Type *> record_defined;
     std::unordered_map<clang::EnumDecl *, const Type *> enum_defined;
-    NamespaceMap named_structs;
-    NamespaceMap named_classes;
-    NamespaceMap named_unions;
-    NamespaceMap named_enums;
-    NamespaceMap typedefs;
 
     CVisitor() : dest(nullptr), Context(NULL) {
-        const Type *T = plain_typename_type(String::from("__builtin_va_list"), nullptr,
-            array_type(TYPE_I8, sizeof(va_list)).assert_ok()).assert_ok();
-        typedefs.insert({Symbol("__builtin_va_list"), T });
     }
 
 #define SCOPES_COMBINE_RESULT(DEST, EXPR) { \
@@ -89,9 +92,12 @@ public:
         return anchor_from_location(SM, loc);
     }
 
-    void SetContext(clang::ASTContext * ctx, const Scope *_dest) {
+    void SetContext(clang::ASTContext * ctx, CNamespaces *_dest) {
         Context = ctx;
         dest = _dest;
+        const Type *T = plain_typename_type(String::from("__builtin_va_list"), nullptr,
+            array_type(TYPE_I8, sizeof(va_list)).assert_ok()).assert_ok();
+        dest->typedefs.insert(Symbol("__builtin_va_list"), ConstPointer::type_from(T));
     }
 
     SCOPES_RESULT(void) GetFields(const TypenameType *tni, clang::RecordDecl * rd) {
@@ -216,15 +222,15 @@ public:
         return {};
     }
 
-    const Type *get_typename(Symbol name, NamespaceMap &map, const Type *supertype) {
+    const Type *get_typename(Symbol name, CNamespaces::TypeMap &map, const Type *supertype) {
         if (name != SYM_Unnamed) {
-            auto it = map.find(name);
-            if (it != map.end()) {
-                return it->second;
+            int it = map.find_index(name);
+            if (it != -1) {
+                return (const Type *)map.values[it]->value;
             }
             const Type *T = incomplete_typename_type(name.name(), supertype);
-            auto ok = map.insert({name, T});
-            assert(ok.second);
+            auto ok = map.insert(name, ConstPointer::type_from(T));
+            assert(ok);
             return T;
         }
         return incomplete_typename_type(name.name(), supertype);
@@ -241,7 +247,8 @@ public:
                 return it->second;
         }
 
-        if (rd->isAnonymousStructOrUnion()) {
+        bool is_anon = rd->isAnonymousStructOrUnion();
+        if (is_anon) {
             auto tdn = rd->getTypedefNameForAnonDecl();
             if (tdn) {
                 name = Symbol(String::from_stdstring(tdn->getName().data()));
@@ -251,35 +258,33 @@ public:
         }
 
         const Type *struct_type = nullptr;
+        const Type *super_type = TYPE_CStruct;
         if (rd->isUnion()) {
-            struct_type = get_typename(name, named_unions, TYPE_CUnion);
+            super_type = TYPE_CUnion;
         } else if (rd->isStruct()) {
-            struct_type = get_typename(name, named_structs, TYPE_CStruct);
         } else if (rd->isClass()) {
-            struct_type = get_typename(name, named_classes, TYPE_CStruct);
         } else {
             SCOPES_ERROR(CImportUnsupportedRecordType,
                 anchorFromLocation(rd->getSourceRange().getBegin()),
                 name);
         }
-
+        CNamespaces::TypeMap *tm = &dest->typedefs;
+        if (!is_anon) {
+            if (rd->isUnion()) {
+                tm = &dest->unions;
+            } else if (rd->isStruct()) {
+                tm = &dest->structs;
+            } else if (rd->isClass()) {
+                tm = &dest->classes;
+            }
+        }
+        struct_type = get_typename(name, *tm, super_type);
         if (defn) {
             record_defined.insert({defn, struct_type});
             auto tni = cast<TypenameType>(struct_type);
             if (tni->is_opaque()) {
                 SCOPES_CHECK_RESULT(GetFields(tni, defn));
-
-                if (name != SYM_Unnamed) {
-                    const Anchor *anchor = anchorFromLocation(rd->getSourceRange().getBegin());
-                    ValueRef tmp; const String *tmp2;
-                    auto _name = ConstInt::symbol_from(name);
-                    // don't overwrite names already bound
-                    if (!dest->lookup(_name, tmp, tmp2)) {
-                        dest = Scope::bind_from(_name,
-                            ref(anchor, ConstPointer::type_from(struct_type)),
-                            nullptr, dest);
-                    }
-                }
+                //const Anchor *anchor = anchorFromLocation(rd->getSourceRange().getBegin());
             } else {
                 SCOPES_ERROR(CImportDuplicateTypeDefinition,
                     anchorFromLocation(rd->getSourceRange().getBegin()),
@@ -303,7 +308,7 @@ public:
 
         Symbol name(String::from_stdstring(ed->getName()));
 
-        const Type *enum_type = get_typename(name, named_enums, TYPE_CEnum);
+        const Type *enum_type = get_typename(name, dest->enums, TYPE_CEnum);
 
         if (defn) {
             enum_defined.insert({ed, enum_type});
@@ -321,9 +326,9 @@ public:
                 auto value = ref(anchor,
                     ConstInt::from(enum_type, val.getExtValue()));
 
-                auto _name = ConstInt::symbol_from(name);
+                //auto _name = ConstInt::symbol_from(name);
                 tni->bind(name, value);
-                dest = Scope::bind_from(_name, value, nullptr, dest);
+                dest->constants.insert(name, value);
             }
         }
 
@@ -463,12 +468,12 @@ public:
         case clang::Type::Typedef: {
             const TypedefType *tt = cast<TypedefType>(Ty);
             TypedefNameDecl * td = tt->getDecl();
-            auto it = typedefs.find(
+            int it = dest->typedefs.find_index(
                 Symbol(String::from_stdstring(td->getName().data())));
-            if (it == typedefs.end()) {
+            if (it == -1) {
                 return empty_arguments_type();
             }
-            return it->second;
+            return (const Type *)dest->typedefs.values[it]->value;
         } break;
         case clang::Type::Record: {
             const RecordType *RT = cast<RecordType>(Ty);
@@ -626,23 +631,17 @@ public:
     }
 
     void exportType(Symbol name, const Type *type, const Anchor *anchor) {
-        dest = Scope::bind_from(ConstInt::symbol_from(name),
-            ref(anchor, ConstPointer::type_from(type)),
-            nullptr, dest);
+        dest->typedefs.insert(name, ref(anchor, ConstPointer::type_from(type)));
     }
 
     void exportExtern(Symbol name, const Type *type, const Anchor *anchor) {
-        dest = Scope::bind_from(ConstInt::symbol_from(name),
-            ref(anchor, Global::from(type, name)),
-            nullptr, dest);
+        dest->externs.insert(name, ref(anchor, Global::from(type, name)));
     }
 
     void exportExternRef(Symbol name, const Type *type, const Anchor *anchor) {
         auto val = ref(anchor, Global::from(type, name));
         auto conv = ref(anchor, PureCast::from(ptr_to_ref(val->get_type()).assert_ok(), val));
-        dest = Scope::bind_from(
-            ConstInt::symbol_from(name), conv,
-            nullptr, dest);
+        dest->externs.insert(name, conv);
     }
 
     bool TraverseRecordDecl(clang::RecordDecl *rd) {
@@ -693,7 +692,6 @@ public:
         Symbol name = Symbol(String::from_stdstring(td->getName().data()));
         const Anchor *anchor = anchorFromLocation(td->getSourceRange().getBegin());
 
-        typedefs.insert({name, type});
         exportType(name, type, anchor);
 
         return true;
@@ -755,10 +753,10 @@ public:
 // see ASTConsumers.h for more utilities
 class EmitLLVMOnlyAction : public clang::EmitLLVMOnlyAction {
 public:
-    const Scope *dest;
+    CNamespaces *dest;
     Result<void> result;
 
-    EmitLLVMOnlyAction(const Scope *dest_);
+    EmitLLVMOnlyAction(CNamespaces *dest_);
 
     std::unique_ptr<clang::ASTConsumer> CreateASTConsumer(clang::CompilerInstance &CI,
         clang::StringRef InFile) override;
@@ -789,12 +787,11 @@ public:
                 return false;
             }
         }
-        act.dest = visitor.dest;
         return true;
     }
 };
 
-EmitLLVMOnlyAction::EmitLLVMOnlyAction(const Scope *dest_) :
+EmitLLVMOnlyAction::EmitLLVMOnlyAction(CNamespaces *dest_) :
     clang::EmitLLVMOnlyAction((llvm::LLVMContext *)LLVMGetGlobalContext()),
     dest(dest_)
 {
@@ -813,7 +810,7 @@ static std::vector<LLVMModuleRef> llvm_c_modules;
 
 static void add_c_macro(clang::Preprocessor & PP,
     const clang::IdentifierInfo * II,
-    clang::MacroDirective * MD, const Scope *&scope, std::list< std::pair<Symbol, Symbol> > &aliases) {
+    clang::MacroDirective * MD, CNamespaces::PureMap &map, std::list< std::pair<Symbol, Symbol> > &aliases) {
     if(!II->hasMacroDefinition())
         return;
     clang::MacroInfo * MI = MD->getMacroInfo();
@@ -848,9 +845,7 @@ static void add_c_macro(clang::Preprocessor & PP,
         const Anchor *anchor = anchor_from_location(PP.getSourceManager(),
             MI->getDefinitionLoc());
 
-        scope = Scope::bind_from(
-            ConstInt::symbol_from(name), ref(anchor, ConstPointer::string_from(value)),
-            nullptr, scope);
+        map.insert(name, ref(anchor, ConstPointer::string_from(value)));
         return;
     }
 
@@ -877,17 +872,17 @@ static void add_c_macro(clang::Preprocessor & PP,
         double V = Result.convertToDouble();
         if (negate)
             V = -V;
-        ValueRef val;
+        PureRef val;
         if (Literal.isFloat) {
             val = ConstReal::from(TYPE_F32, V);
         } else {
             val = ConstReal::from(TYPE_F64, V);
         }
-        scope = Scope::bind_from(ConstInt::symbol_from(name), ref(anchor, val), nullptr, scope);
+        map.insert(name, ref(anchor, val));
     } else {
         llvm::APInt Result(64,0);
         Literal.GetIntegerValue(Result);
-        ValueRef val;
+        PureRef val;
         if (Literal.isUnsigned) {
             uint64_t i = Result.getZExtValue();
             val = ConstInt::from((Literal.isLongLong?TYPE_U64:TYPE_U32), i);
@@ -897,8 +892,23 @@ static void add_c_macro(clang::Preprocessor & PP,
                 i = -i;
             val = ConstInt::from((Literal.isLongLong?TYPE_I64:TYPE_I32), i);
         }
-        scope = Scope::bind_from(ConstInt::symbol_from(name), ref(anchor, val), nullptr, scope);
+        map.insert(name, ref(anchor, val));
     }
+}
+
+template<typename T>
+void merge_namespace_symbols (const Scope *&scope, Symbol symbol, const T&map) {
+    const Scope *sub = Scope::from(nullptr, nullptr);
+    for (int i = 0; i < map.keys.size(); ++i) {
+        auto &&symbol = map.keys[i];
+        auto &&value = map.values[i];
+        sub = Scope::bind_from(
+            ref(value.anchor(), ConstInt::symbol_from(symbol)),
+            value, nullptr, sub);
+    }
+    sub->table();
+    scope = Scope::bind_from(ConstInt::symbol_from(symbol),
+        ConstPointer::scope_from(sub), nullptr, scope);
 }
 
 SCOPES_RESULT(const Scope *) import_c_module (
@@ -950,17 +960,16 @@ SCOPES_RESULT(const Scope *) import_c_module (
 
     LLVMModuleRef M = NULL;
 
-
-    const Scope *result = Scope::from(nullptr, nullptr);
-
+    CNamespaces ns;
     // Create and execute the frontend to generate an LLVM bitcode module.
-    std::unique_ptr<EmitLLVMOnlyAction> Act(new EmitLLVMOnlyAction(result));
+    std::unique_ptr<EmitLLVMOnlyAction> Act(new EmitLLVMOnlyAction(&ns));
     if (compiler.ExecuteAction(*Act)) {
         SCOPES_CHECK_RESULT(Act->result);
-        result = Act->dest;
 
         clang::Preprocessor & PP = compiler.getPreprocessor();
         PP.getDiagnostics().setClient(new IgnoringDiagConsumer(), true);
+
+        CNamespaces::PureMap defs;
 
         std::list< std::pair<Symbol, Symbol> > todo;
         for(Preprocessor::macro_iterator it = PP.macro_begin(false),end = PP.macro_end(false);
@@ -968,18 +977,15 @@ SCOPES_RESULT(const Scope *) import_c_module (
             const IdentifierInfo * II = it->first;
             MacroDirective * MD = it->second.getLatest();
 
-            add_c_macro(PP, II, MD, result, todo);
+            add_c_macro(PP, II, MD, defs, todo);
         }
 
         while (!todo.empty()) {
             auto sz = todo.size();
             for (auto it = todo.begin(); it != todo.end();) {
-                ValueRef value;
-                const String *doc;
-                if (result->lookup(ConstInt::symbol_from(it->second), value, doc)) {
-                    result = Scope::bind_from(
-                        ConstInt::symbol_from(it->first), value,
-                        doc, result);
+                int index = defs.find_index(it->second);
+                if (index != -1) {
+                    defs.insert(it->first, defs.values[index]);
                     auto oldit = it++;
                     todo.erase(oldit);
                 } else {
@@ -1006,6 +1012,16 @@ SCOPES_RESULT(const Scope *) import_c_module (
             }
         }
         SCOPES_CHECK_RESULT(add_module(M, PointerMap(), CF_Cache));
+
+        const Scope *result = Scope::from(nullptr, nullptr);
+        merge_namespace_symbols(result, SYM_Struct, ns.structs);
+        merge_namespace_symbols(result, SYM_Union, ns.unions);
+        merge_namespace_symbols(result, SYM_Enum, ns.enums);
+        merge_namespace_symbols(result, KW_Define, defs);
+        merge_namespace_symbols(result, SYM_Const, ns.constants);
+        merge_namespace_symbols(result, SYM_TypeDef, ns.typedefs);
+        merge_namespace_symbols(result, SYM_Extern, ns.externs);
+        result->table();
         return result;
     } else {
         SCOPES_ERROR(CImportCompilationFailed);

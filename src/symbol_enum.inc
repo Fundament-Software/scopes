@@ -764,6 +764,7 @@ namespace scopes {
     T(SYM_Vector, "vector") \
     T(SYM_FNType, "fntype") \
     T(SYM_Extern, "extern") \
+    T(SYM_Const, "const") \
     \
     SCOPES_STYLE_SYMBOLS() \
     \
