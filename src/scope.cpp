@@ -241,7 +241,15 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
 
 bool Scope::lookup(const ConstRef &name, ValueRef &dest, const String *&doc, size_t depth) const {
     const Scope *self = this;
+    const Scope *last_end = this;
+    int iterations = 0;
     do {
+        // compact when we searched too long and retry
+        if (iterations == 16) {
+            self = last_end;
+            self->table();
+            iterations = 0;
+        }
         if (self->map) {
             int i = self->map->find_index(name);
             if (i != -1) {
@@ -255,6 +263,7 @@ bool Scope::lookup(const ConstRef &name, ValueRef &dest, const String *&doc, siz
                 }
             }
             self = self->start;
+            last_end = self->next;
             //if (self->parent()) self->parent()->table();
         }
         if (self->is_header()) {
@@ -262,6 +271,7 @@ bool Scope::lookup(const ConstRef &name, ValueRef &dest, const String *&doc, siz
                 break;
             depth = depth - 1;
         } else {
+            iterations++;
             if (self->name == name) {
                 if (self->value) {
                     dest = self->value;
