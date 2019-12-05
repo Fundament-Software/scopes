@@ -290,13 +290,16 @@ public:
         if (defn) {
             record_defined.insert({defn, struct_type});
             auto tni = cast<TypenameType>(struct_type);
-            if (tni->is_opaque()) {
+            if (!tni->is_complete()) {
                 SCOPES_CHECK_RESULT(GetFields(tni, defn));
                 //const Anchor *anchor = anchorFromLocation(rd->getSourceRange().getBegin());
             } else {
+                // possibly already provided by scope
+                /*
                 SCOPES_ERROR(CImportDuplicateTypeDefinition,
                     anchorFromLocation(rd->getSourceRange().getBegin()),
                     struct_type);
+                */
             }
         }
 
@@ -320,11 +323,11 @@ public:
 
         if (defn) {
             enum_defined.insert({ed, enum_type});
-
-            auto tag_type = SCOPES_GET_RESULT(TranslateType(ed->getIntegerType()));
-
             auto tni = cast<TypenameType>(enum_type);
-            SCOPES_CHECK_RESULT(tni->complete(tag_type, TNF_Plain));
+            if (!tni->is_complete()) {
+                auto tag_type = SCOPES_GET_RESULT(TranslateType(ed->getIntegerType()));
+                SCOPES_CHECK_RESULT(tni->complete(tag_type, TNF_Plain));
+            }
 
             for (auto it : ed->enumerators()) {
                 const Anchor *anchor = anchorFromLocation(it->getSourceRange().getBegin());
@@ -905,6 +908,27 @@ static void add_c_macro(clang::Preprocessor & PP,
 }
 
 template<typename T>
+void build_namespace_symbols (const Scope *scope, Symbol symbol, T&map) {
+    auto &&top = scope->table();
+    int idx = top.find_index(ConstInt::symbol_from(symbol));
+    if (idx < 0) return;
+    auto value = top.values[idx].value;
+    if (!value.isa<ConstPointer>()) return;
+    auto sub = (const Scope *)value.cast<ConstPointer>()->value;
+    auto &&subtable = sub->table();
+    for (int i = 0; i < subtable.keys.size(); ++i) {
+        auto key = subtable.keys[i].dyn_cast<ConstInt>();
+        if (!key) continue;
+        if (key->get_type() != TYPE_Symbol) continue;
+        auto value = subtable.values[i].value.dyn_cast<ConstPointer>();
+        if (!value) continue;
+        if (value->get_type() != TYPE_Type) continue;
+        auto symbol = Symbol::wrap(key->msw());
+        map.insert(symbol, value);
+    }
+}
+
+template<typename T>
 void merge_namespace_symbols (const Scope *&scope, Symbol symbol, const T&map) {
     const Scope *sub = Scope::from(nullptr, nullptr);
     for (int i = 0; i < map.keys.size(); ++i) {
@@ -921,7 +945,8 @@ void merge_namespace_symbols (const Scope *&scope, Symbol symbol, const T&map) {
 
 SCOPES_RESULT(const Scope *) import_c_module (
     const std::string &path, const std::vector<std::string> &args,
-    const char *buffer) {
+    const char *buffer,
+    const Scope *scope) {
     using namespace clang;
     SCOPES_RESULT_TYPE(const Scope *);
     Timer sum_clang_time(TIMER_ImportC);
@@ -969,6 +994,13 @@ SCOPES_RESULT(const Scope *) import_c_module (
     LLVMModuleRef M = NULL;
 
     CNamespaces ns;
+    if (scope) {
+        build_namespace_symbols(scope, SYM_Struct, ns.structs);
+        build_namespace_symbols(scope, SYM_Union, ns.unions);
+        build_namespace_symbols(scope, SYM_Enum, ns.enums);
+        build_namespace_symbols(scope, SYM_TypeDef, ns.typedefs);
+    }
+
     // Create and execute the frontend to generate an LLVM bitcode module.
     std::unique_ptr<EmitLLVMOnlyAction> Act(new EmitLLVMOnlyAction(&ns));
     if (compiler.ExecuteAction(*Act)) {

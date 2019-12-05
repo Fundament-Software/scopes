@@ -22,7 +22,8 @@ struct Scope;
 
 SCOPES_RESULT(const Scope *) import_c_module (
     const std::string &path, const std::vector<std::string> &args,
-    const char *buffer = nullptr);
+    const char *buffer = nullptr,
+    const Scope *scope = nullptr);
 
 } // namespace scopes
 

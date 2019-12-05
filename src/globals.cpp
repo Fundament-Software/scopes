@@ -655,7 +655,7 @@ uint64_t sc_hashbytes (const char *data, size_t size) {
 ////////////////////////////////////////////////////////////////////////////////
 
 sc_scope_raises_t sc_import_c(const sc_string_t *path,
-    const sc_string_t *content, const sc_list_t *arglist) {
+    const sc_string_t *content, const sc_list_t *arglist, const sc_scope_t *scope) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(const Scope *);
     std::vector<std::string> args;
@@ -669,7 +669,7 @@ sc_scope_raises_t sc_import_c(const sc_string_t *path,
         }
         arglist = arglist->next;
     }
-    SCOPES_C_RETURN(import_c_module(path->data, args, content->data));
+    SCOPES_C_RETURN(import_c_module(path->data, args, content->data, scope));
 }
 
 sc_void_raises_t sc_load_library(const sc_string_t *name) {
@@ -2383,7 +2383,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_hash2x64, TYPE_U64, TYPE_U64, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_hashbytes, TYPE_U64, native_ro_pointer_type(TYPE_I8), TYPE_USize);
 
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_import_c, TYPE_Scope, TYPE_String, TYPE_String, TYPE_List);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_import_c, TYPE_Scope, TYPE_String, TYPE_String, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_load_library, _void, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_load_object, _void, TYPE_String);
 

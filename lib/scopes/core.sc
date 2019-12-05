@@ -6833,33 +6833,24 @@ typedef+ Image
 #-------------------------------------------------------------------------------
 
 sugar include (args...)
-    fn gen-code (cfilename code opts)
+    fn gen-code (cfilename code opts scope)
         let scope =
             do
                 hide-traceback;
-                (sc_import_c cfilename code opts)
+                (sc_import_c cfilename code opts scope)
         `scope
 
     let modulename = (('@ sugar-scope 'module-path) as string)
-    loop (args modulename ext opts includestr = args... modulename ".c" '() "")
+    loop (args modulename ext opts includestr scope = args... modulename ".c" '() "" (nullof Scope))
         sugar-match args
-        #case (('import (name as Symbol)) rest...)
-            if (targetsym != unnamed)
-                error "duplicate 'import'"
-            if (not (empty? filter))
-                error "can't use filter with 'import'"
-            repeat rest... (.. modulename "." (name as string)) ext opts includestr
-        #case (('filter (pattern as string)) rest...)
-            if (not (empty? filter))
-                error "duplicate 'filter'"
-            if (targetsym != unnamed)
-                error "can't use filter with 'import'"
-            repeat rest... modulename ext opts includestr
+        case (('using (name as Symbol)) rest...)
+            let value = ((sc_expand name '() sugar-scope) as Scope)
+            repeat rest... modulename ext opts includestr value
         case (('extern "C++") rest...)
             if (modulename == ".cpp")
                 hide-traceback;
                 error "duplicate 'extern \"C++\"'"
-            repeat rest... modulename ".cpp" opts includestr
+            repeat rest... modulename ".cpp" opts includestr scope
         case (('options opts...) rest...)
             let opts =
                 loop (outopts inopts = '() opts...)
@@ -6875,12 +6866,12 @@ sugar include (args...)
                     val as:= string
                     outopts := (cons val outopts)
                     repeat outopts next
-            repeat rest... modulename ext opts includestr
+            repeat rest... modulename ext opts includestr scope
         case ((s as string) rest...)
             if (not (empty? includestr))
                 hide-traceback;
                 error "duplicate include string"
-            repeat rest... modulename ext opts s
+            repeat rest... modulename ext opts s scope
         case ()
             let sz = (countof includestr)
             if (sz == 0)
@@ -6892,7 +6883,7 @@ sugar include (args...)
                     includestr
                 else (.. "#include \"" includestr "\"")
             return
-                gen-code (.. modulename ext) includestr opts
+                gen-code (.. modulename ext) includestr opts scope
                 next-expr
         default
             hide-traceback;

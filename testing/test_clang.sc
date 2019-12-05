@@ -85,4 +85,21 @@ vvv include
 assert ((Test.extern.get_value) == (1 << 6))
 
 
+do
+    vvv bind mod1
+    vvv include
+    """"typedef struct block_s {
+            int _0; int _1; int _2;
+        } block_t;
 
+    vvv bind mod2
+    include
+        using mod1
+        """"typedef struct block_s {
+                int _0; int _1; int _2;
+            } block_t;
+
+            void process(block_t block) {}
+
+    print
+        mod2.extern.process (mod1.typedef.block_t 1 2 3)
