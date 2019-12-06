@@ -68,6 +68,7 @@ struct CNamespaces {
     TypeMap classes;
     PureMap constants;
     PureMap externs;
+    PureMap defines;
 };
 
 class CVisitor : public clang::RecursiveASTVisitor<CVisitor> {
@@ -908,7 +909,7 @@ static void add_c_macro(clang::Preprocessor & PP,
 }
 
 template<typename T>
-void build_namespace_symbols (const Scope *scope, Symbol symbol, T&map) {
+static void build_namespace_symbols (const Scope *scope, Symbol symbol, T&map) {
     auto &&top = scope->table();
     int idx = top.find_index(ConstInt::symbol_from(symbol));
     if (idx < 0) return;
@@ -929,7 +930,7 @@ void build_namespace_symbols (const Scope *scope, Symbol symbol, T&map) {
 }
 
 template<typename T>
-void merge_namespace_symbols (const Scope *&scope, Symbol symbol, const T&map) {
+static void merge_namespace_symbols (const Scope *&scope, Symbol symbol, const T&map) {
     const Scope *sub = Scope::from(nullptr, nullptr);
     for (int i = 0; i < map.keys.size(); ++i) {
         auto &&symbol = map.keys[i];
@@ -941,6 +942,25 @@ void merge_namespace_symbols (const Scope *&scope, Symbol symbol, const T&map) {
     sub->table();
     scope = Scope::bind_from(ConstInt::symbol_from(symbol),
         ConstPointer::scope_from(sub), nullptr, scope);
+}
+
+template<typename T>
+static bool find_value_in_namespace(Symbol symbol, const T&map, PureRef &result) {
+    int index = map.find_index(symbol);
+    if (index != -1) {
+        result = map.values[index];
+        return true;
+    } else {
+        return false;
+    }
+}
+
+static bool find_value_in_namespaces(const CNamespaces &ns, Symbol symbol, PureRef &result) {
+    if (find_value_in_namespace(symbol, ns.typedefs, result)) return true;
+    if (find_value_in_namespace(symbol, ns.constants, result)) return true;
+    if (find_value_in_namespace(symbol, ns.externs, result)) return true;
+    if (find_value_in_namespace(symbol, ns.defines, result)) return true;
+    return false;
 }
 
 SCOPES_RESULT(const Scope *) import_c_module (
@@ -998,7 +1018,10 @@ SCOPES_RESULT(const Scope *) import_c_module (
         build_namespace_symbols(scope, SYM_Struct, ns.structs);
         build_namespace_symbols(scope, SYM_Union, ns.unions);
         build_namespace_symbols(scope, SYM_Enum, ns.enums);
+        build_namespace_symbols(scope, KW_Define, ns.defines);
+        build_namespace_symbols(scope, SYM_Const, ns.constants);
         build_namespace_symbols(scope, SYM_TypeDef, ns.typedefs);
+        build_namespace_symbols(scope, SYM_Extern, ns.externs);
     }
 
     // Create and execute the frontend to generate an LLVM bitcode module.
@@ -1009,23 +1032,22 @@ SCOPES_RESULT(const Scope *) import_c_module (
         clang::Preprocessor & PP = compiler.getPreprocessor();
         PP.getDiagnostics().setClient(new IgnoringDiagConsumer(), true);
 
-        CNamespaces::PureMap defs;
-
         std::list< std::pair<Symbol, Symbol> > todo;
         for(Preprocessor::macro_iterator it = PP.macro_begin(false),end = PP.macro_end(false);
             it != end; ++it) {
             const IdentifierInfo * II = it->first;
             MacroDirective * MD = it->second.getLatest();
 
-            add_c_macro(PP, II, MD, defs, todo);
+            add_c_macro(PP, II, MD, ns.defines, todo);
         }
 
         while (!todo.empty()) {
             auto sz = todo.size();
             for (auto it = todo.begin(); it != todo.end();) {
-                int index = defs.find_index(it->second);
-                if (index != -1) {
-                    defs.insert(it->first, defs.values[index]);
+                PureRef val;
+                Symbol sym = it->second;
+                if (find_value_in_namespaces(ns, sym, val)) {
+                    ns.defines.insert(it->first, val);
                     auto oldit = it++;
                     todo.erase(oldit);
                 } else {
@@ -1057,7 +1079,7 @@ SCOPES_RESULT(const Scope *) import_c_module (
         merge_namespace_symbols(result, SYM_Struct, ns.structs);
         merge_namespace_symbols(result, SYM_Union, ns.unions);
         merge_namespace_symbols(result, SYM_Enum, ns.enums);
-        merge_namespace_symbols(result, KW_Define, defs);
+        merge_namespace_symbols(result, KW_Define, ns.defines);
         merge_namespace_symbols(result, SYM_Const, ns.constants);
         merge_namespace_symbols(result, SYM_TypeDef, ns.typedefs);
         merge_namespace_symbols(result, SYM_Extern, ns.externs);
