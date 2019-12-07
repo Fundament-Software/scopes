@@ -99,3 +99,27 @@ test (1 == (testf4))
 test (1 == (testf3))
 test (1 == (testf2))
 test (1 == (testf1))
+
+do
+    vvv bind cfun
+    include
+        """"#include <stdio.h>
+            typedef struct Mesh {
+                int vertexCount;
+                int triangleCount;
+                float *vertices;
+                float *texcoords;
+            } Mesh;
+            Mesh cfun (Mesh param) {
+                return param;
+            }
+
+    let s =
+        cfun.typedef.Mesh
+            vertices = (malloc-array f32 1000)
+            vertexCount = 250
+            triangleCount = 303
+    let s2 = (cfun.extern.cfun s)
+    test (s.vertexCount == s2.vertexCount)
+    test (s.triangleCount == s2.triangleCount)
+    test (s.vertices == s2.vertices)
