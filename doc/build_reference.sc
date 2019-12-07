@@ -1,5 +1,8 @@
 #!/usr/bin/env scopes
 using import Array
+using import Map
+import UTF-8
+let char = UTF-8.char
 
 let argc argv = (launch-args)
 assert (argc >= 2)
@@ -25,24 +28,24 @@ fn starts-with-letter (s)
 let EntryT = (tuple Symbol Value)
 local objs : (GrowingArray EntryT)
 
-let used-keys = (Scope)
+local used-keys : (Set Symbol)
+#let used-keys = (typename "used-keys")
 loop (scope = module)
     if (scope == null)
         break;
     let parent = ('parent scope)
-    let used = `true
     for k in ('deleted scope)
-        try
-            '@ used-keys k
-            ;
-        except (err)
-            'set-symbol used-keys k used
+        if (('typeof k) != Symbol)
+            continue;
+        k := k as Symbol
+        if (not ('in? used-keys k))
+            'insert used-keys k
     for k v in scope
-        try
-            '@ used-keys k
-            ;
-        except (err)
-            'set-symbol used-keys k used
+        if (('typeof k) != Symbol)
+            continue;
+        k := k as Symbol
+        if (not ('in? used-keys k))
+            'insert used-keys k
             let T = ('typeof v)
             'append objs
                 tupleof k v

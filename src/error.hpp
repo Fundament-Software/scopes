@@ -354,6 +354,9 @@ formatters:
     T(CGenUnboundValue, \
         "codegen: value %0 is unbound", \
         ValueRef) \
+    T(CGenInvalidRedeclaration, \
+        "codegen: invalid redeclaration of symbol '%0' with different type", \
+        Rawstring) \
     T(CGenUnsupportedBuiltin, \
         "codegen: builtin %0 is unsupported for this target", \
         Builtin) \

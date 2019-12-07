@@ -2103,23 +2103,43 @@ struct LLVMIRGenerator {
                 const char *name = namestr->data;
                 assert(name);
                 if ((namestr->count > 5) && !strncmp(name, "llvm.", 5)) {
-                    result = LLVMAddFunction(module, name, LLT);
-                } else {
-                    void *pptr = local_aware_dlsym(node->name);
-                    uint64_t ptr = *(uint64_t*)&pptr;
-                    if (!ptr) {
-                        last_llvm_error = nullptr;
-                        LLVMInstallFatalErrorHandler(fatal_error_handler);
-                        ptr = SCOPES_GET_RESULT(get_address(name));
-                        LLVMResetFatalErrorHandler();
-                        if (last_llvm_error) {
-                            SCOPES_RETURN_ERROR(last_llvm_error);
+                    result = LLVMGetNamedFunction(module, name);
+                    if (result) {
+                        LLT = LLVMPointerType(LLT, 0);
+                        if (LLVMTypeOf(result) != LLT) {
+                            //result = LLVMConstBitCast(result, LLT);
+                            //LLVMDumpValue(result);
+                            SCOPES_ERROR(CGenInvalidRedeclaration, name);
                         }
+                    } else {
+                        result = LLVMAddFunction(module, name, LLT);
                     }
-                    if (!ptr) {
-                        SCOPES_ERROR(CGenFailedToResolveExtern, node);
+                } else {
+                    result = LLVMGetNamedGlobal(module, name);
+                    if (result) {
+                        LLT = LLVMPointerType(LLT, 0);
+                        if (LLVMTypeOf(result) != LLT) {
+                            //result = LLVMConstBitCast(result, LLT);
+                            //LLVMDumpValue(result);
+                            SCOPES_ERROR(CGenInvalidRedeclaration, name);
+                        }
+                    } else {
+                        void *pptr = local_aware_dlsym(node->name);
+                        uint64_t ptr = *(uint64_t*)&pptr;
+                        if (!ptr) {
+                            last_llvm_error = nullptr;
+                            LLVMInstallFatalErrorHandler(fatal_error_handler);
+                            ptr = SCOPES_GET_RESULT(get_address(name));
+                            LLVMResetFatalErrorHandler();
+                            if (last_llvm_error) {
+                                SCOPES_RETURN_ERROR(last_llvm_error);
+                            }
+                        }
+                        if (!ptr) {
+                            SCOPES_ERROR(CGenFailedToResolveExtern, node);
+                        }
+                        result = LLVMAddGlobal(module, LLT, name);
                     }
-                    result = LLVMAddGlobal(module, LLT, name);
                 }
                 global2global.insert({ node.unref(), result });
                 return result;
