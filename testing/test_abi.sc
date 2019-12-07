@@ -103,8 +103,7 @@ test (1 == (testf1))
 do
     vvv bind cfun
     include
-        """"#include <stdio.h>
-            typedef struct Mesh {
+        """"typedef struct Mesh {
                 int vertexCount;
                 int triangleCount;
                 float *vertices;
