@@ -1040,14 +1040,187 @@ would be translated as follows::
 Loops
 -----
 
+C offers two structured control flows for loops which depend on mutation of
+an exit variable, namely ``while`` and ``for``. In addition, C++11 introduced
+the range-based ``for`` loop, which provides syntactical sugar for iterating
+elements of a collection.
 
+..  code-block:: c++
+
+    // C-style for-loop implementing a counter
+    for (int i = 0; i < 10; ++i) {
+        printf("%i\n", i);
+    }
+
+    // C-style for-loop implementing an iterator
+    for (iter_t it = first(container), int k = 0; is_valid(it); it = next(it), k++) {
+        process(k, at(it));
+    }
+
+    // while-loop implementing a counter
+    int i = 0;
+    while (i < 10) {
+        printf("%i\n", i);
+        ++i;
+    }
+
+    // range-based for-loop implementing an iterator (C++17 form)
+    for (auto &&[first,second] : map) {
+        process(first, second);
+    }
+
+Scopes defines a single builtin primitive for loops which leverages
+backpropagation of immutable values, upon which various other library forms are
+implemented::
+
+    # implementing a counter using the range-based form
+    for i in (range 10)
+        print i
+
+    # implementing an iterator using the loop primitive and immutable values
+    loop (it k = (first container) 0)
+        if (is_valid it)
+            process k (at it)
+            repeat (next it) (k + 1)
+        else
+            # break can return values
+            break it k
+
+    # implementing a counter using a while loop and mutation
+    local i = 0
+    while (i < 10)
+        print i
+        i += 1
+
+    # range-based form implementing an iterator
+    for key value in map
+        process key value
+
+In addition, with the `fold .. for .. in` form, Scopes combines both immutable
+loop and range-based form.
 
 Targeting Shader Programs
 -------------------------
 
+C/C++ do not offer a native way to compile functions to shader code. However,
+there exist various third party solutions to provide equivalent features. The
+GLSL (GL shader language) offers a C-like domain specific language to write
+shaders that has enough overlap with C/C++ in order to allow users to share
+definitions.
+
+Scopes is able to natively compile functions to SPIR-V as well as GLSL at
+compile time using the builtins `compile-spirv` and `compile-glsl` respectively,
+allowing the CPU and GPU side to share all definitions. To aid in this task,
+Scopes provides the :doc:`module-glm` and :doc:`module-glsl` modules, which
+implement native GLSL types and functions.
+
+See the following example implementing and compiling a pixel shader::
+
+    using import glm
+    using import glsl
+
+    in uv : vec2 (location = 0)
+    out color : vec4 (location = 1)
+    fn main ()
+        color = (vec4 (uv * 0.5 + 0.5) 0 1)
+
+    print
+        compile-glsl 330 'fragment
+            static-typify main
+
+The program output is as follows:
+
+.. code-block:: glsl
+
+    #version 330
+    #ifdef GL_ARB_shading_language_420pack
+    #extension GL_ARB_shading_language_420pack : require
+    #endif
+
+    in vec2 uv;
+    layout(location = 1) out vec4 color;
+
+    void main()
+    {
+        vec2 _14 = (uv * vec2(0.5)) + vec2(0.5);
+        vec4 _19 = vec4(0.0);
+        _19.x = _14.x;
+        vec4 _21 = _19;
+        _21.y = _14.y;
+        vec4 _22 = _21;
+        _22.z = 0.0;
+        vec4 _24 = _22;
+        _24.w = 1.0;
+        color = _24;
+    }
+
+
+
 Exceptions
 ----------
+
+C provides only a primitive kind of unstructured exception handling via the
+``setjmp()`` and ``longjmp()`` functions provided by ``setjmp.h``.
+
+C++ provides structured and polymorphic exception handling at runtime. Any value
+can be thrown as an exception using the ``throw`` keyword, and caught using
+the ``try .. catch`` form.
+
+.. code-block:: c++
+
+    struct myexception {
+        const char *what;
+    };
+
+    void main () {
+        try {
+            // throw value of type myexception
+            myexception exc = { "an error occurred" };
+            throw exc;
+        } catch (myexception& e) {
+            // print content to screen
+            std::cout << e.what << std::endl;
+        }
+    }
+
+Scopes supports a form of structured exception handling that is monomorphic,
+light weight and C compatible. A value of any type can be raised using the
+``raise`` form, and handled using the ``try .. except`` form::
+
+    using import struct
+
+    struct myexception
+        what : string
+
+    try
+        # raise value of type myexception
+        raise (myexception "an error occurred")
+    except (e)
+        # print content to screen
+        print e.what
+
+The presence of an exception modifies the return type of a function to a hidden
+tagged union type which returns which path the function returned on, and
+both return and exception value, of which only the appropriate value has been
+set.
+
+Monomorphic means that in contrast to C++, Scopes does not allow more than one
+exception type per expression to be backpropagated. If you wish to support a
+polymorphic type, you can use `enum` to define a tagged union type which can be
+dispatched to the correct exception type.
 
 ABI Compliance
 --------------
 
+Scopes aims to achieve full compliance with the C ABI used on x64 platforms
+for Linux, MacOS X and Windows, defaulting to the ``cdecl`` calling convention.
+Other calling conventions are not yet supported. Any Scopes function can be
+passed as a callback to a C library, and C functions can be called from Scopes
+without any additional hinting required.
+
+All types aim to follow the same alignment and size conventions as C types,
+including plain unions.
+
+On Windows, Scopes is built for and communicates with system resources through
+mingw64. Operating with WINAPI functions directly has not been extensively
+tested yet.
