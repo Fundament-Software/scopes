@@ -584,7 +584,7 @@ C++                                             Scopes
 `double`                                        `f64`
 ``typedef U V``                                 `let V = U`
 ``using V = U``                                 `let V = U`
-`const T *`                                     `pointer T`
+`const T *`                                     `@ T`
 `T *`                                           `mutable (@ T)`
 `const T &`                                     `& T`
 `T &`                                           `mutable (& T)`

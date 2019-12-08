@@ -6836,7 +6836,7 @@ sugar include (args...)
     let modulename = (('@ sugar-scope 'module-path) as string)
     loop (args modulename ext opts includestr scope = args... modulename ".c" '() "" (nullof Scope))
         sugar-match args
-        case (('using (name as Symbol)) rest...)
+        case (('using name) rest...)
             let value = ((sc_expand name '() sugar-scope) as Scope)
             repeat rest... modulename ext opts includestr value
         case (('extern "C++") rest...)
