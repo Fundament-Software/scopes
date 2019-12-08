@@ -163,6 +163,7 @@ SCOPES_LIBEXPORT int sc_cache_misses();
 
 SCOPES_LIBEXPORT sc_valueref_list_scope_raises_t sc_expand(sc_valueref_t expr, const sc_list_t *next, const sc_scope_t *scope);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, const sc_scope_t *scope);
+SCOPES_LIBEXPORT sc_valueref_raises_t sc_eval_stage(const sc_anchor_t *anchor, const sc_list_t *expr, const sc_scope_t *scope);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_prove(sc_valueref_t expr);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_typify(const sc_closure_t *f, int numtypes, const sc_type_t **typeargs);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_typify_template(sc_valueref_t f, int numtypes, const sc_type_t **typeargs);

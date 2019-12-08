@@ -1,3 +1,12 @@
+#
+    The Scopes Compiler Infrastructure
+    This file is distributed under the MIT License.
+    See LICENSE.md for details.
+
+""""Box
+    ===
+
+    Provides a unique reference container for heap allocated values.
 
 typedef Box
 

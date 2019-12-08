@@ -1,8 +1,8 @@
 Array
 =====
 
-Exports a configurable type for a mutable array that stores its elements
-on the heap rather than in registers or the stack.
+Provides mutable array types that store their elements on the heap rather
+than in registers or the stack.
 
 .. type:: Array
 
@@ -12,9 +12,8 @@ on the heap rather than in registers or the stack.
       
       Implements support for the `@` operator. Returns a view reference to the
       element at `index` of array `self`.
-   
-   .. spice:: (__as cls T)
-   
+   .. inline:: (__as cls T)
+      
       Implements support for the `as` operator. Arrays can be cast to
       `Generator`, or directly passed to `for`.
    .. inline:: (__countof self)
@@ -25,6 +24,10 @@ on the heap rather than in registers or the stack.
       
       Implements support for freeing the array's memory when it goes out
       of scope.
+   .. inline:: (__imply cls T)
+      
+      Implements support for pointer casts, to pass the array to C functions
+      for example.
    .. inline:: (__typecall cls element-type capacity)
       
       Construct a mutable array type of ``element-type`` with a variable or
@@ -48,12 +51,24 @@ on the heap rather than in registers or the stack.
       Construct a new element with arguments `args...` directly in a newly
       assigned slot of array `self`. When the `array` is of `GrowingArray`
       type, this operation will transparently resize the array's storage.
+   .. inline:: (emplace-append-many self size args...)
+      
+      Construct a new element with arguments `args...` directly in a newly
+      assigned slot of array `self`. When the `array` is of `GrowingArray`
+      type, this operation will transparently resize the array's storage.
+   .. fn:: (resize self count args...)
+      
+      Resize the array to the specified count. Items are apppend or removed
+      to meet the desired count.
    .. inline:: (sort self key)
       
       Sort elements of array `self` from smallest to largest, either using
       the `<` operator supplied by the element type, or by using the key
       supplied by the callable `key`, which is expected to return a comparable
       value for each element value supplied.
+   .. fn:: (swap self a b)
+      
+      Safely swap the contents of two indices.
 .. type:: FixedArray
 
    An opaque type of supertype `Array`.

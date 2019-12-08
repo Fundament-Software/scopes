@@ -6260,13 +6260,6 @@ sugar fold-locals (args...)
     let block = (sc_expression_new)
     sc_expression_append block init
     let anchor = ('anchor expression)
-    let scope-docstr = ('module-docstring scope)
-    let init =
-        if (empty? scope-docstr) init
-        else
-            let expr = ('tag `(f init unnamed scope-docstr) anchor)
-            sc_expression_append block expr
-            expr
     # first go through the constants
     let outval =
         loop (index outval = -1 init)
@@ -6499,9 +6492,6 @@ define append-to-scope
             let docstr = ('getarg args 2)
             let values = ('getarglist args 3)
             let constant-scope? = ('constant? packedscope)
-            #if ((('typeof key) == Symbol) and (key as Symbol == unnamed))
-                'set-docstring (packedscope as Scope) key (docstr as string)
-                return packedscope
             if (constant-scope? & (stage-constant? values))
                 let scope = (packedscope as Scope)
                 let scope =
@@ -6534,9 +6524,12 @@ define append-to-scope
     the runtime values. If all values in the scope are constant, then the
     resulting scope will also be constant.
 sugar locals ()
-    spice make-scope ()
-        `[(Scope)]
-    list fold-locals (list make-scope) append-to-scope
+    spice make-scope (docstring)
+        let docstring = (docstring as string)
+        # create a scope constant at compile time
+        `[(sc_scope_new_with_docstring docstring)]
+    let docstring = ('module-docstring sugar-scope)
+    list fold-locals (list make-scope docstring) append-to-scope
 
 #-------------------------------------------------------------------------------
 # typedef

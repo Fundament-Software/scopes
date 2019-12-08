@@ -15,7 +15,7 @@ using import spicetools
 # generators
 #---------------------------------------------------------------------------
 
-# for each element in generator a, repeat generator b and return both states
+""""for each element in generator a, repeat generator b and return both states
 inline span (a b)
     let start-a valid-a at-a next-a = ((a as Generator))
     let start-b valid-b at-b next-b = ((b as Generator))
@@ -60,7 +60,7 @@ spice unpack-bitdim (n size...)
         _ `(expr >> S)
     sc_argument_list_new acount values
 
-# a branchless generator that iterates multidimensional coordinates
+""""a branchless generator that iterates multidimensional coordinates
 @@ spice-quote
 inline dim (x n...)
     let T = (typeof x)
@@ -73,7 +73,7 @@ inline dim (x n...)
         inline (n) (unpack-dim n x n...)
         inline (n) (n + _1)
 
-# a variant of dim optimized for power of two sizes; the dimensions are
+""""a variant of dim optimized for power of two sizes; the dimensions are
     specified as exponents of 2
 @@ spice-quote
 inline bitdim (x n...)
@@ -144,7 +144,7 @@ inline ipair (gen N)
                         inline () (next it...)
                     range...
 
-# when generator a is exhausted, continue with generator b
+""""when generator a is exhausted, continue with generator b
     both generators must yield the same value type
 inline join (a b)
     let start-a valid-a at-a next-a = ((a as Generator))
@@ -266,13 +266,12 @@ inline cat (coll)
     static-if (none? coll) _cat
     else (_cat coll)
 
-sugar --> (expr ...)
-    """"Expands a processing chain into nested expressions so that each expression
-        is passed as tailing argument to the following expression.
+""""Expands a processing chain into nested expressions so that each expression
+    is passed as tailing argument to the following expression.
 
-        `__` can be used as a placeholder token to position the previous expression.
+    `__` can be used as a placeholder token to position the previous expression.
 
-        example:
+    example::
 
         --> x
             f
@@ -280,13 +279,13 @@ sugar --> (expr ...)
             h 2 __
             k
 
-        expands to
+    expands to::
 
         k
             h 2
                 g
                     f x
-
+sugar --> (expr ...)
     fn placeholder? (elem)
         (('typeof elem) == Symbol) and (elem as Symbol == '__)
 
@@ -614,4 +613,9 @@ inline retain (mapl ...)
 
 unlet cascade1 retain1
 
-locals;
+do
+    let span dim bitdim imap ipair join zip span join collect each compose cat
+        \ --> ->> flatten map reduce drain limit gate filter take cascade mux
+        \ demux
+
+    locals;

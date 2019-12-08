@@ -4,6 +4,200 @@ glsl
 The `glsl` module exports bridge symbols that make it possible to define
 and access external variables for shader programs.
 
+.. define:: gl_ClipDistance
+
+   A constant of type `[f32 x ?]`.
+.. define:: gl_FragCoord
+
+   A constant of type `vec4`.
+.. define:: gl_FragDepth
+
+   A constant of type `f32`.
+.. define:: gl_GlobalInvocationID
+
+   A constant of type `uvec3`.
+.. define:: gl_InstanceID
+
+   A constant of type `i32`.
+.. define:: gl_InstanceIndex
+
+   A constant of type `i32`.
+.. define:: gl_LocalInvocationID
+
+   A constant of type `uvec3`.
+.. define:: gl_LocalInvocationIndex
+
+   A constant of type `u32`.
+.. define:: gl_NumWorkGroups
+
+   A constant of type `uvec3`.
+.. define:: gl_PointSize
+
+   A constant of type `f32`.
+.. define:: gl_Position
+
+   A constant of type `vec4`.
+.. define:: gl_VertexID
+
+   A constant of type `i32`.
+.. define:: gl_VertexIndex
+
+   A constant of type `i32`.
+.. define:: gl_WorkGroupID
+
+   A constant of type `uvec3`.
+.. define:: gl_WorkGroupSize
+
+   A constant of type `uvec3`.
+.. define:: r16
+
+   A constant of type `Symbol`.
+.. define:: r16_snorm
+
+   A constant of type `Symbol`.
+.. define:: r16f
+
+   A constant of type `Symbol`.
+.. define:: r16i
+
+   A constant of type `Symbol`.
+.. define:: r16ui
+
+   A constant of type `Symbol`.
+.. define:: r32
+
+   A constant of type `Symbol`.
+.. define:: r32f
+
+   A constant of type `Symbol`.
+.. define:: r32i
+
+   A constant of type `Symbol`.
+.. define:: r32ui
+
+   A constant of type `Symbol`.
+.. define:: r8
+
+   A constant of type `Symbol`.
+.. define:: r8_snorm
+
+   A constant of type `Symbol`.
+.. define:: r8i
+
+   A constant of type `Symbol`.
+.. define:: r8ui
+
+   A constant of type `Symbol`.
+.. define:: rg16
+
+   A constant of type `Symbol`.
+.. define:: rg16_snorm
+
+   A constant of type `Symbol`.
+.. define:: rg16f
+
+   A constant of type `Symbol`.
+.. define:: rg16i
+
+   A constant of type `Symbol`.
+.. define:: rg16ui
+
+   A constant of type `Symbol`.
+.. define:: rg32
+
+   A constant of type `Symbol`.
+.. define:: rg32f
+
+   A constant of type `Symbol`.
+.. define:: rg32i
+
+   A constant of type `Symbol`.
+.. define:: rg32ui
+
+   A constant of type `Symbol`.
+.. define:: rg8
+
+   A constant of type `Symbol`.
+.. define:: rg8_snorm
+
+   A constant of type `Symbol`.
+.. define:: rg8i
+
+   A constant of type `Symbol`.
+.. define:: rg8ui
+
+   A constant of type `Symbol`.
+.. define:: rgba16
+
+   A constant of type `Symbol`.
+.. define:: rgba16_snorm
+
+   A constant of type `Symbol`.
+.. define:: rgba16f
+
+   A constant of type `Symbol`.
+.. define:: rgba16i
+
+   A constant of type `Symbol`.
+.. define:: rgba16ui
+
+   A constant of type `Symbol`.
+.. define:: rgba32
+
+   A constant of type `Symbol`.
+.. define:: rgba32f
+
+   A constant of type `Symbol`.
+.. define:: rgba32i
+
+   A constant of type `Symbol`.
+.. define:: rgba32ui
+
+   A constant of type `Symbol`.
+.. define:: rgba8
+
+   A constant of type `Symbol`.
+.. define:: rgba8_snorm
+
+   A constant of type `Symbol`.
+.. define:: rgba8i
+
+   A constant of type `Symbol`.
+.. define:: rgba8ui
+
+   A constant of type `Symbol`.
+.. type:: DispatchIndirectCommand
+
+   A plain type of supertype `CStruct` and of storage type `{num_groups_x=u32 num_groups_y=u32 num_groups_z=u32}`.
+
+.. type:: DrawArraysIndirectCommand
+
+   A plain type of supertype `CStruct` and of storage type `{count=u32 instanceCount=u32 first=u32 baseInstance=u32}`.
+
+.. type:: ceil
+
+   An opaque type of supertype `OverloadedFunction`.
+
+.. type:: dFdx
+
+   An opaque type of supertype `OverloadedFunction`.
+
+.. type:: dFdy
+
+   An opaque type of supertype `OverloadedFunction`.
+
+.. type:: findLSB
+
+   An opaque type of supertype `OverloadedFunction`.
+
+.. type:: fract
+
+   An opaque type of supertype `OverloadedFunction`.
+
+.. type:: fwidth
+
+   An opaque type of supertype `OverloadedFunction`.
+
 .. type:: gsampler
 
    An opaque type.
@@ -162,6 +356,10 @@ and access external variables for shader programs.
 
    A plain type of supertype `gsamplerCubeArray$2` and of storage type `<SampledImage <Image vec4 'Cube array sampled 'Unknown>>`.
 
+.. type:: smoothstep
+
+   An opaque type of supertype `OverloadedFunction`.
+
 .. type:: usampler1D
 
    A plain type of supertype `gsampler1D$4` and of storage type `<SampledImage <Image uvec4 '1D sampled 'Unknown>>`.
@@ -206,6 +404,16 @@ and access external variables for shader programs.
 
    A plain type of supertype `gsamplerCubeArray$4` and of storage type `<SampledImage <Image uvec4 'Cube array sampled 'Unknown>>`.
 
+.. inline:: (atomicAdd mem data)
+.. inline:: (atomicAnd mem data)
+.. inline:: (atomicCompSwap mem compare data)
+.. inline:: (atomicExchange mem data)
+.. inline:: (atomicMax mem data)
+.. inline:: (atomicMin mem data)
+.. inline:: (atomicOr mem data)
+.. inline:: (atomicXor mem data)
+.. inline:: (barrier)
+.. inline:: (groupMemoryBarrier)
 .. inline:: (iimage1D format)
 .. inline:: (iimage1DArray format)
 .. inline:: (iimage2D format)
@@ -231,6 +439,10 @@ and access external variables for shader programs.
 .. inline:: (imageLoad image coord)
 .. inline:: (imageStore image coord data)
 .. inline:: (local_size x y z)
+.. inline:: (memoryBarrier)
+.. inline:: (memoryBarrierBuffer)
+.. inline:: (memoryBarrierImage)
+.. inline:: (memoryBarrierShared)
 .. inline:: (texelFetch sampler P ...)
 .. inline:: (texelFetchOffset sampler P lod offset)
 .. inline:: (texture sampler P ...)
@@ -254,13 +466,48 @@ and access external variables for shader programs.
 .. inline:: (uimageCube format)
 .. inline:: (uimageCubeArray format)
 .. sugar:: (buffer ...)
+.. sugar:: (fragment_depth ...)
 .. sugar:: (in ...)
 .. sugar:: (inout ...)
+.. sugar:: (inout-geometry ...)
+.. sugar:: (input_primitive ...)
 .. sugar:: (out ...)
+.. sugar:: (output_primitive ...)
+.. sugar:: (shared ...)
 .. sugar:: (uniform ...)
+.. compiledfn:: (EmitVertex ...)
+
+   An external function of type ``void<-()``.
+.. compiledfn:: (EndPrimitive ...)
+
+   An external function of type ``void<-()``.
 .. compiledfn:: (packHalf2x16 ...)
 
    An external function of type ``u32<-(vec2)``.
+.. compiledfn:: (packSnorm2x16 ...)
+
+   An external function of type ``u32<-(vec2)``.
+.. compiledfn:: (packSnorm4x8 ...)
+
+   An external function of type ``u32<-(vec4)``.
+.. compiledfn:: (packUnorm2x16 ...)
+
+   An external function of type ``u32<-(vec2)``.
+.. compiledfn:: (packUnorm4x8 ...)
+
+   An external function of type ``u32<-(vec4)``.
 .. compiledfn:: (unpackHalf2x16 ...)
 
    An external function of type ``vec2<-(u32)``.
+.. compiledfn:: (unpackSnorm2x16 ...)
+
+   An external function of type ``vec2<-(u32)``.
+.. compiledfn:: (unpackSnorm4x8 ...)
+
+   An external function of type ``vec4<-(u32)``.
+.. compiledfn:: (unpackUnorm2x16 ...)
+
+   An external function of type ``vec2<-(u32)``.
+.. compiledfn:: (unpackUnorm4x8 ...)
+
+   An external function of type ``vec4<-(u32)``.

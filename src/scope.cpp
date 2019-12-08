@@ -107,7 +107,14 @@ const Scope::Map &Scope::table() const {
 
 const Scope *Scope::reparent_from(const Scope *content, const Scope *parent) {
     auto &&map = content->table();
-    auto self = from(content->header_doc(), parent);
+    // we lose our scopes docstring and instead reuse the parents docstring
+    const String *doc = nullptr;
+    if (parent) {
+        doc = parent->header_doc();
+    } else {
+        doc = content->header_doc();
+    }
+    auto self = from(doc, parent);
     #if 0
     auto count = map.keys.size();
     for (size_t i = 0; i < count; ++i) {

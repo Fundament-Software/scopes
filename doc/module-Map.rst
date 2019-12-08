@@ -35,7 +35,7 @@ hashtables.
       computes the hashmap load as a normal between 0.0 and 1.0
 .. type:: MapError
 
-   A plain type of supertype `CEnum` and of storage type `i32`.
+   An unique type of supertype `Enum` and of storage type `{u8 {<i8 x 1>}}`.
 
 .. type:: Set
 

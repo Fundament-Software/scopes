@@ -3,10 +3,10 @@
     This file is distributed under the MIT License.
     See LICENSE.md for details.
 
-""""Struct
+""""struct
     ======
 
-    support for defining structs via enum sugar
+    Support for defining structs through the `struct` sugar.
 
 sugar struct (name body...)
     fn define-field-runtime (T anchor name field-type default-value)

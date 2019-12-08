@@ -33,20 +33,40 @@ generators and collectors.
    when both are full, output both
    until then, new input for full containers is discarded
 .. inline:: (imap gen f)
+.. inline:: (ipair gen N)
+   
+   generate one variadic argument from N generated arguments
 .. inline:: (limit f coll)
 .. inline:: (map f coll)
 .. inline:: (mux collector...)
    
    send input into multiple collectors which each fork the target collector
-.. inline:: (mux1 c1 c2 coll)
-   
-   send input into two collectors which fork the target collector
 .. inline:: (reduce init f)
 .. inline:: (take n coll)
    
    limit collector to output n items
+.. sugar:: (--> ...)
+   
+   Expands a processing chain into nested expressions so that each expression
+   is passed as tailing argument to the following expression.
+   
+   `__` can be used as a placeholder token to position the previous expression.
+   
+   example::
+   
+       --> x
+           f
+           g
+           h 2 __
+           k
+   
+   expands to::
+   
+       k
+           h 2
+               g
+                   f x
 .. spice:: (compose ...)
+.. spice:: (join ...)
 .. spice:: (span ...)
-.. spice:: (unpack-bitdim ...)
-.. spice:: (unpack-dim ...)
 .. spice:: (zip ...)

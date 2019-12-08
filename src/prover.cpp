@@ -1295,11 +1295,12 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
     auto parent = sc_scope_get_parent(scope);
     auto docstr = sc_scope_module_docstring(scope);
 
-    auto newscope =
-        parent?
-            sc_scope_new_subscope(parent)
-            : (sc_string_count(docstr)?sc_scope_new_with_docstring(docstr):sc_scope_new());
-
+    const Scope *newscope = nullptr;
+    if (parent) {
+        newscope = sc_scope_new_subscope_with_docstring(parent, docstr);
+    } else {
+        newscope = sc_scope_new_with_docstring(docstr);
+    }
 
     auto block = ref(anchor, Expression::unscoped_from());
     //StyledStream ss;
@@ -1394,7 +1395,7 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
     tmp = ref(anchor, CallTemplate::from(g_sc_scope_new_subscope, { tmp }));
     block->append(
         ref(anchor, CallTemplate::from(g_bitcast, {
-            ref(anchor, CallTemplate::from(g_sc_eval, {
+            ref(anchor, CallTemplate::from(g_sc_eval_stage, {
                 ref(anchor, ConstPointer::anchor_from(anchor)),
                 ref(anchor, ConstPointer::list_from(sx->next)),
                 tmp })),

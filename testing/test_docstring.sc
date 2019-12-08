@@ -1,5 +1,7 @@
 """"a module docstring
 
+run-stage;
+
 using import testing
 
 """"a docstring for x

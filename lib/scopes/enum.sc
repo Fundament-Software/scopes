@@ -3,10 +3,11 @@
     This file is distributed under the MIT License.
     See LICENSE.md for details.
 
-""""Enum
+""""enum
     ====
 
-    support for defining tagged unions and classical enums via enum sugar
+    Support for defining tagged unions and classical enums through the `enum`
+    sugar.
 
 # tagged union / sum type
 typedef Enum

@@ -1,3 +1,14 @@
+#
+    The Scopes Compiler Infrastructure
+    This file is distributed under the MIT License.
+    See LICENSE.md for details.
+
+""""UTF-8
+    =====
+
+    This module provides UTF-8 encoder and decoder collectors, as well as
+    an UTF-8 aware `char` function.
+
 using import enum
 
 # declare i8   @llvm.ctlz.i8  (i8   <src>, i1 <is_zero_undef>)

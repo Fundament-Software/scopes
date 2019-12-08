@@ -29,7 +29,6 @@ let EntryT = (tuple Symbol Value)
 local objs : (GrowingArray EntryT)
 
 local used-keys : (Set Symbol)
-#let used-keys = (typename "used-keys")
 loop (scope = module)
     if (scope == null)
         break;
@@ -44,6 +43,8 @@ loop (scope = module)
         if (('typeof k) != Symbol)
             continue;
         k := k as Symbol
+        if (k == unnamed)
+            continue;
         if (not ('in? used-keys k))
             'insert used-keys k
             let T = ('typeof v)
@@ -274,7 +275,7 @@ fn print-entry (module parent key entry parent-name opts...)
             io-write! "`.\n"
     write-docstring tab docstr
 
-let moduledoc = ('docstring module unnamed)
+let moduledoc = ('module-docstring module)
 if (not (empty? moduledoc))
     io-write! (moduledoc as string)
     io-write! "\n"

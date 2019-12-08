@@ -55,15 +55,15 @@ written in the GL shader language.
 
 .. type:: bvec2
 
-   A plain type of supertype `vec-type` and of storage type `<bool x 2>`.
+   A plain type of supertype `gvec2` and of storage type `<bool x 2>`.
 
 .. type:: bvec3
 
-   A plain type of supertype `vec-type` and of storage type `<bool x 3>`.
+   A plain type of supertype `gvec3` and of storage type `<bool x 3>`.
 
 .. type:: bvec4
 
-   A plain type of supertype `vec-type` and of storage type `<bool x 4>`.
+   A plain type of supertype `gvec4` and of storage type `<bool x 4>`.
 
 .. type:: dmat2
 
@@ -115,15 +115,27 @@ written in the GL shader language.
 
 .. type:: dvec2
 
-   A plain type of supertype `vec-type` and of storage type `<f64 x 2>`.
+   A plain type of supertype `gvec2` and of storage type `<f64 x 2>`.
 
 .. type:: dvec3
 
-   A plain type of supertype `vec-type` and of storage type `<f64 x 3>`.
+   A plain type of supertype `gvec3` and of storage type `<f64 x 3>`.
 
 .. type:: dvec4
 
-   A plain type of supertype `vec-type` and of storage type `<f64 x 4>`.
+   A plain type of supertype `gvec4` and of storage type `<f64 x 4>`.
+
+.. type:: gvec2
+
+   An opaque type of supertype `vec-type`.
+
+.. type:: gvec3
+
+   An opaque type of supertype `vec-type`.
+
+.. type:: gvec4
+
+   An opaque type of supertype `vec-type`.
 
 .. type:: imat2
 
@@ -175,15 +187,15 @@ written in the GL shader language.
 
 .. type:: ivec2
 
-   A plain type of supertype `vec-type` and of storage type `<i32 x 2>`.
+   A plain type of supertype `gvec2` and of storage type `<i32 x 2>`.
 
 .. type:: ivec3
 
-   A plain type of supertype `vec-type` and of storage type `<i32 x 3>`.
+   A plain type of supertype `gvec3` and of storage type `<i32 x 3>`.
 
 .. type:: ivec4
 
-   A plain type of supertype `vec-type` and of storage type `<i32 x 4>`.
+   A plain type of supertype `gvec4` and of storage type `<i32 x 4>`.
 
 .. type:: mat-type
 
@@ -295,15 +307,15 @@ written in the GL shader language.
 
 .. type:: uvec2
 
-   A plain type of supertype `vec-type` and of storage type `<u32 x 2>`.
+   A plain type of supertype `gvec2` and of storage type `<u32 x 2>`.
 
 .. type:: uvec3
 
-   A plain type of supertype `vec-type` and of storage type `<u32 x 3>`.
+   A plain type of supertype `gvec3` and of storage type `<u32 x 3>`.
 
 .. type:: uvec4
 
-   A plain type of supertype `vec-type` and of storage type `<u32 x 4>`.
+   A plain type of supertype `gvec4` and of storage type `<u32 x 4>`.
 
 .. type:: vec-type
 
@@ -312,15 +324,18 @@ written in the GL shader language.
    .. spice:: (__% ...)
    .. spice:: (__& ...)
    .. spice:: (__* ...)
+   .. spice:: (__** ...)
    .. spice:: (__+ ...)
    .. spice:: (__- ...)
    .. spice:: (__/ ...)
    .. spice:: (__// ...)
    .. spice:: (__< ...)
+   .. spice:: (__<< ...)
    .. spice:: (__<= ...)
    .. spice:: (__== ...)
    .. spice:: (__> ...)
    .. spice:: (__>= ...)
+   .. spice:: (__>> ...)
    .. inline:: (__@ self i)
    .. spice:: (__^ ...)
    .. spice:: (__as ...)
@@ -329,14 +344,17 @@ written in the GL shader language.
    .. spice:: (__r% ...)
    .. spice:: (__r& ...)
    .. spice:: (__r* ...)
+   .. spice:: (__r** ...)
    .. spice:: (__r+ ...)
    .. spice:: (__r- ...)
    .. spice:: (__r/ ...)
    .. spice:: (__r// ...)
    .. spice:: (__r< ...)
+   .. spice:: (__r<< ...)
    .. spice:: (__r<= ...)
    .. spice:: (__r> ...)
    .. spice:: (__r>= ...)
+   .. spice:: (__r>> ...)
    .. spice:: (__r^ ...)
    .. inline:: (__rcp self)
    .. spice:: (__rimply ...)
@@ -347,15 +365,15 @@ written in the GL shader language.
    .. spice:: (__| ...)
 .. type:: vec2
 
-   A plain type of supertype `vec-type` and of storage type `<f32 x 2>`.
+   A plain type of supertype `gvec2` and of storage type `<f32 x 2>`.
 
 .. type:: vec3
 
-   A plain type of supertype `vec-type` and of storage type `<f32 x 3>`.
+   A plain type of supertype `gvec3` and of storage type `<f32 x 3>`.
 
 .. type:: vec4
 
-   A plain type of supertype `vec-type` and of storage type `<f32 x 4>`.
+   A plain type of supertype `gvec4` and of storage type `<f32 x 4>`.
 
-.. fn:: (dot u v)
+.. inline:: (dot u v)
 .. spice:: (mix ...)

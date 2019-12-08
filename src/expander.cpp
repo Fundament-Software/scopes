@@ -1243,8 +1243,6 @@ SCOPES_RESULT(TemplateRef) expand_inline(const Anchor *anchor, const TemplateRef
 SCOPES_RESULT(TemplateRef) expand_module(const Anchor *anchor, const List *expr, const Scope *scope) {
     SCOPES_RESULT_TYPE(TemplateRef);
     Timer sum_expand_time(TIMER_Expand);
-    //const Anchor *anchor = expr->anchor();
-    //auto list = SCOPES_GET_RESULT(extract_list_constant(expr));
     assert(anchor);
     StyledString ss = StyledString::plain();
     ss.out << anchor->path.name()->data << ":" << anchor->lineno;
@@ -1260,6 +1258,22 @@ SCOPES_RESULT(TemplateRef) expand_module(const Anchor *anchor, const List *expr,
     }
     subenv = Scope::from(doc, subenv);
 
+    Expander subexpr(subenv, mainfunc);
+    mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(ref(anchor, expr), false));
+
+    return mainfunc;
+}
+
+SCOPES_RESULT(TemplateRef) expand_module_stage(const Anchor *anchor, const List *expr, const Scope *scope) {
+    SCOPES_RESULT_TYPE(TemplateRef);
+    Timer sum_expand_time(TIMER_Expand);
+    assert(anchor);
+    StyledString ss = StyledString::plain();
+    ss.out << anchor->path.name()->data << ":" << anchor->lineno;
+    TemplateRef mainfunc = ref(anchor, Template::from(Symbol(ss.str())));
+
+    const Scope *subenv = scope?scope:sc_get_globals();
+    subenv = Scope::from(nullptr, subenv);
     Expander subexpr(subenv, mainfunc);
     mainfunc->value = SCOPES_GET_RESULT(subexpr.expand_expression(ref(anchor, expr), false));
 

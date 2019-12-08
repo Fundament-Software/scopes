@@ -213,6 +213,13 @@ sc_valueref_raises_t sc_eval(const sc_anchor_t *anchor, const sc_list_t *expr, c
     return convert_result(prove(FunctionRef(), module_result, {}));
 }
 
+sc_valueref_raises_t sc_eval_stage(const sc_anchor_t *anchor, const sc_list_t *expr, const sc_scope_t *scope) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(TypedValueRef);
+    auto module_result = SCOPES_C_GET_RESULT(expand_module_stage(anchor, expr, scope));
+    return convert_result(prove(FunctionRef(), module_result, {}));
+}
+
 sc_valueref_raises_t sc_prove(sc_valueref_t expr) {
     using namespace scopes;
     //SCOPES_RESULT_TYPE(TypedValue *);
@@ -2250,6 +2257,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_cache_misses, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_expand, arguments_type({TYPE_ValueRef, TYPE_List, TYPE_Scope}), TYPE_ValueRef, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval, TYPE_ValueRef, TYPE_Anchor, TYPE_List, TYPE_Scope);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_stage, TYPE_ValueRef, TYPE_Anchor, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_prove, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_eval_inline, TYPE_Anchor, TYPE_ValueRef, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify_template, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32, native_ro_pointer_type(TYPE_Type));

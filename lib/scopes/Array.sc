@@ -6,8 +6,8 @@
 """"Array
     =====
 
-    Exports a configurable type for a mutable array that stores its elements
-    on the heap rather than in registers or the stack.
+    Provides mutable array types that store their elements on the heap rather
+    than in registers or the stack.
 
 using import struct
 
