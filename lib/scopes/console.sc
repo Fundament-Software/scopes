@@ -49,7 +49,6 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
 
     let eval-scope = (Scope global-scope)
 
-    set-autocomplete-scope! eval-scope
     if (not (empty? history-path))
         sc_load_history history-path
 
@@ -120,6 +119,8 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                     inline __typecall () (if true (exit 0))
 
     loop (preload cmdlist counter eval-scope = "" "" 0 eval-scope)
+        set-autocomplete-scope! eval-scope
+
         fn make-idstr (counter)
             .. "$" (tostring counter)
 
