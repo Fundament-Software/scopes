@@ -7,7 +7,8 @@ let S =
 run-stage;
 
 do
-    using S filter "^test$"
+    let pattern = "^test$"
+    using S filter pattern
     test;
 
 do

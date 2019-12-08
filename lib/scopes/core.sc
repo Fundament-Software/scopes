@@ -3883,8 +3883,8 @@ let using =
                     if (token != 'filter)
                         error
                             "syntax: using <scope> [filter <filter-string>]"
-                    let pattern = (pattern as string)
-                    list pattern
+                    let value = ((sc_expand pattern rest sugar-scope) as string)
+                    list value
             # attempt to import directly if possible
             inline process (src)
                 _ (list do)
