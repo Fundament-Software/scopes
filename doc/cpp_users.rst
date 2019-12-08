@@ -79,7 +79,8 @@ many tokens without separating whitespace, such as in ``x+y``.
 
 Instead of a whitelist of permitted characters, Scopes only maintains a
 blacklist of characters that terminate a symbolic sequence. These characters are
-the whitespace characters and characters from the set ``()[]{}"';#,``.
+the whitespace characters and characters from the set ``()[]{}"';#,``, where
+``,`` is in itself a context free symbol.
 
 This means that ``x+y`` would be read as a single token. A semantically
 equivalent expression in Scopes would have to be written as ``x + y``.
@@ -104,22 +105,22 @@ just one basic form::
 
 The value and type of the head controls whether the expression is dispatched to
 
-* A syntax macro (called a `sugar`), which has complete control over which,
-  when and how remaining arguments will be expanded and evaluated, and can
-  either return new symbolic lists to be expanded further, or a template IL.
-* An IL macro (called a `spice`), which receives typed arguments and can
-  generate new template IL to be specialized.
+* A syntax macro (called a `sugar`), called at expansion time, which has
+  complete control over which, when and how remaining arguments will be expanded
+  and evaluated, and can either return new symbolic lists to be expanded
+  further, or a template IL.
+* An IL macro (called a `spice`), called at compile time, which receives typed
+  arguments and can generate new template IL to be specialized.
 * A call expression, equivalent to the ``head(argument1, ..., argumentN);``
-  syntax in C/C++.
+  syntax in C/C++, called at runtime.
 
 As a result of this principle, there are no keywords in Scopes. Every single
 symbol can be rebound or deleted, globally or just for one scope.
 
 Scopes also supports wildcard syntax macros (wildcard sugars), which can be
 applied to either any expression or symbol before the expansion begins, and
-which can be used to implement exceptions to the head dispatch rule.
-
-One of these exceptions is infix notation.
+which can be used to implement exceptions to the head dispatch rule. One of
+these exceptions for instance is infix notation support.
 
 Infix Expressions
 -----------------
@@ -531,15 +532,12 @@ way, using `include`, `load-library` and `load-object`::
     # how to create trivial bindings for a C library
 
     # include thirdparty.h and make its declarations available as a scope object
-    include "thirdparty.h"
-        import thirdparty # when this is commented out, declarations will be
-                            directly imported into the local scope
-        # filter "^thirdparty_.*$" # when import is not specified, import only
-                                     functions matching this regular expression
-        options "-I" (module-dir .. "/../include") # specify options for clang
+    let thirdparty =
+        include "thirdparty.h"
+            options "-I" (module-dir .. "/../include") # specify options for clang
 
-    # access defines and constants from thirdparty.h
-    if thirdparty.USE_SHARED_LIBRARY
+    # access a define from thirdparty.h
+    if thirdparty.define.USE_SHARED_LIBRARY
         # load thirdparty as a shared library from system search paths
         if (operating-system == 'windows)
             load-library "thirdparty.dll"
@@ -549,8 +547,21 @@ way, using `include`, `load-library` and `load-object`::
         # load thirdparty as a static library from an object file
         load-object (module-dir .. "/../lib/thirdparty.o")
 
-    # return thirdparty scope object for this module
-    return thirdparty
+    # assemble a ready-to-use scope object for this module
+    do
+        # import only symbols beginning with thirdparty
+        using thirdparty.define filter "^THIRDPARTY_.*$"
+        using thirdparty.typedef filter "^thirdparty_.*$"
+        using thirdparty.const filter "^thirdparty_.*$"
+        using thirdparty.extern filter "^thirdparty_.*$"
+
+        locals;
+
+Externals using C signatures can also be defined and used directly::
+
+    let puts = (extern 'puts (function i32 rawstring))
+    # definition becomes immediately available
+    puts "hello\n"
 
 Type Primitives
 ---------------
@@ -574,12 +585,12 @@ C++                                             Scopes
 ``typedef U V``                                 `let V = U`
 ``using V = U``                                 `let V = U`
 `const T *`                                     `pointer T`
-`T *`                                           `mutable (pointer T)`
+`T *`                                           `mutable (@ T)`
 `const T &`                                     `& T`
 `T &`                                           `mutable (& T)`
 ``std::array<T, N>``                            `array T N`
 ``std::tuple<T0, ..., Tn>``                     `tuple T0 ... Tn`
-``const T [N] __attribute__((aligned (16)))``   `vector T N`
+``const T [N] __attribute__((aligned (A)))``    `vector T N`
 =============================================== =======================
 
 Initializer Lists
@@ -617,6 +628,8 @@ initializers and designated initializers:
     Example example = { .value = 100, .text = "test" };
 
 to this equivalent declaration in Scopes::
+
+    using import struct
 
     struct Example plain
         value : i32
@@ -680,8 +693,9 @@ as ``(getattr (typeof object) 'methodname) object arg0 ... argN``.
 Virtual Methods
 ---------------
 
-As Scopes doesn't provide an abstraction for composition by inheritance,
-virtual methods are not supported.
+As Scopes doesn't provide a native abstraction for composition by inheritance,
+virtual methods are not supported out of the box, but can be implemented through
+its extensive domain specific language support.
 
 Classes
 -------
@@ -859,14 +873,169 @@ that is automatically called when the value goes out of scope::
 Operator Overloading
 --------------------
 
+C++ allows overloading type operators through special methods defined either
+in a struct, class or namespace.
+
+..  code-block:: c++
+
+    class Accumulable {
+    public:
+        // overload the addition operator for class + class
+        Accumulable operator +(Accumulable x) {
+            return Accumulable(this->value + x.value);
+        }
+        // another overload for class + int
+        Accumulable operator +(int x) {
+            return Accumulable(this->value + x);
+        }
+
+        Accumulable (int _value) : value(_value) {}
+
+        int value;
+    };
+
+    // a third overload for supporting int + class
+    Accumulable operator +(Accumulable a, int b) {
+        return Accumulable(a.value + b.value);
+    }
+
+Scopes supports operator overloading through informally specified operator
+protocols that that any type can support by exposing dispatch methods bound to
+special attributes. See this equivalent example, which applies not only to
+structs, but any type definition::
+
+    struct Accumulable
+        # one compile time function for all left-hand side variants receives
+            left-hand and right-hand types and returns a function which can
+            perform the operation or void.
+        inline __+ (cls T)
+            # test for type + type
+            static-if (T == this-type)
+                # return new closure
+                inline (self other)
+                    this-type (self.value + other.value)
+            # if T can be implicitly cast to i32, support it
+            elseif (imply? T i32)
+                inline (self other)
+                    this-type (self.value + other)
+
+        # another function covers all right-hand side variants
+        inline __r+ (T cls)
+            static-if (imply? T i32)
+                inline (self other)
+                    this-type (self + other.value)
+
+        value : i32
+
+        inline __repr (self)
+            tostring self.value
+
 Standard Library
 ----------------
 
-Memory Handling
----------------
+C and C++ support an extensive standard library, covering many system functions
+and algorithmic container types.
+
+Scopes supports the C standard library through the clang bridge accessible
+by the `include` mechanism.
+
+Only a few containers from the C++ standard library have functional equivalents
+in Scopes yet. Here is a comparison table:
+
+======================= ====================
+C++                     Scopes
+======================= ====================
+``std::array``          `array`
+``std::tuple``          `tuple`
+``std::vector``         `Array.GrowingArray`
+``std::unordered_set``  `Map.Set`
+``std::unordered_map``  `Map.Map`
+``std::unique_ptr``     `Box.Box`
+``std::function``       `Capture.capture`
+======================= ====================
+
+Memory Handling & Management
+----------------------------
+
+C and C++ use a stack based machine model that is compatible with native
+targets. Within this model, mutable memory can be pre-allocated globally,
+on the function's stack and in main memory, called the "heap".
+
+Scopes uses an identical model. No garbage collection is employed at runtime.
+
+A comparison of concepts by example:
+
+=================================== ===================================
+C/C++                               Scopes
+=================================== ===================================
+``T value;`` (globally)             `global value : T`
+``T value;`` (locally)              `local value : T`
+``T values[size];`` (static size)   `local value : (array T size)`
+``T values[size];`` (dynamic size)  `let value = (alloca-array T size)`
+``alloca(sizeof(T))``               `alloca T`
+``alloca(sizeof(T) * size)``        `alloca-array T size`
+``malloc(sizeof(T))``               `malloc T`
+``malloc(sizeof(T) * size)``        `malloc-array T size`
+=================================== ===================================
+
+In addition, C++ allows to manage memory by recursively invoking a type-defined
+destructor on stack values when exiting a bracketed scope, as well as on globals
+when the program is exited or a library unloaded. Based on this mechanism and
+intricate elision rules, various smart pointer types are implemented, of which
+the most useful is ``std::unique_ptr``, which is a type that manages the
+lifetime of a single heap value until it goes out of scope.
+
+In Scopes, types can be defined as unique, which instructs scope to manage the
+lifetime of values in a similar fashion as C++ does. In addition, weak
+references to these values (direct or indirect) can be borrowed as "views",
+which become inaccessible as soon as the viewed unique value goes out of scope.
+This mechanism incurs no performance cost at runtime. See `Destructors`_ for
+an example.
 
 Closures
 --------
+
+C++ supports runtime closures through the ``std::function`` type, which allows
+to implicitly bind values to a function, so that when the function is called,
+the bound values become available to the function without having to pass them
+as arguments. In functional programming, this process can be used to implement
+currying.
+
+..  code-block:: c++
+
+    void print_bound_constant () {
+        const int y = 42;
+        // capture `y` along with the function
+        auto f = [y](int x) -> int { return x + y; }
+        // prints 65
+        std::cout << f(23) << std::endl;
+    }
+
+    void print_bound_value (int y) {
+        // capture `y` along with the function
+        auto f = [y](int x) -> int { return x + y; }
+        // prints 23+y
+        std::cout << f(23) << std::endl;
+    }
+
+Scopes supports compile time closures natively, as demonstrated previously, but
+runtime closures are also supported through so-called captures. Above example
+would be translated as follows::
+
+    fn print_bound_constant ()
+        let y = 42
+        # capture constant `y` along with the function
+        fn f (x)
+            x + y
+        # prints 65
+        print (f 23)
+
+    fn print_bound_value (y)
+        # capture variable `y` along with the function
+        capture f (x) {y}
+            x + y
+        # prints 65
+        print (f 23)
 
 Loops
 -----
