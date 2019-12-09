@@ -103,3 +103,14 @@ do
 
     print
         mod2.extern.process (mod1.typedef.block_t 1 2 3)
+
+
+do
+    # enums assume typedef name if there is no name
+    vvv bind mod
+    vvv include
+    """"typedef enum {
+            A, B, C
+        } EnumType;
+
+    test ((tostring mod.typedef.EnumType) == "EnumType")
