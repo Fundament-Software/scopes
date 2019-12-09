@@ -596,15 +596,19 @@ C++                                             Scopes
 Initializer Lists
 -----------------
 
-Scopes does not support initializer lists, but provides convenience constructors
-for arrays and tuple types.
+Scopes provides convenience constructors for arrays and tuple types, as well as
+a special initializer type called `typeinit`, which can be used to initialize
+fields without knowing their type. `typeinit` stores passed arguments in a
+temporary closure which is turned into a constructor call as soon as the
+typeinit instance is cast to its target type during assignment.
 
-======================================== =========================
-C++                                      Scopes
-======================================== =========================
-`const T _[] = { arg0, ..., argN };`     `arrayof T arg0 ... argN`
-`const T _ = { arg0, ..., argN };`       `tupleof arg0 ... argN`
-======================================== =========================
+=========================================== =====================================
+C++                                         Scopes
+=========================================== =====================================
+`std::array<T> _ = { arg0, ..., argN };`    `arrayof T arg0 ... argN`
+`std::tuple<auto> _ = { arg0, ..., argN };` `tupleof arg0 ... argN`
+`x.member = { arg0, ..., argN };`           `x.member = (typeinit arg0 ... argN)`
+=========================================== =====================================
 
 Structs
 -------
