@@ -1,34 +1,35 @@
+using import testing
 
 # raw string blocks
 ###################
 
 # keeps first trailing LF
-assert
+test
     "hello world\n" == """"hello world
 
 # doesn't escape anything
-assert
+test
     "hello \"world\"\\n\n" == """"hello "world"\n
 
 # sub 4-space indentation is illegal
-#assert
+#test
     "hello world\nwhat's up\n" == """"hello world
                                      what's up
 
 # all indentation up to 4-spaces is trimmed
-assert
+test
     "hello world\nwhat's up\n" == """"hello world
                                       what's up
 
 # empty first line isn't trimmed
-assert
+test
     ==
         """"
             hi everyone
         "\nhi everyone\n"
 
 # nested use of string block token has no effect
-assert
+test
     ==
         "\"\"\"\"\n\"\"\"\"\n    \"\"\"\"\n"
         """"""""
@@ -36,7 +37,7 @@ assert
                 """"
 
 # multiline block with indented lines
-assert
+test
     ==
         """"first line
             second line

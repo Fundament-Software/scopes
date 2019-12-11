@@ -1323,6 +1323,21 @@ struct Global : Pure {
 
 //------------------------------------------------------------------------------
 
+struct GlobalString : Pure {
+    static bool classof(const Value *T);
+
+    GlobalString(const String *str);
+
+    bool key_equal(const GlobalString *other) const;
+    std::size_t hash() const;
+
+    static GlobalStringRef from(const String *str);
+
+    const String *value;
+};
+
+//------------------------------------------------------------------------------
+
 struct PureCast : Pure {
     static bool classof(const Value *T);
 

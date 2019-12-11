@@ -1958,6 +1958,11 @@ struct SPIRVGenerator {
         return builder.createUndefined(ty);
     }
 
+    SCOPES_RESULT(spv::Id) GlobalString_to_value(const GlobalStringRef &node) {
+        SCOPES_RESULT_TYPE(spv::Id);
+        SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
+    }
+
     SCOPES_RESULT(spv::Id) Global_to_value(const GlobalRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
         spv::StorageClass sc = SCOPES_GET_RESULT(storage_class_from_extern_class(

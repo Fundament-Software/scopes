@@ -1528,24 +1528,32 @@ inline cast-error (intro-string vT T)
 fn operator-valid? (value)
     ptrcmp!= ('typeof value) void
 
-fn cast-converter (symbol rsymbol vT T)
+fn cast-converter (symbol rsymbol vQT T)
     """"for two given types, find a matching conversion function
         this function only works inside a spice macro
+    let vT = ('strip-qualifiers vQT)
     label next
         let f =
             try ('@ vT symbol)
             except (err) (merge next)
         let conv = (sc_prove `(f vT T))
         if (operator-valid? conv) (return conv)
+        if (ptrcmp!= vT vQT)
+            let conv = (sc_prove `(f vQT T))
+            if (operator-valid? conv) (return conv)
     label next
         let f =
             try ('@ T rsymbol)
             except (err) (merge next)
         let conv = (sc_prove `(f vT T))
         if (operator-valid? conv) (return conv)
+        if (ptrcmp!= vT vQT)
+            let conv = (sc_prove `(f vQT T))
+            if (operator-valid? conv) (return conv)
     return (sc_empty_argument_list)
 
-fn imply-converter (vT T static?)
+fn imply-converter (vQT T static?)
+    let vT = ('strip-qualifiers vQT)
     if (ptrcmp== vT T)
         return `_
     if (sc_type_is_superof T vT)
@@ -1556,11 +1564,12 @@ fn imply-converter (vT T static?)
         except (err)
     if static?
         let conv =
-            cast-converter '__static-imply '__static-rimply vT T
+            cast-converter '__static-imply '__static-rimply vQT T
         if (operator-valid? conv) (return conv)
-    cast-converter '__imply '__rimply vT T
+    cast-converter '__imply '__rimply vQT T
 
-fn as-converter (vT T static?)
+fn as-converter (vQT T static?)
+    let vT = ('strip-qualifiers vQT)
     if (ptrcmp== vT T)
         return `_
     if (sc_type_is_superof T vT)
@@ -1569,14 +1578,14 @@ fn as-converter (vT T static?)
         try
             return ('@ vT '__tobool)
         except (err)
-    let conv = (cast-converter '__as '__ras vT T)
+    let conv = (cast-converter '__as '__ras vQT T)
     if (operator-valid? conv) (return conv)
     # try implicit cast last
     if static?
         let conv =
-            cast-converter '__static-imply '__static-rimply vT T
+            cast-converter '__static-imply '__static-rimply vQT T
         if (operator-valid? conv) (return conv)
-    cast-converter '__imply '__rimply vT T
+    cast-converter '__imply '__rimply vQT T
 
 inline gen-cast-op (f str)
     spice-macro
@@ -1585,7 +1594,7 @@ inline gen-cast-op (f str)
             verify-count argc 2 2
             let value = ('getarg args 0)
             let anyT = ('getarg args 1)
-            let vT = ('typeof value)
+            let vT = ('qualified-typeof value)
             let T = (unbox-pointer anyT type)
             let conv = (f vT T ('constant? value))
             if (operator-valid? conv)
@@ -2338,7 +2347,7 @@ inline gen-cast? (converterf)
             let valueT constant =
                 if (band (== ('typeof value) type) ('constant? value))
                     _ (as value type) false
-                else (_ ('typeof value) ('constant? value))
+                else (_ ('qualified-typeof value) ('constant? value))
             let conv = (converterf valueT T constant)
             let result = (operator-valid? conv)
             `result
@@ -4451,6 +4460,21 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                 else
                     verify-count argc 1 1
                     `(nullof cls)
+    __imply =
+        do
+            inline arrayref->pointer (T)
+                inline (self)
+                    bitcast (reftoptr self) T
+            spice-cast-macro
+                fn "array.__imply" (cls T)
+                    # &(array T n) -> @T
+                    if ('refer? cls)
+                        if ('pointer? T)
+                            let clsET = ('element@ cls 0)
+                            let TET = ('element@ T 0)
+                            if (== clsET TET)
+                                return `(arrayref->pointer T)
+                    `()
     __as =
         do
             inline array-generator (arr)

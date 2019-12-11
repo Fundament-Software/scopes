@@ -2029,6 +2029,17 @@ struct LLVMIRGenerator {
         return LLVMGetUndef(LLT);
     }
 
+    SCOPES_RESULT(LLVMValueRef) GlobalString_to_value(const GlobalStringRef &node) {
+        //SCOPES_RESULT_TYPE(LLVMValueRef);
+        //LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
+        //auto ET = LLVMGetElementType(LLT);
+        auto data = LLVMConstString(node->value->data, node->value->count, true);
+        LLVMValueRef result = LLVMAddGlobal(module, LLVMTypeOf(data), "");
+        LLVMSetInitializer(result, data);
+        LLVMSetGlobalConstant(result, true);
+        return result;
+    }
+
     SCOPES_RESULT(LLVMValueRef) Global_to_value(const GlobalRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         auto it = global2global.find(node.unref());

@@ -654,6 +654,62 @@ GlobalRef Global::from(const Type *type, Symbol name, size_t flags, Symbol stora
 
 //------------------------------------------------------------------------------
 
+template<typename T>
+struct ConstSet {
+    struct Hash {
+        std::size_t operator()(const T *k) const {
+            return k->hash();
+        }
+    };
+
+    struct Equal {
+        std::size_t operator()(const T *self, const T *other) const {
+            return self->key_equal(other);
+        }
+    };
+
+    std::unordered_set<T *, Hash, Equal> map;
+
+    template<typename ... Args>
+    TValueRef<T> from(Args ... args) {
+        T key(args ...);
+        auto it = map.find(&key);
+        if (it != map.end()) {
+            return ref(unknown_anchor(), *it);
+        }
+        auto val = new T(args ...);
+        map.insert(val);
+        return ref(unknown_anchor(), val);
+    }
+};
+
+//------------------------------------------------------------------------------
+
+static ConstSet<GlobalString> globalstrings;
+
+GlobalString::GlobalString(const String *str)
+    : Pure(VK_GlobalString,
+        refer_type(
+            array_type(TYPE_I8, str->count + 1).assert_ok(),
+            PTF_NonWritable,
+            SYM_SPIRV_StorageClassPrivate)),
+        value(str)
+{}
+
+bool GlobalString::key_equal(const GlobalString *other) const {
+    return String::KeyEqual{}(value, other->value);
+}
+
+std::size_t GlobalString::hash() const {
+    return value->hash();
+}
+
+GlobalStringRef GlobalString::from(const String *str) {
+    return globalstrings.from(str);
+}
+
+//------------------------------------------------------------------------------
+
 PureCast::PureCast(const Type *type, const PureRef &_value)
     : Pure(VK_PureCast, type), value(_value) {}
 
@@ -1588,37 +1644,6 @@ SCOPES_CONST_VALUE_KIND()
 Const::Const(ValueKind _kind, const Type *type)
     : Pure(_kind, type) {
 }
-
-//------------------------------------------------------------------------------
-
-template<typename T>
-struct ConstSet {
-    struct Hash {
-        std::size_t operator()(const T *k) const {
-            return k->hash();
-        }
-    };
-
-    struct Equal {
-        std::size_t operator()(const T *self, const T *other) const {
-            return self->key_equal(other);
-        }
-    };
-
-    std::unordered_set<T *, Hash, Equal> map;
-
-    template<typename ... Args>
-    TValueRef<T> from(Args ... args) {
-        T key(args ...);
-        auto it = map.find(&key);
-        if (it != map.end()) {
-            return ref(unknown_anchor(), *it);
-        }
-        auto val = new T(args ...);
-        map.insert(val);
-        return ref(unknown_anchor(), val);
-    }
-};
 
 //------------------------------------------------------------------------------
 

@@ -38,6 +38,7 @@ namespace scopes {
 #define SCOPES_PURE_VALUE_KIND() \
     T(VK_Function, "value-kind-function", Function) \
     T(VK_Global, "value-kind-global", Global) \
+    T(VK_GlobalString, "value-kind-global-string", GlobalString) \
     T(VK_PureCast, "value-kind-pure-cast", PureCast) \
     T(VK_Undef, "value-kind-undef", Undef) \
     /* constants (Const::classof) */ \
