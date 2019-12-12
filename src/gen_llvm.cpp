@@ -2030,13 +2030,14 @@ struct LLVMIRGenerator {
     }
 
     SCOPES_RESULT(LLVMValueRef) GlobalString_to_value(const GlobalStringRef &node) {
-        //SCOPES_RESULT_TYPE(LLVMValueRef);
-        //LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
+        SCOPES_RESULT_TYPE(LLVMValueRef);
+        LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         //auto ET = LLVMGetElementType(LLT);
         auto data = LLVMConstString(node->value->data, node->value->count, true);
         LLVMValueRef result = LLVMAddGlobal(module, LLVMTypeOf(data), "");
         LLVMSetInitializer(result, data);
         LLVMSetGlobalConstant(result, true);
+        result = LLVMConstBitCast(result, LLT);
         return result;
     }
 
@@ -2118,9 +2119,9 @@ struct LLVMIRGenerator {
                     if (result) {
                         LLT = LLVMPointerType(LLT, 0);
                         if (LLVMTypeOf(result) != LLT) {
-                            //result = LLVMConstBitCast(result, LLT);
+                            result = LLVMConstBitCast(result, LLT);
                             //LLVMDumpValue(result);
-                            SCOPES_ERROR(CGenInvalidRedeclaration, name);
+                            //SCOPES_ERROR(CGenInvalidRedeclaration, name);
                         }
                     } else {
                         result = LLVMAddFunction(module, name, LLT);

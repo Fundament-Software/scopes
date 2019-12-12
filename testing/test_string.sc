@@ -48,3 +48,13 @@ test
         # all string compares are done at runtime
         "first line\nsecond line\n\nthird \"line\"\n    fourth line\n"
 
+# global strings
+###################
+
+let str = (sc_global_string_new "test\n")
+run-stage;
+print (sizeof str)
+let C = (include "stdio.h")
+C.extern.printf str
+print (imply str rawstring)
+
