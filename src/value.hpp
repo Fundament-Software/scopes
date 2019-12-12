@@ -1326,14 +1326,14 @@ struct Global : Pure {
 struct GlobalString : Pure {
     static bool classof(const Value *T);
 
-    GlobalString(const String *str);
+    GlobalString(const char *_data, size_t _count);
 
     bool key_equal(const GlobalString *other) const;
     std::size_t hash() const;
 
-    static GlobalStringRef from(const String *str);
+    static GlobalStringRef from(const char *_data, size_t _count);
 
-    const String *value;
+    std::string value;
 };
 
 //------------------------------------------------------------------------------

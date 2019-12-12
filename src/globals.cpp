@@ -1428,9 +1428,14 @@ sc_symbol_raises_t sc_global_storage_class(sc_valueref_t value) {
     SCOPES_C_RETURN(glob->storage_class);
 }
 
-sc_valueref_t sc_global_string_new(const sc_string_t *str) {
+sc_valueref_t sc_global_string_new(const char *ptr, size_t count) {
     using namespace scopes;
-    return GlobalString::from(str);
+    return GlobalString::from(ptr, count);
+}
+
+sc_valueref_t sc_global_string_new_from_cstr(const char *ptr) {
+    using namespace scopes;
+    return GlobalString::from(ptr, strlen(ptr));
 }
 
 sc_valueref_t sc_if_new() {
@@ -2331,7 +2336,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_binding, TYPE_I32, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_descriptor_set, TYPE_I32, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_storage_class, TYPE_Symbol, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_string_new, TYPE_ValueRef, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_string_new, TYPE_ValueRef, native_ro_pointer_type(TYPE_I8), TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_string_new_from_cstr, TYPE_ValueRef, native_ro_pointer_type(TYPE_I8));
     DEFINE_EXTERN_C_FUNCTION(sc_if_new, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_then_clause, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_if_append_else_clause, _void, TYPE_ValueRef, TYPE_ValueRef);

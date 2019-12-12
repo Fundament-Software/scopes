@@ -687,25 +687,25 @@ struct ConstSet {
 
 static ConstSet<GlobalString> globalstrings;
 
-GlobalString::GlobalString(const String *str)
+GlobalString::GlobalString(const char *_data, size_t _count)
     : Pure(VK_GlobalString,
         refer_type(
-            array_type(TYPE_I8, str->count).assert_ok(),
+            array_type(TYPE_I8, _count).assert_ok(),
             PTF_NonWritable,
             SYM_SPIRV_StorageClassPrivate)),
-        value(str)
-{}
+        value(_data, _count) {
+}
 
 bool GlobalString::key_equal(const GlobalString *other) const {
-    return String::KeyEqual{}(value, other->value);
+    return value == other->value;
 }
 
 std::size_t GlobalString::hash() const {
-    return value->hash();
+    return hash_bytes(value.data(), value.size());
 }
 
-GlobalStringRef GlobalString::from(const String *str) {
-    return globalstrings.from(str);
+GlobalStringRef GlobalString::from(const char *_data, size_t _count) {
+    return globalstrings.from(_data, _count);
 }
 
 //------------------------------------------------------------------------------

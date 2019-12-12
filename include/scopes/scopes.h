@@ -234,7 +234,8 @@ SCOPES_LIBEXPORT sc_int_raises_t sc_global_binding(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_int_raises_t sc_global_descriptor_set(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_symbol_raises_t sc_global_storage_class(sc_valueref_t value);
 
-SCOPES_LIBEXPORT sc_valueref_t sc_global_string_new(const sc_string_t *str);
+SCOPES_LIBEXPORT sc_valueref_t sc_global_string_new(const char *ptr, size_t count);
+SCOPES_LIBEXPORT sc_valueref_t sc_global_string_new_from_cstr(const char *ptr);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_if_new();
 SCOPES_LIBEXPORT void sc_if_append_then_clause(sc_valueref_t value, sc_valueref_t cond, sc_valueref_t body);
