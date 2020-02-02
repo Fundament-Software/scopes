@@ -612,7 +612,7 @@ typedef Set < Struct
         fn "__drop" (self)
             for i in (range 0:u64 (self._mask + 1:u64))
                 if (valid-slot? self i)
-                    drop (self._keys @ i)
+                    __drop (self._keys @ i)
             free self._valid
             free self._keys
 
