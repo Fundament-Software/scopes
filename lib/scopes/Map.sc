@@ -242,8 +242,8 @@ typedef Map < Struct
         for i in (range 0:u64 (self._mask + 1:u64))
             if (valid-slot? self i)
                 unset-slot self i
-                drop (self._keys @ i)
-                drop (self._values @ i)
+                __drop (self._keys @ i)
+                __drop (self._values @ i)
         self._count = 0:u64
         self._mask = MinMask
         return;
@@ -333,8 +333,8 @@ typedef Map < Struct
     fn __drop (self)
         for i in (range 0:u64 (self._mask + 1:u64))
             if (valid-slot? self i)
-                drop (self._keys @ i)
-                drop (self._values @ i)
+                __drop (self._keys @ i)
+                __drop (self._values @ i)
         free self._valid
         free self._keys
         free self._values
@@ -541,7 +541,7 @@ typedef Set < Struct
         for i in (range 0:u64 (self._mask + 1:u64))
             if (valid-slot? self i)
                 unset-slot self i
-                drop (self._keys @ i)
+                __drop (self._keys @ i)
         self._count = 0:u64
         self._mask = MinMask
         return;
