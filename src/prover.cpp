@@ -639,16 +639,19 @@ static void sort_drop_ids(const IDSet &invalid, IDs &drop_ids) {
     std::sort(drop_ids.rbegin(), drop_ids.rend());
 }
 
-static SCOPES_RESULT(void) merge_drop_values(const ASTContext &ctx,
-    const ValueRef &mover, const IDs &drop_ids) {
+static SCOPES_RESULT(void) drop_values(const ASTContext &ctx,
+    const ValueRef &mover, const IDSet &todrop) {
     SCOPES_RESULT_TYPE(void);
+    IDs drop_ids;
+    drop_ids.reserve(todrop.size());
+    sort_drop_ids(todrop, drop_ids);
     auto anchor = mover.anchor();
     for (auto &&id : drop_ids) {
         if (!ctx.block->is_valid(id)) // already moved
             continue;
         #if SCOPES_ANNOTATE_TRACKING
         StyledString ss;
-        ss.out << "merge-dropping " << id;
+        ss.out << "dropping " << id;
         write_annotation(ctx, anchor, ss.str(), {});
         #endif
         auto info = ctx.function->get_unique_info(id);
@@ -697,17 +700,21 @@ static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
         }
     }
 
-    // auto-drop all locally valid uniques
-    Block *block = ctx.block;
-    assert(block);
-    IDSet valid = block->valid;
-    for (auto id : valid) {
-        if (saved.count(id))
-            continue;
-        auto info = ctx.function->get_unique_info(id);
-        if (info.get_depth() <= retdepth)
-            continue;
-        SCOPES_CHECK_RESULT(drop_value(ctx, mover, info.value));
+    {
+        // auto-drop all locally valid uniques
+        Block *block = ctx.block;
+        assert(block);
+        IDSet valid = block->valid;
+        IDSet todrop;
+        for (auto id : valid) {
+            if (saved.count(id))
+                continue;
+            auto info = ctx.function->get_unique_info(id);
+            if (info.get_depth() <= retdepth)
+                continue;
+            todrop.insert(id);
+        }
+        SCOPES_CHECK_RESULT(drop_values(ctx, mover, todrop));
     }
 
     return {};
@@ -749,11 +756,7 @@ SCOPES_RESULT(void) finalize_merges(const ASTContext &ctx,
         SCOPES_CHECK_RESULT(validate_merge_values(valid, merge->values));
         // values to drop: deleted values which are still alive in merge block
         IDSet todrop = intersect_idset(deleted, merge->block->valid);
-        IDs drop_ids;
-        drop_ids.reserve(todrop.size());
-        sort_drop_ids(todrop, drop_ids);
-        SCOPES_CHECK_RESULT(
-            merge_drop_values(mctx, merge, drop_ids));
+        SCOPES_CHECK_RESULT(drop_values(mctx, merge, todrop));
     }
     return {};
 }
@@ -793,21 +796,13 @@ SCOPES_RESULT(void) finalize_returns_raises(const ASTContext &ctx) {
         auto mctx = ctx.with_block(*merge->block);
         SCOPES_CHECK_RESULT(validate_merge_values(valid, merge->values));
         IDSet todrop = intersect_idset(deleted, merge->block->valid);
-        IDs drop_ids;
-        drop_ids.reserve(todrop.size());
-        sort_drop_ids(todrop, drop_ids);
-        SCOPES_CHECK_RESULT(
-            merge_drop_values(mctx, merge, drop_ids));
+        SCOPES_CHECK_RESULT(drop_values(mctx, merge, todrop));
     }
     for (auto merge : ctx.function->raises) {
         auto mctx = ctx.with_block(*merge->block);
         SCOPES_CHECK_RESULT(validate_merge_values(valid, merge->values));
         IDSet todrop = intersect_idset(deleted, merge->block->valid);
-        IDs drop_ids;
-        drop_ids.reserve(todrop.size());
-        sort_drop_ids(todrop, drop_ids);
-        SCOPES_CHECK_RESULT(
-            merge_drop_values(mctx, merge, drop_ids));
+        SCOPES_CHECK_RESULT(drop_values(mctx, merge, todrop));
     }
     return {};
 }

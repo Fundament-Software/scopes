@@ -497,5 +497,40 @@ test-error (One.test-refcount-balanced)
 
 # TODO: builtins
 
+fn test-drop ()
+    # testing destructor order
+
+    using import struct
+    global idx = 0
+    struct LoudDrop
+        index : i32
+        inline __typecall (cls)
+            print "creating" (deref idx)
+            local index = idx
+            idx += 1
+            super-type.__typecall cls
+                index = index
+        inline __drop (self)
+            print "dropping" self.index
+            idx -= 1
+            assert (idx == self.index)
+            ;
+
+    dump (LoudDrop)
+    dump (LoudDrop)
+    dump (LoudDrop)
+    dump (LoudDrop)
+    dump (LoudDrop)
+    dump (LoudDrop)
+    dump (LoudDrop)
+    dump (LoudDrop)
+    dump (LoudDrop)
+    dump (LoudDrop)
+    dump (LoudDrop)
+    dump (LoudDrop)
+    return;
+
+test-drop;
+print "done"
 
 ;
