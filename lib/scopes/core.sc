@@ -4751,16 +4751,31 @@ let vectorof =
             let ET = (('getarg args 0) as type)
             let numvals = (sub argc 1)
 
-            # generate insert instructions
+            let values = (alloca-array Value numvals)
+            # check if all arguments are constant and convert accordingly
+            let const? =
+                loop (i const? = 0 true)
+                    if (i == numvals)
+                        break const?
+                    let arg = ('getarg args (add i 1))
+                    let arg =
+                        if ((sc_value_type arg) == ET) arg
+                        else
+                            hide-traceback;
+                            sc_prove ('tag `(arg as ET) ('anchor arg))
+                    store arg (getelementptr values i)
+                    _ (i + 1) (const? & ('constant? arg))
+
             let TT = (sc_vector_type ET (usize numvals))
-            loop (i result = 0 `(nullof TT))
-                if (i == numvals)
-                    break result
-                let arg = ('getarg args (add i 1))
-                let arg =
-                    if ((sc_value_type arg) == ET) arg
-                    else `(arg as ET)
-                _ (i + 1) `(insertelement result arg i)
+            if const?
+                sc_const_aggregate_new TT numvals values
+            else
+                # generate insert instructions
+                loop (i result = 0 `(nullof TT))
+                    if (i == numvals)
+                        break result
+                    let arg = (load (getelementptr values i))
+                    _ (i + 1) `(insertelement result arg i)
 
 #-------------------------------------------------------------------------------
 
