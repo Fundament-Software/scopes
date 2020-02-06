@@ -327,6 +327,9 @@ typedef Map < Struct
             inline "fail" ()
                 return;
 
+    inline __tobool (self)
+        self._count != 0:usize
+
     inline __countof (self)
         (deref self._count) as usize
 
@@ -604,6 +607,9 @@ typedef Set < Struct
             set-generator
         else
             ;
+
+    inline __tobool (self)
+        self._count != 0:usize
 
     inline __countof (self)
         (deref self._count) as usize
