@@ -437,7 +437,9 @@ inline Option (T)
         case (cls : type,)
             this-type.None;
         case (cls : type, value)
-            this-type.Some value
+            # follow same rules as assignment
+            (this-type.__rimply this-type (typeof value))
+                value
 
         inline __tobool (self)
             dispatch self
