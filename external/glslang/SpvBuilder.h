@@ -566,7 +566,7 @@ public:
     // Remove OpDecorate instructions whose operands are defined in unreachable
     // blocks.
     void eliminateDeadDecorations();
-    void dump(std::vector<unsigned int>&) const;
+    void dump(unsigned int version, std::vector<unsigned int>&) const;
 
     void createBranch(Block* block);
     void createConditionalBranch(Id condition, Block* thenBlock, Block* elseBlock);
