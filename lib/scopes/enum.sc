@@ -459,7 +459,13 @@ inline Option (T)
                     this-type.None;
             else (imply? other-cls T)
                 inline (self)
-                    this-type.Some self
+                    static-if (T < pointer)
+                        if (self == null)
+                            this-type.None;
+                        else
+                            this-type.Some self
+                    else
+                        this-type.Some self
 
 do
     let enum dispatch Enum Option
