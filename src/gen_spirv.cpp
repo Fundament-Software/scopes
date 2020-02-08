@@ -1979,6 +1979,26 @@ struct SPIRVGenerator {
                 name = node->name.name()->data;
                 break;
         }
+        switch (builtin) {
+        case spv::BuiltInClipDistance:
+            builder.addCapability(spv::CapabilityClipDistance); break;
+        case spv::BuiltInCullDistance:
+            builder.addCapability(spv::CapabilityCullDistance); break;
+        case spv::BuiltInPrimitiveId:
+            builder.addCapability(spv::CapabilityRayTracingNV); break;
+        case spv::BuiltInLayer:
+            builder.addCapability(spv::CapabilityShaderViewportIndexLayerEXT);
+            break;
+        case spv::BuiltInViewportIndex:
+            builder.addCapability(spv::CapabilityMultiViewport);
+            builder.addCapability(spv::CapabilityShaderViewportIndexLayerEXT);
+            break;
+        case spv::BuiltInSampleId:
+        case spv::BuiltInSamplePosition:
+            builder.addCapability(spv::CapabilitySampleRateShading);
+            break;
+        default: break;
+        }
         auto ty = SCOPES_GET_RESULT(type_to_spirv_type(node->element_type, node->flags));
         auto id = builder.createVariable(sc, ty, name);
         if (builtin != spv::BuiltInMax) {
@@ -2258,7 +2278,8 @@ struct SPIRVGenerator {
             }
         }
 
-        builder.dump(result);
+        // fixed: Invalid SPIR-V binary version 1.3 for target environment SPIR-V 1.0 (under OpenGL 4.5 semantics).
+        builder.dump((env == SPV_ENV_OPENGL_4_5)?0x10000:spv::Version, result);
 
         SCOPES_CHECK_RESULT(verify_spirv(env, result));
 

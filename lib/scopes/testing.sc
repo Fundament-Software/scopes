@@ -90,7 +90,7 @@ define-sugar-macro test-error
 
     inline assertion-error! (msg)
         let assert-msg =
-            .. "error assertion failed: "
+            .. "error test failed: "
                 if (== (typeof msg) string) msg
                 else (repr msg)
         error assert-msg
@@ -121,23 +121,23 @@ sugar test-compiler-error (args...)
             sc_compile (sc_typify f 0 null) 0:u64
             false
         except (err)
-            io-write! "ASSERT OK: "
+            io-write! "COMPILER ERROR TEST OK: "
             print
                 'format err
             true
 
     inline assertion-error! (anchor msg)
         let assert-msg =
-            .. "compiler error assertion failed: "
+            .. "compiler error test failed: "
                 if (== (typeof msg) string) msg
                 else (repr msg)
         hide-traceback;
-        error@ anchor "while checking assertion" assert-msg
+        error@ anchor "while checking test" assert-msg
     let cond body = (decons args...)
     let cond =
         try (sc_expand cond '() sugar-scope)
         except (err)
-            io-write! "ASSERT OK (while expanding): "
+            io-write! "COMPILER ERROR TEST OK (while expanding): "
             print
                 'format err
             return '()

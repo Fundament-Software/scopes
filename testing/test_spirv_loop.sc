@@ -17,6 +17,7 @@ let s =
     compile-spirv 'fragment
         typify main
         'O2
+        'dump-disassembly
 assert (not (empty? s))
 
 compile-glsl 0 'fragment
