@@ -170,6 +170,11 @@ do
         a : i32
         b
 
+    test (A.a.Literal == 0)
+    test (A.a.Name == 'a)
+    test (A.b.Literal == 1)
+    test (A.b.Name == 'b)
+
     dump
         arrayof A
             A.a 0
@@ -198,9 +203,9 @@ do
         do
             dispatch rad
             case A (a b c)
-                assert (a == x)
-                assert (b == y) # fails
-                assert (c == z)
+                test (a == x)
+                test (b == y) # fails
+                test (c == z)
             default;
 
     testval 0x1234 0x5678 0xabcd
