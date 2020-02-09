@@ -99,4 +99,19 @@ test-compiler-error
             repeat (i + 1)
         true
 
+do
+    # for-in/else form
+
+    fn contains? (x)
+        for i in (range 10)
+            if (i == x)
+                break true
+        else
+            print "not found"
+            false
+
+    assert (contains? 3)
+    assert (not (contains? 13))
+
+
 true

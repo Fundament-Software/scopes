@@ -3466,6 +3466,15 @@ let va-option =
                 # return the next iterator in sequence
                 'next container it...
 
+fn next-head? (next)
+    if (not (empty? next))
+        let expr next = (decons next)
+        if (('typeof expr) == list)
+            let at = ('@ (expr as list))
+            if (('typeof at) == Symbol)
+                return (at as Symbol) ('anchor at)
+    _ unnamed unknown-anchor
+
 """".. sugar:: (for name ... _:in gen body...)
 
     Defines a loop that enumerates all elements in collection or sequence
@@ -3497,6 +3506,16 @@ define for
     sugar-block-scope-macro
         fn "expand-for" (topexpr scope)
             let expr next-expr = (decons topexpr)
+            let else-head else-head-anchor = (next-head? next-expr)
+            let has-else? = (else-head == 'else)
+            let else-body next-expr =
+                if has-else?
+                    let at next-expr = (decons next-expr)
+                    let block = (at as list)
+                    let at block = (decons block)
+                    _ block next-expr
+                else
+                    _ '() next-expr
             let expr = (expr as list)
             let head args = (decons expr)
             let it params =
@@ -3541,7 +3560,12 @@ define for
                                     'tag value ('anchor head)
                                 continue;
                             else
-                                break;
+                                spice-unquote
+                                    if has-else?
+                                        let value = (sc_expand (cons do else-body) '() subscope)
+                                        'tag `(break [value]) else-head-anchor
+                                    else
+                                        `(break)
                     next-expr
             return result scope
 
@@ -4936,15 +4960,6 @@ fn check-count (count mincount maxcount)
         if (icmp>s count maxcount)
             return false
     return true
-
-fn next-head? (next)
-    if (not (empty? next))
-        let expr next = (decons next)
-        if (('typeof expr) == list)
-            let at = ('@ (expr as list))
-            if (('typeof at) == Symbol)
-                return (at as Symbol) ('anchor at)
-    _ unnamed unknown-anchor
 
 inline gen-match-block-parser (handle-case)
     sugar-block-scope-macro
