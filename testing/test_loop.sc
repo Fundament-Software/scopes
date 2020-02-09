@@ -113,5 +113,15 @@ do
     assert (contains? 3)
     assert (not (contains? 13))
 
+do
+    let u v w =
+        fold (a b c = 1 2 3) for i in (range 3)
+            print a b c
+            if true
+                repeat 4 5 6
+            _ 1 2 3
+    test (u == 4)
+    test (v == 5)
+    test (w == 6)
 
 true

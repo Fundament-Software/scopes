@@ -6460,9 +6460,8 @@ sugar unlet ((name as Symbol) names...)
        the loop. The state of `gen` is transparently maintained and does not
        have to be managed.
 
-       Unlike `for`, `fold` requires both calls to ``break`` and ``continue``
-       to pass a state compatible with `state ...`. Otherwise they serve
-       the same function.
+       Unlike `for`, `fold` requires calls to ``break`` to pass a state
+       compatible with `state ...`. Otherwise they serve the same function.
 
        Usage example::
 
@@ -6474,7 +6473,7 @@ sugar unlet ((name as Symbol) names...)
                         break sum
                     if (i == 5)
                         # skip this index
-                        continue sum
+                        continue;
                     # continue with the next state for sum
                     sum + i
 sugar fold ((binding...) 'for expr...)
@@ -6502,9 +6501,11 @@ sugar fold ((binding...) 'for expr...)
                 if (valid? it...)
                     inline continue ()
                         repeat (va-append-va state (next it...))
+                    inline _repeat (newstate...)
+                        repeat (va-append-va (inline () newstate...) (next it...))
                     let at... = (at it...)
                     let state... = (state)
-                    let newstate... =
+                    _repeat
                         spice-unquote
                             let expr1 expr2 =
                                 cons let ('rjoin itparams (list '= at...))
@@ -6513,9 +6514,10 @@ sugar fold ((binding...) 'for expr...)
                             let expr2 = ('tag `expr2 anchor)
                             let subscope =
                                 'bind subscope 'continue continue
+                            let subscope =
+                                'bind subscope 'repeat _repeat
                             let result = (sc_expand (cons ('tag `do anchor) expr1 expr2 body) '() subscope)
                             result
-                    repeat (va-append-va (inline () newstate...) (next it...))
                 else
                     break (state)
 
