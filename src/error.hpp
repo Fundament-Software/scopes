@@ -117,7 +117,7 @@ formatters:
         syntax_undeclared_identifier_print_suggestions, \
         Symbol, PScope) \
     T(SyntaxExceptBlockExpected, \
-        "syntax: except block expected") \
+        "syntax: except or else block expected") \
     T(SyntaxMissingDefaultCase, \
         "syntax: missing default case") \
     T(SyntaxCaseBlockExpected, \
