@@ -443,7 +443,9 @@ spice extract-payload (enum-value extractT)
 
 run-stage;
 
-typedef UnwrapError
+typedef UnwrapError : (tuple)
+    inline __typecall (cls)
+        bitcast none this-type
 
 @@ memo
 inline Option (T)
@@ -484,7 +486,7 @@ inline Option (T)
             if self
                 extract-payload self T
             else
-                raise UnwrapError
+                raise (UnwrapError)
 
 
 do
