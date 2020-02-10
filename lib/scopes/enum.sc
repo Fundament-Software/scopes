@@ -9,20 +9,51 @@
     Support for defining tagged unions and classical enums through the `enum`
     sugar.
 
+# typechecking-time function
+fn _extract-payload (enum-value extractT)
+    extractT as:= type
+    # don't bother if it's a unit tag
+    if (extractT == Nothing)
+        return (spice-quote none)
+
+    let qcls = ('qualified-typeof enum-value)
+    let cls = ('strip-qualifiers qcls)
+    let payload-cls = ('element@ cls 1)
+    let raw-payload = `(extractvalue enum-value 1)
+    let refer = ('refer? qcls)
+    let ptrT = ('refer->pointer-type qcls)
+
+    let extracted =
+        if refer
+            let ptrET = ('change-element-type ptrT extractT)
+            spice-quote
+                let ptr = (reftoptr raw-payload)
+                let ptr = (bitcast ptr ptrET)
+                ptrtoref ptr
+        else
+            let ptrET = ('change-storage-class
+                ('mutable (pointer.type extractT)) 'Function)
+            spice-quote
+                let ptr = (alloca payload-cls)
+                store raw-payload ptr
+                let ptr = (bitcast ptr ptrET)
+                load ptr
+    let ET = ('strip-qualifiers extractT)
+    let extracted =
+        if (ET < tuple)
+            `(unpack extracted)
+        else extracted
+
 # tagged union / sum type
 typedef Enum
     spice __dispatch (self handlers...)
         let qcls = ('qualified-typeof self)
         let cls = ('strip-qualifiers qcls)
-        let payload-cls = ('element@ cls 1)
         let fields = (('@ cls '__fields) as type)
         let field-types = ('@ cls '__fields__)
         let field-type-args = ('args field-types)
-        let expression =
         let tag = `(extractvalue self 0)
         let sw = (sc_switch_new tag)
-        let refer = ('refer? qcls)
-        let ptrT = ('refer->pointer-type qcls)
         for arg in ('args handlers...)
             let anchor = ('anchor arg)
             let key arg = ('dekey arg)
@@ -33,28 +64,9 @@ typedef Enum
                 let ET = ('key-type ('element@ fields i) unnamed)
                 let field = (('getarg field-types i) as type)
                 let lit = ('@ field 'Literal)
-                let payload = `(extractvalue self 1)
-                let extracted =
-                    if refer
-                        let ptrET = ('change-element-type ptrT ET)
-                        spice-quote
-                            let ptr = (reftoptr payload)
-                            let ptr = (bitcast ptr ptrET)
-                            ptrtoref ptr
-                    else
-                        let ptrET = ('change-storage-class
-                            ('mutable (pointer.type ET)) 'Function)
-                        spice-quote
-                            let ptr = (alloca payload-cls)
-                            store payload ptr
-                            let ptr = (bitcast ptr ptrET)
-                            load ptr
-                let ET = ('strip-qualifiers ET)
-                let extracted =
-                    if (ET < tuple)
-                        `(unpack extracted)
-                    else extracted
-                sc_switch_append_case sw lit ('tag `(arg extracted) anchor)
+                let extractT = ('@ field 'Type)
+                let payload = (_extract-payload self extractT)
+                sc_switch_append_case sw lit ('tag `(arg payload) anchor)
         sw
 
 fn define-field-runtime (T name field-type index-value)
@@ -425,7 +437,13 @@ sugar dispatch (value)
         default
             error "missing default case"
 
+# wrap for usage outside spices
+spice extract-payload (enum-value extractT)
+    _extract-payload enum-value extractT
+
 run-stage;
+
+typedef UnwrapError
 
 @@ memo
 inline Option (T)
@@ -461,6 +479,13 @@ inline Option (T)
             else (imply? other-cls T)
                 inline (self)
                     this-type.Some self
+
+        inline unwrap (self)
+            if self
+                extract-payload self T
+            else
+                raise UnwrapError
+
 
 do
     let enum dispatch Enum Option
