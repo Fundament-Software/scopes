@@ -1,4 +1,6 @@
 
+using import testing
+
 let tuple_i8_i32 = (tuple i8 i32)
 
 run-stage;
@@ -26,3 +28,12 @@ do
     assert ((@ k 0 1) == 4)
     assert ((@ k 1 1) == 5)
     assert ((@ k 2 1) == 6)
+
+do
+    let a = (tupleof 1 606 true)
+    let b = (tupleof 1 606 true)
+    let c = (tupleof 1 606 false)
+
+    test (a == b)
+    test (b != c)
+

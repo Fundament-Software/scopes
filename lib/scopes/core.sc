@@ -7050,7 +7050,26 @@ fn constructor (cls args...)
 # tuple construction
 #-------------------------------------------------------------------------------
 
+# comparison
+spice tuple== (self other)
+    let cls = ('typeof self)
+    let numfields = ('element-count cls)
+    let block = (sc_if_new)
+    let quoted-false = `false
+    loop (i = 0)
+        if (i == numfields)
+            break;
+        sc_if_append_then_clause block `((@ self i) != (@ other i)) quoted-false
+        i + 1
+    sc_if_append_else_clause block `true
+    block
+
 typedef+ tuple
+    spice-quote
+        inline __== (cls T)
+            static-if (cls == T)
+                tuple==
+
     # extend type constructor with value constructor
     spice __typecall (cls args...)
         let cls = (cls as type)
@@ -7390,6 +7409,7 @@ let e = e:f32
 
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
+    \ tuple==
 
 run-stage; # 12
 
