@@ -1586,6 +1586,10 @@ LabelTemplateRef LabelTemplate::except_from(const ValueRef &value) {
     return ref(unknown_anchor(), new LabelTemplate(LK_Except, KW_Except, value));
 }
 
+LabelTemplateRef LabelTemplate::except_all_from(const ValueRef &value) {
+    return ref(unknown_anchor(), new LabelTemplate(LK_ExceptAll, KW_Else, value));
+}
+
 //------------------------------------------------------------------------------
 
 bool Pure::classof(const Value *T) {

@@ -219,12 +219,12 @@ fn finalize-enum-runtime (T storage)
         for field in field-type-args
             let field = (field as type)
             let name = (('@ field 'Name) as Symbol)
+            check-field-redefinition name T
             let index = (('@ field 'Index) as u64)
             let field-type = (('@ field 'Type) as type)
             if (field-type != Nothing)
                 error "plain enums can't have tagged fields"
             let value = (sc_const_int_new T index)
-            check-field-redefinition name T
             'set-symbol T name value
             using-scope =
                 'bind using-scope name value
@@ -283,14 +283,15 @@ fn finalize-enum-runtime (T storage)
         for i _field in (enumerate field-type-args)
             let field = (_field as type)
             let name = (('@ field 'Name) as Symbol)
+            check-field-redefinition name type
             let index = (('@ field 'Index) as u64)
             let field-type = (('@ field 'Type) as type)
             let index-value = (sc_const_int_new index-type index)
             'set-symbol field 'Literal index-value
-            let value =
+            let constructor =
                 if (field-type == Nothing)
                     spice-quote
-                        inline constructor ()
+                        inline constructor (cls)
                             unit-tag-constructor T index-value payload-type
                     sc_template_set_name constructor name
                     constructor
@@ -298,15 +299,14 @@ fn finalize-enum-runtime (T storage)
                     let TT = ('change-storage-class
                             ('mutable (pointer.type field-type)) 'Function)
                     spice-quote
-                        inline constructor (...)
+                        inline constructor (cls ...)
                             tag-constructor T index-value payload-type field-type TT ...
                     sc_template_set_name constructor name
                     constructor
-
-            check-field-redefinition name Unknown
-            'set-symbol T name value
+            'set-symbol field '__typecall constructor
+            'set-symbol T name field
             using-scope =
-                'bind using-scope name value
+                'bind using-scope name field
     'set-symbol T '__using (deref using-scope)
     ;
 

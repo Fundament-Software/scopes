@@ -893,6 +893,9 @@ static SCOPES_RESULT(TypedValueRef) make_raise1(
     SCOPES_RESULT_TYPE(TypedValueRef);
     auto anchor = mover.anchor();
     if (ctx.except) {
+        if (ctx.except->label_kind == LK_ExceptAll) {
+            values.clear();
+        }
         return make_merge1(ctx, anchor, ctx.except, values);
     } else {
         SCOPES_CHECK_RESULT(move_merge_values(ctx, mover, 0, values, "raise"));
@@ -940,6 +943,7 @@ static SCOPES_RESULT(TypedValueRef) prove_LabelTemplate(const ASTContext &ctx, c
     const char *by = "label merge";
     ASTContext labelctx;
     switch (label->label_kind) {
+    case LK_ExceptAll:
     case LK_Except: {
         by = "exception";
         result = SCOPES_GET_RESULT(

@@ -2278,7 +2278,8 @@ struct SPIRVGenerator {
             }
         }
 
-        builder.dump(result);
+        // fixed: Invalid SPIR-V binary version 1.3 for target environment SPIR-V 1.0 (under OpenGL 4.5 semantics).
+        builder.dump((env == SPV_ENV_OPENGL_4_5)?0x10000:spv::Version, result);
 
         SCOPES_CHECK_RESULT(verify_spirv(env, result));
 

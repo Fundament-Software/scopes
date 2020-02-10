@@ -1,3 +1,5 @@
+using import testing
+
 do
     let ok =
         try
@@ -31,22 +33,45 @@ fn test-loop-xp ()
 
 test-loop-xp;
 
-# test void exception type
-try
-    print "in try"
-    raise;
-except (err)
-    static-assert (none? err)
-    print "in except"
-
-fn raise-void ()
-    print "in raise-void"
-    raise;
-
-fn try-catch-void ()
+do
+    # test void exception type
     try
-        raise-void;
-    except ()
-        print "caught the void"
+        print "in try"
+        raise;
+    except (err)
+        static-assert (none? err)
+        print "in except"
 
-try-catch-void;
+    fn raise-void ()
+        print "in raise-void"
+        raise;
+
+    fn try-catch-void ()
+        try
+            raise-void;
+        except ()
+            print "caught the void"
+
+    try-catch-void;
+
+do
+    # test try/else
+    fn test-try-else (x)
+        try
+            if (x == 1)
+                raise true
+            elseif (x == 2)
+                raise (One 100)
+            elseif (x == 3)
+                error "error"
+            else
+                true
+        else # catch-all permits polymorphic raise type
+            print "error occurred with x =" x
+            false
+
+    test-try-else 0
+    test-try-else 1
+    test-try-else 2
+    test-try-else 3
+    One.test-refcount-balanced;

@@ -3466,6 +3466,15 @@ let va-option =
                 # return the next iterator in sequence
                 'next container it...
 
+fn next-head? (next)
+    if (not (empty? next))
+        let expr next = (decons next)
+        if (('typeof expr) == list)
+            let at = ('@ (expr as list))
+            if (('typeof at) == Symbol)
+                return (at as Symbol) ('anchor at)
+    _ unnamed unknown-anchor
+
 """".. sugar:: (for name ... _:in gen body...)
 
     Defines a loop that enumerates all elements in collection or sequence
@@ -3497,6 +3506,16 @@ define for
     sugar-block-scope-macro
         fn "expand-for" (topexpr scope)
             let expr next-expr = (decons topexpr)
+            let else-head else-head-anchor = (next-head? next-expr)
+            let has-else? = (else-head == 'else)
+            let else-body next-expr =
+                if has-else?
+                    let at next-expr = (decons next-expr)
+                    let block = (at as list)
+                    let at block = (decons block)
+                    _ block next-expr
+                else
+                    _ '() next-expr
             let expr = (expr as list)
             let head args = (decons expr)
             let it params =
@@ -3541,7 +3560,12 @@ define for
                                     'tag value ('anchor head)
                                 continue;
                             else
-                                break;
+                                spice-unquote
+                                    if has-else?
+                                        let value = (sc_expand (cons do else-body) '() subscope)
+                                        'tag `(break [value]) else-head-anchor
+                                    else
+                                        `(break)
                     next-expr
             return result scope
 
@@ -4936,15 +4960,6 @@ fn check-count (count mincount maxcount)
         if (icmp>s count maxcount)
             return false
     return true
-
-fn next-head? (next)
-    if (not (empty? next))
-        let expr next = (decons next)
-        if (('typeof expr) == list)
-            let at = ('@ (expr as list))
-            if (('typeof at) == Symbol)
-                return (at as Symbol) ('anchor at)
-    _ unnamed unknown-anchor
 
 inline gen-match-block-parser (handle-case)
     sugar-block-scope-macro
@@ -6445,9 +6460,8 @@ sugar unlet ((name as Symbol) names...)
        the loop. The state of `gen` is transparently maintained and does not
        have to be managed.
 
-       Unlike `for`, `fold` requires both calls to ``break`` and ``continue``
-       to pass a state compatible with `state ...`. Otherwise they serve
-       the same function.
+       Unlike `for`, `fold` requires calls to ``break`` to pass a state
+       compatible with `state ...`. Otherwise they serve the same function.
 
        Usage example::
 
@@ -6459,7 +6473,7 @@ sugar unlet ((name as Symbol) names...)
                         break sum
                     if (i == 5)
                         # skip this index
-                        continue sum
+                        continue;
                     # continue with the next state for sum
                     sum + i
 sugar fold ((binding...) 'for expr...)
@@ -6487,9 +6501,11 @@ sugar fold ((binding...) 'for expr...)
                 if (valid? it...)
                     inline continue ()
                         repeat (va-append-va state (next it...))
+                    inline _repeat (newstate...)
+                        repeat (va-append-va (inline () newstate...) (next it...))
                     let at... = (at it...)
                     let state... = (state)
-                    let newstate... =
+                    _repeat
                         spice-unquote
                             let expr1 expr2 =
                                 cons let ('rjoin itparams (list '= at...))
@@ -6498,9 +6514,10 @@ sugar fold ((binding...) 'for expr...)
                             let expr2 = ('tag `expr2 anchor)
                             let subscope =
                                 'bind subscope 'continue continue
+                            let subscope =
+                                'bind subscope 'repeat _repeat
                             let result = (sc_expand (cons ('tag `do anchor) expr1 expr2 body) '() subscope)
                             result
-                    repeat (va-append-va (inline () newstate...) (next it...))
                 else
                     break (state)
 
@@ -7033,7 +7050,26 @@ fn constructor (cls args...)
 # tuple construction
 #-------------------------------------------------------------------------------
 
+# comparison
+spice tuple== (self other)
+    let cls = ('typeof self)
+    let numfields = ('element-count cls)
+    let block = (sc_if_new)
+    let quoted-false = `false
+    loop (i = 0)
+        if (i == numfields)
+            break;
+        sc_if_append_then_clause block `((@ self i) != (@ other i)) quoted-false
+        i + 1
+    sc_if_append_else_clause block `true
+    block
+
 typedef+ tuple
+    spice-quote
+        inline __== (cls T)
+            static-if (cls == T)
+                tuple==
+
     # extend type constructor with value constructor
     spice __typecall (cls args...)
         let cls = (cls as type)
@@ -7373,6 +7409,7 @@ let e = e:f32
 
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
+    \ tuple==
 
 run-stage; # 12
 

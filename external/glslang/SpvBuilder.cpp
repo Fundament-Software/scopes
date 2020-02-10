@@ -2422,11 +2422,11 @@ void Builder::eliminateDeadDecorations() {
         decorations.end());
 }
 
-void Builder::dump(std::vector<unsigned int>& out) const
+void Builder::dump(unsigned int version, std::vector<unsigned int>& out) const
 {
     // Header, before first instructions:
     out.push_back(MagicNumber);
-    out.push_back(Version);
+    out.push_back(version);
     out.push_back(builderNumber);
     out.push_back(uniqueId + 1);
     out.push_back(0);
