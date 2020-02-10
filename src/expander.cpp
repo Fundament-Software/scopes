@@ -319,11 +319,6 @@ struct Expander {
         return tok == OP_Set;
     }
 
-    bool is_except_token(const ValueRef &name) {
-        auto tok = try_extract_symbol(name);
-        return tok == KW_Except;
-    }
-
     // (loop ([x...] [= init...]) body...)
     SCOPES_RESULT(ValueRef) expand_loop(const List *it) {
         SCOPES_RESULT_TYPE(ValueRef);
@@ -606,11 +601,12 @@ struct Expander {
     }
 
     // (try [x ...]) (except (param ...) [expr ...])
+    // (try [x ...]) (else [expr ...])
     SCOPES_RESULT(ValueRef) expand_try(const List *it) {
         SCOPES_RESULT_TYPE(ValueRef);
 
         /*
-        # we're building this structure
+        # for try/except, we're building this structure
         label try
             let except-param ... =
                 label except
@@ -618,6 +614,15 @@ struct Expander {
                         do
                             try-body ...
                             (any raise merges to except)
+            except-body ...
+
+        # for try/else, we're building this structure
+        label try
+            label except
+                merge try
+                    do
+                        try-body ...
+                        (any raise merges void to except)
             except-body ...
         */
 
@@ -631,17 +636,34 @@ struct Expander {
         ValueRef try_value = SCOPES_GET_RESULT(subexp.expand_expression(
             ref(try_anchor, it), false));
         LabelTemplateRef try_label = ref(try_anchor, LabelTemplate::try_from());
-        LabelTemplateRef except_label = ref(try_anchor, LabelTemplate::except_from(
-            ref(try_anchor, MergeTemplate::from(try_label, try_value))));
-
         if (next != EOL) {
             //auto _next_def = next->at;
             it = SCOPES_GET_RESULT(extract_list_constant(next->at));
             if (it != EOL) {
-                if (is_except_token(it->at)) {
+                auto tok = try_extract_symbol(it->at);
+                switch (tok.known_value()) {
+                case KW_Else: {
+                    auto except_anchor = it->at.anchor();
+                    LabelTemplateRef except_label = ref(except_anchor, LabelTemplate::except_all_from(
+                        ref(try_anchor, MergeTemplate::from(try_label, try_value))));
+                    it = it->next;
+                    next = next->next;
+
+                    Expander subexp(Scope::from(nullptr, env), astscope);
+                    auto expr = Expression::unscoped_from();
+                    expr->append(except_label);
+
+                    ValueRef except_value = SCOPES_GET_RESULT(
+                        subexp.expand_expression(ref(except_anchor, it), false));
+                    expr->append(except_value);
+                    try_label->value = ref(except_anchor, expr);
+                    return ValueRef(try_label);
+                } break;
+                case KW_Except: {
                     SCOPES_CHECK_RESULT(verify_list_parameter_count("except", it, 1, -1));
                     auto except_anchor = it->at.anchor();
-                    except_label = ref(except_anchor, except_label);
+                    LabelTemplateRef except_label = ref(except_anchor, LabelTemplate::except_from(
+                        ref(try_anchor, MergeTemplate::from(try_label, try_value))));
                     it = it->next;
                     next = next->next;
 
@@ -680,6 +702,8 @@ struct Expander {
                     expr->append(except_value);
                     try_label->value = ref(except_anchor, expr);
                     return ValueRef(try_label);
+                } break;
+                default: break;
                 }
             }
         }
