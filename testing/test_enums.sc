@@ -228,35 +228,3 @@ do
             B
             C
 ;
-
-# Option type
-# wrap pointers as options (enforces null check)
-do
-    let i32ptrOption = (Option (pointer i32))
-    fn test-option (opt some _none)
-        let result =
-            dispatch opt
-            case Some (v)
-                some
-            case None ()
-                _none
-            default
-                _none
-        test result
-
-    let opt0 = (i32ptrOption)
-    test-option opt0 false true
-
-    # test initialization as null
-    let opt1 = (i32ptrOption null)
-    test-option opt1 false true
-
-    # test ptr assignment (non constant)
-    local ptr : (pointer i32) = null
-    let opt2 = (i32ptrOption (deref ptr))
-    test-option opt2 false true
-
-    ptr = (inttoptr 100 (pointer i32)) # don't use this!
-    local opt3 : i32ptrOption
-    opt3 = (deref ptr)
-    test-option opt3 true false
