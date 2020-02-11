@@ -37,8 +37,8 @@ inline property (getter setter)
                 inline (self value)
                     setter (bitcast self T) value
 
-    typedef "PropertyAccessor" < Accessor
-        inline __typecall (cls value key)
+    Accessor
+        inline "generate-property" (value key)
             (property-type (typeof value) key) value
 
 do

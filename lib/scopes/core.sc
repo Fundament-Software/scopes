@@ -858,7 +858,7 @@ let
 
 let NullType = (sc_typename_type "NullType" typename)
 let Accessor = (sc_typename_type "Accessor" typename)
-sc_typename_type_set_opaque Accessor
+sc_typename_type_set_storage Accessor (sc_type_storage Closure) typename-flag-plain
 
 let cons =
     spice-macro
@@ -2298,12 +2298,14 @@ let getattr =
                 let prop =
                     try ('@ lhsT sym)
                     else (merge skip-accessor-lookup)
-                if (ptrcmp!= ('typeof prop) type)
+                if (ptrcmp!= ('typeof prop) Accessor)
                     merge skip-accessor-lookup;
-                let prop = (unbox-pointer prop type)
-                if (type< prop Accessor)
-                    return
-                        'tag `(prop lhs rhs) ('anchor args)
+                if (not ('constant? prop))
+                    merge skip-accessor-lookup
+                let prop = (unbox-pointer prop Accessor)
+                let prop = (bitcast prop Closure)
+                return
+                    'tag `(prop lhs rhs) ('anchor args)
             let f =
                 try ('@ lhsT '__getattr)
                 else
@@ -3193,6 +3195,18 @@ let
 
 #del extract-single-arg
 #del make-const-type-property-function
+
+let Closure->Accessor =
+    spice-macro
+        fn "Closure->Accessor" (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let self = ('getarg args 0)
+            if (not ('constant? self))
+                error "Closure must be constant"
+            let self = (as self Closure)
+            let self = (bitcast self Accessor)
+            `self
 
 let Closure->Generator =
     spice-macro
@@ -7376,6 +7390,14 @@ inline typeinit (...)
         inline (T)
             T ...
         typedef "typeinit" < TypeInitializer : (storageof Closure)
+
+#-------------------------------------------------------------------------------
+# Accessors
+#-------------------------------------------------------------------------------
+
+typedef+ Accessor
+    inline __typecall (cls closure)
+        Closure->Accessor closure
 
 #-------------------------------------------------------------------------------
 # hex/oct/bin conversion

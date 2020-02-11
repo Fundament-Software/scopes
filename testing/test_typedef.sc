@@ -46,11 +46,12 @@ typedef MyTupleType < MyTupleSuperType : (tuple i32 i32)
     static-assert (super-type == MyTupleSuperType)
 
     # trivial accessor implementation
-    typedef get < Accessor
-        inline __typecall (cls self key)
-            _
-                extractvalue self 0
-                extractvalue self 1
+    let get =
+        Accessor
+            inline (self key)
+                _
+                    extractvalue self 0
+                    extractvalue self 1
 
 # recursive definition
 typedef SelfRefType < tuple : (tuple i32 (pointer this-type))
