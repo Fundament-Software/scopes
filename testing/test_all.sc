@@ -65,6 +65,7 @@ test-modules
     .test_operators
     .test_overload
     .test_parser
+    .test_property
     .test_quote
     .test_recursion
     .test_reference

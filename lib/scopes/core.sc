@@ -857,6 +857,8 @@ let
     type> = (spice-macro (type-comparison-func type>))
 
 let NullType = (sc_typename_type "NullType" typename)
+let Accessor = (sc_typename_type "Accessor" typename)
+sc_typename_type_set_opaque Accessor
 
 let cons =
     spice-macro
@@ -2268,9 +2270,45 @@ let
     .. = (balanced-binary-op-dispatch '__.. '__r.. "join")
     = = (balanced-lvalue-binary-op-dispatch '__= "apply assignment with")
     @ = (unary-or-unbalanced-binary-op-dispatch '__toref "dereference" '__@ integer "apply subscript operator with")
-    getattr = (unbalanced-binary-op-dispatch '__getattr Symbol "get attribute from")
+    #getattr = (unbalanced-binary-op-dispatch '__getattr Symbol "get attribute from")
     lslice = (unbalanced-binary-op-dispatch '__lslice usize "apply left-slice operator with")
     rslice = (unbalanced-binary-op-dispatch '__rslice usize "apply right-slice operator with")
+
+let getattr =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 2 2
+            let lhs rhs =
+                'getarg args 0
+                'getarg args 1
+            let lhsT = ('typeof lhs)
+            let rhsT = ('typeof rhs)
+            let rhs =
+                if (ptrcmp== rhsT Symbol) rhs
+                else
+                    # can we cast rhsT to rtype?
+                    let conv = (imply-converter rhsT Symbol ('constant? rhs))
+                    if (operator-valid? conv)
+                        sc_prove `(conv rhs)
+                    else
+                        cast-error "can't coerce secondary argument of type " rhsT Symbol
+            label skip-accessor-lookup
+                let sym = (unbox-symbol rhs Symbol)
+                let prop =
+                    try ('@ lhsT sym)
+                    else (merge skip-accessor-lookup)
+                if (ptrcmp!= ('typeof prop) type)
+                    merge skip-accessor-lookup;
+                let prop = (unbox-pointer prop type)
+                if (type< prop Accessor)
+                    return
+                        'tag `(prop lhs rhs) ('anchor args)
+            let f =
+                try ('@ lhsT '__getattr)
+                else
+                    unary-op-error "get attribute from" lhsT
+            'tag `(f lhs rhs) ('anchor args)
 
 let drop =
     spice-macro
