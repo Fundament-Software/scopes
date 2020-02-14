@@ -1,4 +1,6 @@
 
+using import testing
+
 # various ways to create arrays
 
 let u8x4 = (array u8 4)
@@ -71,6 +73,16 @@ do
         assert ((vals2 @ 1) == 0xb0:u8)
         assert ((vals2 @ 2) == 0xc0:u8)
         assert ((vals2 @ 3) == 0xd0:u8)
+
+    do
+        # compare array
+        test 
+            == (arrayof u8 0xa0 0xb0 0xc0 0xd0)
+                (arrayof u8 0xa0 0xb0 0xc0 0xd0)
+        test 
+            != (arrayof u8 0xa0 0xb0 0xc0 0xd0)
+                (arrayof u8 0xa0 0xb0 0xc0 0xd1)
+
 
     do
         # uninitialized mutable array on stack with constant length

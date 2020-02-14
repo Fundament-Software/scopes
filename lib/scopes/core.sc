@@ -4509,6 +4509,19 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
 #-------------------------------------------------------------------------------
 
 'set-symbols array
+    __== =
+        simple-binary-op
+            spice-macro
+                fn (args)
+                    let self = ('getarg args 0)
+                    let other = ('getarg args 1)
+                    let block = (sc_if_new)
+                    for i in (range ('element-count ('typeof self)))
+                        sc_if_append_then_clause block 
+                            `((self @ i) != (other @ i))
+                            `false
+                    sc_if_append_else_clause block `true
+                    block
     __unpack = __unpack-aggregate
     __countof = __countof-aggregate
     __@ =
