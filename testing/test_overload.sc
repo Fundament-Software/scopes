@@ -76,7 +76,19 @@ test ((test4 1.0 2.0) == "real")
 test ((test4 1 2.0) == "real")
 test ((test4 1.0 2) == "real")
 
+@@ memo
+inline ArrayPattern (element-type)
+    typedef (.. "[" (tostring element-type) " x ...]")
+        inline __typematch (cls T)
+            static-if (T < array)
+                (elementof T) == element-type
+            else false
+        inline __rimply (cls T)
+            inline (self) self
+
 fn... test5
+case (a : (ArrayPattern i32),) 3
+case (a : (ArrayPattern f32),) 4
 case (a : &i32,) true
 case (a : i32,) false
 case (a : &real,) 1
@@ -88,3 +100,7 @@ test ((test5 y) == true)
 test ((test5 1.0) == 2)
 local z = 2.0
 test ((test5 z) == 1)
+test ((test5 (arrayof i32 1 2 3)) == 3)
+test ((test5 (arrayof f32 1 2 3)) == 4)
+test-compiler-error (test5 (arrayof i64 1 2 3))
+

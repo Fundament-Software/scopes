@@ -4517,7 +4517,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                     let other = ('getarg args 1)
                     let block = (sc_if_new)
                     for i in (range ('element-count ('typeof self)))
-                        sc_if_append_then_clause block 
+                        sc_if_append_then_clause block
                             `((self @ i) != (other @ i))
                             `false
                     sc_if_append_else_clause block `true
@@ -5824,6 +5824,14 @@ spice overloaded-fn-append (T args...)
                         if (('refer? qparamT) & (not ('refer? qargT)))
                             no-match;
                         continue;
+                    try
+                        let matchfunc = ('@ paramT '__typematch)
+                        let result = (sc_prove `(matchfunc paramT argT))
+                        if (result as bool)
+                            continue;
+                        else
+                            no-match;
+                    else;
                     assert (paramT != Variadic)
                     let conv = (imply-converter argT paramT ('constant? arg))
                     if (not (operator-valid? conv))
@@ -5843,10 +5851,7 @@ spice overloaded-fn-append (T args...)
                         if (paramT == Unknown) arg
                         elseif (paramT == Variadic) arg
                         elseif (argT <= paramT) arg
-                        else
-                            let conv = (imply-converter argT paramT ('constant? arg))
-                            assert (operator-valid? conv)
-                            `(conv arg)
+                        else `(imply arg paramT)
                     sc_call_append_argument outargs outarg
                 # complete default values
                 for i in (range count explicit-argcount)
