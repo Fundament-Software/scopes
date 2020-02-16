@@ -4583,6 +4583,25 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                     if (T == Generator)
                         return `array-generator
                     `()
+    __rimply =
+        do
+            inline passthru (self) self
+            spice-cast-macro
+                fn "array.__rimply" (cls T)
+                    if (('element-count T) == -1) # unsized array
+                        if (('kind cls) == type-kind-array)
+                            if (('element@ cls 0) == ('element@ T 0))
+                                return `passthru
+                    `()
+
+    __typematch =
+        spice-cast-macro
+            fn "array.__typematch" (cls T)
+                if (('element-count cls) == -1) # unsized array
+                    if (('kind T) == type-kind-array)
+                        if (('element@ T 0) == ('element@ cls 0))
+                            return `true
+                `false
 
 let arrayof =
     spice-macro
