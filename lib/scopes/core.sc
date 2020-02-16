@@ -5828,6 +5828,8 @@ spice overloaded-fn-append (T args...)
                         let matchfunc = ('@ paramT '__typematch)
                         let result = (sc_prove `(matchfunc paramT argT))
                         if (result as bool)
+                            if (('refer? qparamT) & (not ('refer? qargT)))
+                                no-match;
                             continue;
                         else
                             no-match;
