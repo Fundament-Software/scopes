@@ -3981,6 +3981,9 @@ let using =
             if (('typeof nameval) == Scope)
                 return (process (nameval as Scope))
             let nameval = (sc_prove nameval)
+            if (not ('constant? nameval))
+                hide-traceback;
+                error "argument passed to `using` must be constant at sugar time"
             let nameval =
                 if (('typeof nameval) == type)
                     hide-traceback;

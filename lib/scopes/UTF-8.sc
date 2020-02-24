@@ -26,9 +26,8 @@ inline ctlz-u32 (c)
     llvm.ctlz.u32 c false
 
 inline encoder (coll)
-    """"convert an integer codepoint to i8 byte array chunks of 1 to 4 bytes length
-        the collector forwards two arguments, the number of bytes required
-        and a buffer containing those bytes, which is only valid for this call.
+    """"convert an integer codepoint to i8 bytes.
+        the collector forwards a byte at a time.
     inline _encoder (coll)
         let init full? done push = ((coll as Collector))
         let tmp = (alloca-array i8 4)
@@ -60,7 +59,12 @@ inline encoder (coll)
                         tmp @ 2 = 0x80:i8 | ((c >> 6:u32) & 0x3f:u32) as i8
                         tmp @ 3 = 0x80:i8 | (c & 0x3f:u32) as i8
                         4
-                push (inline () (_ bytecount tmp)) state...
+                loop (i state... = 0 state...)
+                    if (i == bytecount)
+                        break state...
+                    let c = (deref (tmp @ i))
+                    _ (i + 1)
+                        push (inline () c) state...
     static-if (none? coll) _encoder
     else (_encoder coll)
 
