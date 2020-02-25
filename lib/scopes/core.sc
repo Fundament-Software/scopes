@@ -7084,41 +7084,58 @@ fn constructor (cls args...)
                 "field is already initialized"
         let ET = (sc_type_element_at cls k)
         let ET = (sc_strip_qualifiers ET)
-        let v = ('tag `(imply v ET) ('anchor arg))
+        let v =
+            do
+                hide-traceback;
+                sc_prove ('tag `(imply v ET) ('anchor arg))
         store v (getelementptr fields k)
         i + 1
-    let block = (sc_expression_new)
-    loop (i result = 0 `(nullof cls))
-        sc_expression_append block result
-        if (i == numfields)
-            break block
-        let elem =
-            if ((load (getelementptr fields i)) == null)
-                :: success
-                :: skip
-                if (('typeof struct-fields) == Nothing)
-                    merge skip
-                let field = ('getarg struct-fields i)
-                let field = (field as type)
-                let elem =
-                    try ('@ field 'Default)
-                    except (err)
-                        merge skip
-                merge success elem
-                skip ::
-                # default initializer
-                let ET = (sc_type_element_at cls i)
-                try
-                    sc_prove `(ET)
-                except (err)
-                    error
-                        .. "field " (repr ET) " has no default initializer"
-                success ::
-            else
-                load (getelementptr fields i)
-        let field = ('getarg struct-fields i)
-        let result = ('tag `(insertvalue result elem i) ('anchor field))
-        _ (i + 1) result
+    # complete default initializers
+    let const? = (cls < CStruct)
+    let const? =
+        loop (i const? = 0 const?)
+            if (i == numfields)
+                break const?
+            let elem = (load (getelementptr fields i))
+            let elem =
+                if (elem == null)
+                    define elem
+                        :: success
+                        :: skip
+                        if (('typeof struct-fields) == Nothing)
+                            merge skip
+                        let field = ('getarg struct-fields i)
+                        let field = (field as type)
+                        let elem =
+                            try ('@ field 'Default)
+                            except (err)
+                                merge skip
+                        merge success elem
+                        skip ::
+                        # default initializer
+                        let ET = (sc_type_element_at cls i)
+                        try
+                            sc_prove `(ET)
+                        except (err)
+                            error
+                                .. "field " (repr ET) " has no default initializer"
+                        success ::
+                    store elem (getelementptr fields i)
+                    elem
+                else elem
+            _ (i + 1) (const? & ('constant? elem))
+    if const?
+        sc_const_aggregate_new cls numfields fields
+    else
+        let block = (sc_expression_new)
+        loop (i result = 0 `(nullof cls))
+            sc_expression_append block result
+            if (i == numfields)
+                break block
+            let elem = (load (getelementptr fields i))
+            let field = ('getarg struct-fields i)
+            let result = ('tag `(insertvalue result elem i) ('anchor field))
+            _ (i + 1) result
 
 'set-symbols Struct
     __getattr = extractvalue

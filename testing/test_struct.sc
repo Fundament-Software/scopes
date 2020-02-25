@@ -57,6 +57,9 @@ run-stage;
 let q =
     AnotherStruct 3 4 0
 
+# since all arguments to q are constant, q should be constant
+test (constant? q)
+
 dump q
 
 test
