@@ -76,12 +76,16 @@ do
 
     do
         # compare array
-        test 
+        test
             == (arrayof u8 0xa0 0xb0 0xc0 0xd0)
                 (arrayof u8 0xa0 0xb0 0xc0 0xd0)
-        test 
+        test
             != (arrayof u8 0xa0 0xb0 0xc0 0xd0)
                 (arrayof u8 0xa0 0xb0 0xc0 0xd1)
+
+    do
+        # constant arguments initialize constant array
+        test (constant? (arrayof u8 0xa0 0xb0 0xc0 0xd0))
 
 
     do

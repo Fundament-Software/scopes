@@ -4485,24 +4485,31 @@ inline gen-tupleof (type-func)
             #verify-count argc 0 -1
             raising Error
 
-            # build tuple type
+            # build tuple type and values
+            # also check if all arguments are constant
+            let values = (alloca-array Value argc)
             let field-types = (alloca-array type argc)
-            loop (i = 0)
-                if (i == argc)
-                    break;
-                let k arg = ('dekey ('getarg args i))
-                let T = ('key-type ('typeof arg) k)
-                store T (getelementptr field-types i)
-                i + 1
+            let const? =
+                loop (i const? = 0 true)
+                    if (i == argc)
+                        break const?
+                    let k arg = ('dekey ('getarg args i))
+                    store arg (getelementptr values i)
+                    let T = ('key-type ('typeof arg) k)
+                    store T (getelementptr field-types i)
+                    _ (i + 1) (const? & ('constant? arg))
 
-            # generate insert instructions
             let TT = (type-func argc field-types)
-            loop (i result = 0 `(nullof TT))
-                if (i == argc)
-                    break result
-                let arg = ('getarg args i)
-                _ (i + 1)
-                    `(insertvalue result arg i)
+            if const?
+                sc_const_aggregate_new TT argc values
+            else
+                # generate insert instructions
+                loop (i result = 0 `(nullof TT))
+                    if (i == argc)
+                        break result
+                    let arg = (load (getelementptr values i))
+                    _ (i + 1)
+                        `(insertvalue result arg i)
 
 let tupleof = (gen-tupleof sc_tuple_type)
 let packedtupleof = (gen-tupleof sc_packed_tuple_type)
@@ -4606,7 +4613,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                             return `true
                 `false
 
-let arrayof =
+inline gen-arrayof (gentypef insertop)
     spice-macro
         fn (args)
             let argc = ('argcount args)
@@ -4616,18 +4623,33 @@ let arrayof =
             let ET = (('getarg args 0) as type)
             let numvals = (sub argc 1)
 
-            let TT = (sc_array_type ET (usize numvals))
+            let values = (alloca-array Value numvals)
+            # check if all arguments are constant and convert accordingly
+            let const? =
+                loop (i const? = 0 true)
+                    if (i == numvals)
+                        break const?
+                    let arg = ('getarg args (add i 1))
+                    let arg =
+                        if ((sc_value_type arg) == ET) arg
+                        else
+                            hide-traceback;
+                            sc_prove ('tag `(arg as ET) ('anchor arg))
+                    store arg (getelementptr values i)
+                    _ (i + 1) (const? & ('constant? arg))
 
-            # generate insert instructions
-            loop (i result = 0 `(undef TT))
-                if (i == numvals)
-                    break result
-                let arg = ('getarg args (add i 1))
-                let arg =
-                    if ((sc_value_type arg) == ET) arg
-                    else `(arg as ET)
-                _ (i + 1)
-                    `(insertvalue result arg i)
+            let TT = (gentypef ET (usize numvals))
+            if const?
+                sc_const_aggregate_new TT numvals values
+            else
+                # generate insert instructions
+                loop (i result = 0 `(nullof TT))
+                    if (i == numvals)
+                        break result
+                    let arg = (load (getelementptr values i))
+                    _ (i + 1) `(insertop result arg i)
+
+let arrayof = (gen-arrayof sc_array_type insertvalue)
 
 # destructors for aggregates
 
@@ -4852,41 +4874,7 @@ inline vector-binary-op-dispatch (symbol)
                     verify-count argc 1 1
                     `(nullof cls)
 
-let vectorof =
-    spice-macro
-        fn (args)
-            let argc = ('argcount args)
-            verify-count argc 1 -1
-            raising Error
-
-            let ET = (('getarg args 0) as type)
-            let numvals = (sub argc 1)
-
-            let values = (alloca-array Value numvals)
-            # check if all arguments are constant and convert accordingly
-            let const? =
-                loop (i const? = 0 true)
-                    if (i == numvals)
-                        break const?
-                    let arg = ('getarg args (add i 1))
-                    let arg =
-                        if ((sc_value_type arg) == ET) arg
-                        else
-                            hide-traceback;
-                            sc_prove ('tag `(arg as ET) ('anchor arg))
-                    store arg (getelementptr values i)
-                    _ (i + 1) (const? & ('constant? arg))
-
-            let TT = (sc_vector_type ET (usize numvals))
-            if const?
-                sc_const_aggregate_new TT numvals values
-            else
-                # generate insert instructions
-                loop (i result = 0 `(nullof TT))
-                    if (i == numvals)
-                        break result
-                    let arg = (load (getelementptr values i))
-                    _ (i + 1) `(insertelement result arg i)
+let vectorof = (gen-arrayof sc_vector_type insertelement)
 
 #-------------------------------------------------------------------------------
 
@@ -7511,7 +7499,7 @@ let e = e:f32
 
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
-    \ tuple==
+    \ tuple== gen-arrayof
 
 run-stage; # 12
 
