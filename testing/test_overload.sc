@@ -104,3 +104,9 @@ test ((test5 (arrayof i32 1 2 3)) == 3)
 test ((test5 (arrayof f32 1 2 3)) == 4)
 test-compiler-error (test5 (arrayof i64 1 2 3))
 
+# inlined case form
+fn... test6 (a : i32, b, c) 1
+case (x,) 2
+
+test ((test6 1 2 3) == 1)
+test ((test6 1) == 2)

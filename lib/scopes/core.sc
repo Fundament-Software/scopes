@@ -5936,12 +5936,12 @@ sugar fn... (name...)
     let inline? =
         (expr-head as Symbol) == 'inline...
     let finalize-overloaded-fn = overloaded-fn-append
-    let fn-name =
+    let fn-name bind-name? inlined-case =
         sugar-match name...
-        case (name as Symbol;) name
-        case (name as string;) (Symbol name)
-        case () unnamed
-        default
+        case (name as Symbol; rest...) (_ name true rest...)
+        case (name as string; rest...) (_ (Symbol name) false rest...)
+        default (_ unnamed false name...)
+        #default
             error
                 """"syntax: (fn... name|"name") (case pattern body...) ...
     let outtype =
@@ -5951,6 +5951,13 @@ sugar fn... (name...)
     let bodyscope = (Scope sugar-scope)
     let bodyscope =
         'bind bodyscope 'this-function outtype
+    let next-expr =
+        if (inlined-case == '()) next-expr
+        else
+            let at = (decons inlined-case)
+            cons
+                cons ('tag `'case ('anchor at)) inlined-case
+                next-expr
     loop (next outargs = next-expr (sc_argument_list_new 0 null))
         let next-anchor =
             if (empty? next) unknown-anchor
@@ -6046,10 +6053,9 @@ sugar fn... (name...)
                             "syntax: (parameter-name[: type], ...)"
         default
             let sugar-scope =
-                sugar-match name...
-                case (name as Symbol;)
+                if bind-name?
                     'bind sugar-scope fn-name outtype
-                default sugar-scope
+                else sugar-scope
             return
                 `(finalize-overloaded-fn outtype outargs)
                 next
