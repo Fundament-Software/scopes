@@ -770,8 +770,15 @@ sc_type_set_symbol type 'raises
 # symbol constructor
 sc_type_set_symbol Symbol '__typecall
     box-pointer
-        inline (cls str)
-            sc_symbol_new str
+        spice-macro
+            fn (args)
+                let argcount = (sc_argcount args)
+                verify-count argcount 2 2
+                let value = (sc_getarg args 1)
+                if (sc_value_is_constant value)
+                    `[(sc_symbol_new (unbox-pointer value string))]
+                else
+                    `(sc_symbol_new value)
 
 let none? =
     spice-macro
@@ -5363,7 +5370,7 @@ define spice
                         'tag
                             Value
                                 qq
-                                    [verify-count] ([`sc_argcount args])
+                                    [verify-count] [(list sc_argcount args)]
                                         [(? varargs (sub paramcount 1) paramcount)]
                                         [(? varargs -1 paramcount)]
                             anchor
