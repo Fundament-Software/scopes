@@ -6880,6 +6880,7 @@ let global =
     gen-allocator-sugar "global"
         spice "global-copy" (T value)
             let val = (extern-new unnamed (T as type) (storage-class = 'Private))
+            let qval = `(ptrtoref val)
             if (('constant? value) and (('typeof value) == Closure))
                 # constructor, build function
                 let f = (value as Closure)
@@ -6889,26 +6890,31 @@ let global =
                         ;
                 let constructor = (sc_typify_template constructor 0 null)
                 sc_global_set_constructor val constructor
-                `(ptrtoref val)
+                qval
             else
                 let init = (sc_prove `(imply value T))
                 if ('pure? init)
                     hide-traceback;
                     sc_global_set_initializer val init
-                spice-quote
-                    store init val
-                    ptrtoref val
+                    qval
+                else
+                    spice-quote
+                        store init val
+                        qval
 
         spice "global-new" (T args...)
             let T = (T as type)
             let val = (extern-new unnamed (T as type) (storage-class = 'Private))
+            let qval = `(ptrtoref val)
             let init = (sc_prove `(T args...))
             if ('pure? init)
                 hide-traceback;
                 sc_global_set_initializer val init
-            spice-quote
-                store init val
-                ptrtoref val
+                qval
+            else
+                spice-quote
+                    store init val
+                    qval
 
 run-stage; # 11
 
