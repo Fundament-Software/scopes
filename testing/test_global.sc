@@ -3,17 +3,21 @@ using import testing
 
 # make sure static isn't memoizing the returned pointer
 
-global samplerate = 0
-global buffersize = 0
-
-samplerate = 44100
-buffersize = 4096
+global samplerate = 44100
+global buffersize = 4096
 
 fn main ()
     test (samplerate == 44100)
     test (buffersize == 4096)
 
+fn main2 ()
+    test (samplerate == 11024)
+    test (buffersize == 256)
+
 main;
+samplerate = 11024
+buffersize = 256
+main2;
 
 fn local-globals (x)
     global tmp = 100
