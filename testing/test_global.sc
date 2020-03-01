@@ -1,4 +1,5 @@
 
+using import struct
 using import testing
 
 # make sure static isn't memoizing the returned pointer
@@ -28,4 +29,17 @@ fn local-globals (x)
 test ((local-globals 200) == 100)
 test ((local-globals 300) == 200)
 test ((local-globals 400) == 300)
+
+struct GlobalVal
+    value = -1
+
+fn struct-access ()
+    global gv : GlobalVal 10
+    gv.value += 1
+    deref gv.value
+
+test ((struct-access) == 11)
+test ((struct-access) == 12)
+test ((struct-access) == 13)
+
 

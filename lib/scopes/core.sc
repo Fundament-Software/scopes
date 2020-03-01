@@ -6906,15 +6906,30 @@ let global =
             let T = (T as type)
             let val = (extern-new unnamed (T as type) (storage-class = 'Private))
             let qval = `(ptrtoref val)
-            let init = (sc_prove `(T args...))
-            if ('pure? init)
-                hide-traceback;
-                sc_global_set_initializer val init
+            let pure-args? =
+                for arg in ('args args...)
+                    if (not ('pure? arg))
+                        break false
+                else true
+            if pure-args?
+                # static constructor
+                spice-quote
+                    fn constructor ()
+                        store (T args...) val
+                        ;
+                let constructor = (sc_typify_template constructor 0 null)
+                sc_global_set_constructor val constructor
                 qval
             else
-                spice-quote
-                    store init val
+                let init = (sc_prove `(T args...))
+                if ('pure? init)
+                    hide-traceback;
+                    sc_global_set_initializer val init
                     qval
+                else
+                    spice-quote
+                        store init val
+                        qval
 
 run-stage; # 11
 
