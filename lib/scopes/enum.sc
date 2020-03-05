@@ -437,58 +437,11 @@ sugar dispatch (value)
         default
             error "missing default case"
 
-# wrap for usage outside spices
-spice extract-payload (enum-value extractT)
-    _extract-payload enum-value extractT
-
-run-stage;
-
-typedef UnwrapError : (tuple)
-    inline __typecall (cls)
-        bitcast none this-type
-
-@@ memo
-inline Option (T)
-    enum (.. "Option<" (tostring T) ">")
-        None
-        Some : T
-
-        inline... __typecall
-        case (cls : type,)
-            this-type.None;
-        case (cls : type, value)
-            # follow same rules as assignment
-            imply value this-type
-
-        inline __tobool (self)
-            dispatch self
-            case None () false
-            default true
-
-        inline swap (self newvalue)
-            let value = (deref (dupe self))
-            assign (imply newvalue this-type) self
-            value
-
-        inline __imply (cls other-cls)
-            static-if (T == bool)
-                __tobool
-
-        inline __rimply (other-cls cls)
-            static-if (other-cls == Nothing)
-                inline ()
-                    this-type.None;
-            else (imply? other-cls T)
-                inline (self)
-                    this-type.Some self
-
-        inline unwrap (self)
-            if self
-                extract-payload self T
-            else
-                raise (UnwrapError)
-
+typedef+ Enum
+    # wrap for usage outside spices
+    spice unsafe-extract-payload (enum-value extractT)
+        _extract-payload enum-value extractT
 
 do
-    let enum dispatch Enum Option
+    let enum dispatch Enum
     locals;

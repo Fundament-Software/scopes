@@ -63,6 +63,7 @@ test-modules
     .test_namedargs
     .test_object
     .test_operators
+    .test_option
     .test_overload
     .test_parser
     .test_property
