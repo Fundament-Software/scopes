@@ -1285,11 +1285,13 @@ struct LLVMIRGenerator {
     LLVMValueRef values_to_struct(LLVMTypeRef T, const LLVMValueRefs &values) {
         int count = (int)values.size();
         if (count == 1) {
-            return values[0];
+            return build_struct_cast(values[0], T);
         } else {
             LLVMValueRef value = LLVMGetUndef(T);
             for (int i = 0; i < count; ++i) {
-                value = LLVMBuildInsertValue(builder, value, values[i], i, "");
+                value = LLVMBuildInsertValue(builder, value,
+                    build_struct_cast(values[i], LLVMStructGetTypeAtIndex(T, i)),
+                    i, "");
             }
             return value;
         }

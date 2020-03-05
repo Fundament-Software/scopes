@@ -239,4 +239,23 @@ do
         Q
             pT = k
 
+# test returning structs from functions
+fn make-struct ()
+    fn unconst (x) x
+    let x = (unconst 25)
+    let y = (unconst 3.0)
+
+    struct M
+        x : (typeof x)
+        y : (typeof y)
+
+    if false
+        error ":("
+
+    M
+        x = x
+        y = y
+
+make-struct;
+
 none
