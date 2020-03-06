@@ -18,7 +18,7 @@ typedef UnwrapError : (tuple)
 
 @@ memo
 inline Option (T)
-    enum (.. "Option<" (tostring T) ">")
+    enum (.. "<Option " (tostring T) ">")
         None
         Some : T
 
