@@ -68,6 +68,7 @@ test-modules
     .test_parser
     .test_property
     .test_quote
+    .test_rc
     .test_recursion
     .test_reference
     .test_regexp
