@@ -674,7 +674,9 @@ struct LLVMIRGenerator {
                         zero, LLVMConstInt(i32T,i,false),
                     };
                     auto dest = LLVMBuildGEP(builder, ptr, indices, 2, "");
-                    LLVMBuildStore(builder, LLVMGetParam(func, k++), dest);
+                    auto param = LLVMGetParam(func, k++);
+                    //LLVMBuildStore(builder, param, fix_named_struct_store(param, dest));
+                    LLVMBuildStore(builder, param, dest);
                 }
                 ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(T, 0), "");
                 return LLVMBuildLoad(builder, ptr, "");
@@ -692,7 +694,8 @@ struct LLVMIRGenerator {
         size_t sz = abi_classify(AT, classes);
         if (!sz) {
             LLVMValueRef ptrval = safe_alloca(SCOPES_GET_RESULT(type_to_llvm_type(AT)));
-            LLVMBuildStore(builder, val, ptrval);
+            LLVMBuildStore(builder, val, fix_named_struct_store(val, ptrval));
+            //LLVMBuildStore(builder, val, ptrval);
             val = ptrval;
             memptrs.push_back(values.size());
             values.push_back(val);
