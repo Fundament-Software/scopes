@@ -3,7 +3,7 @@
     This file is distributed under the MIT License.
     See LICENSE.md for details.
 
-""""RC
+""""Rc
     ==
 
     A reference counted value that is dropped when all users are dropped.
@@ -12,7 +12,7 @@ let
     PAYLOAD_INDEX = 0
     REF_INDEX = 1
 
-typedef RC
+typedef Rc
     @@ memo
     inline gen-type (T)
         let content-type = (tuple T i32)
@@ -100,5 +100,5 @@ typedef RC
     unlet gen-type
 
 do
-    let RC
+    let Rc
     locals;
