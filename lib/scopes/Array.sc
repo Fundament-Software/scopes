@@ -83,6 +83,10 @@ typedef+ Array
         assert (index < self._count) "index out of bounds"
         self._items @ index
 
+    fn last (self)
+        assert (self._count > 0) "empty array has no last element"
+        self._items @ (self._count - 1:usize)
+
     inline gen-sort (key)
         let key =
             static-if (none? key)
