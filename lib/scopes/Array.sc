@@ -177,6 +177,14 @@ typedef+ Array
             assign value (self._items @ idx)
         dest
 
+    """"Remove element with highest index from array `self` and return it.
+    fn pop (self)
+        let &count = self._count
+        assert (&count > 0) "can't pop from empty array"
+        &count -= 1
+        let idx = (deref &count)
+        dupe (deref (self._items @ idx))
+
     """"Clear the array and reset its element count to zero. This will drop
         all elements that have been previously contained by the array.
     fn clear (self)

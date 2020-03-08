@@ -247,7 +247,7 @@ typedef One :: (tuple i32 (mutable pointer i32))
     unlet make-binop
 
     fn value (self)
-        dupe (deref (@ (storagecast self) 0))
+        deref (@ (storagecast (view self)) 0)
 
     fn check (self)
         let ref = (@ (@ (storagecast self) 1))

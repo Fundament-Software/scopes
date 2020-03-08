@@ -185,3 +185,28 @@ fn test-one ()
 # handling of unique elements
 test-one;
 One.test-refcount-balanced;
+
+# removal of elements
+fn test-remove ()
+    One.test-refcount-balanced;
+
+    local a : (Array One)
+    'append a (One 0)
+    'append a (One 1)
+    'append a (One 2)
+    'append a (One 3)
+    'append a (One 4)
+    'append a (One 5)
+    test ((countof a) == 6)
+    let q = ('pop a)
+    test (('value q) == 5)
+    test ((countof a) == 5)
+    test (('value (a @ 0)) == 0)
+    test (('value (a @ 1)) == 1)
+    test (('value (a @ 2)) == 2)
+    test (('value (a @ 3)) == 3)
+    test (('value (a @ 4)) == 4)
+    ;
+
+test-remove;
+One.test-refcount-balanced;
