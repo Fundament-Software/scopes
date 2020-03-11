@@ -45,6 +45,13 @@ typedef+ Array
     inline __as (cls T)
         static-if (T == Generator) array-generator
 
+    inline reverse (self)
+        Generator
+            inline () (deref self._count)
+            inline (i) (i > 0:usize)
+            inline (i) (self @ (i - 1:usize))
+            inline (i) (i - 1:usize)
+
     """"Implements support for pointer casts, to pass the array to C functions
         for example.
     inline __imply (cls T)
