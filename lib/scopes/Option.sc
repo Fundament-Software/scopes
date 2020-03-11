@@ -65,11 +65,9 @@ inline Option (T)
             extract-payload self T
 
         inline try-unwrap (self)
-            if self
-                extract-payload self T
-            else
+            if (not self)
                 raise (UnwrapError)
-
+            extract-payload self T
 
 do
     let Option

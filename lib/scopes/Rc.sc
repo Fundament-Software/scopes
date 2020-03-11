@@ -6,40 +6,119 @@
 """"Rc
     ==
 
-    A reference counted value that is dropped when all users are dropped.
+    A reference counted value that is dropped when all users are dropped. This
+    module provides a strong reference type `Rc`, as well as a weak reference
+    type `Weak`.
+
+using import Option
 
 let
     PAYLOAD_INDEX = 0
-    REF_INDEX = 1
+    METADATA_INDEX = 1
+    STRONGRC_INDEX = 0
+    WEAKRC_INDEX = 1
 
-typedef Rc
+typedef ReferenceCounted
     let RefType = i32
+    let MetaDataType =
+        tuple RefType RefType
 
-    @@ memo
-    inline gen-type (T)
-        let storage-type =
-            tuple
-                mutable pointer T
-                mutable pointer RefType
-        typedef (.. "<RC " (tostring T) ">") < this-type
+typedef Weak < ReferenceCounted
+typedef Rc < ReferenceCounted
+
+@@ memo
+inline gen-type (T)
+    let storage-type =
+        tuple
+            mutable pointer T
+            mutable pointer Weak.MetaDataType
+    let WeakType =
+        typedef (.. "<Weak " (tostring T) ">") < Weak
+            \ :: storage-type
+    let RcType =
+        typedef (.. "<Rc " (tostring T) ">") < Rc
             \ :: storage-type
 
-            let Type = T
+    typedef+ WeakType
+        let Type = T
+        let RcType = RcType
 
-            fn wrap (value)
-                let ref = (malloc RefType)
-                let ptr = (malloc T)
-                store value ptr
-                store 1 ref
-                let self = (nullof storage-type)
-                dump self
-                let self = (insertvalue self ptr PAYLOAD_INDEX)
-                let self = (insertvalue self ref REF_INDEX)
-                bitcast self this-type
+        inline... __typecall (cls, value : RcType)
+            let md = (extractvalue value METADATA_INDEX)
+            let refcount =
+                getelementptr
+                    extractvalue value METADATA_INDEX
+                    \ 0 WEAKRC_INDEX
+            let rc = (add (load refcount) 1)
+            store rc refcount
+            bitcast (dupe (view value)) this-type
 
-            inline __typecall (cls args...)
-                wrap (T args...)
+    typedef+ RcType
+        let Type = T
+        let WeakType = WeakType
 
+        fn wrap (value)
+            let self = (nullof storage-type)
+            let ptr = (malloc T)
+            store value ptr
+            let self = (insertvalue self ptr PAYLOAD_INDEX)
+            let mdptr = (malloc super-type.MetaDataType)
+            store 1 (getelementptr mdptr 0 STRONGRC_INDEX)
+            store 0 (getelementptr mdptr 0 WEAKRC_INDEX)
+            let self = (insertvalue self mdptr METADATA_INDEX)
+            bitcast self this-type
+
+        inline __typecall (cls args...)
+            wrap (T args...)
+    RcType
+
+typedef+ ReferenceCounted
+    fn strong-count (value)
+        viewing value
+        load
+            getelementptr
+                extractvalue value METADATA_INDEX
+                \ 0 STRONGRC_INDEX
+
+    fn weak-count (value)
+        viewing value
+        load
+            getelementptr
+                extractvalue value METADATA_INDEX
+                \ 0 WEAKRC_INDEX
+
+typedef+ Weak
+    inline... __typecall
+    case (cls, T : type)
+        (gen-type T) . WeakType
+
+    fn __drop (self)
+        let md = (extractvalue self METADATA_INDEX)
+        let refcount = (getelementptr md 0 WEAKRC_INDEX)
+        let rc = (sub (load refcount) 1)
+        assert (rc >= 0)
+        store rc refcount
+        if (rc == 0)
+            free md
+
+    fn upgrade (self)
+        viewing self
+        let refcount =
+            getelementptr
+                extractvalue self METADATA_INDEX
+                \ 0 STRONGRC_INDEX
+        let rc = (load refcount)
+        assert (rc >= 0)
+        let RcType = ((typeof self) . RcType)
+        let OptionType = (Option RcType)
+        if (rc == 0)
+            OptionType none
+        else
+            let rc = (add rc 1)
+            store rc refcount
+            OptionType (bitcast (dupe self) RcType)
+
+typedef+ Rc
     inline... __typecall
     case (cls, T : type)
         gen-type T
@@ -47,14 +126,12 @@ typedef Rc
     inline new (T args...)
         (gen-type T) args...
 
-    fn refcount (value)
+    fn... clone (value : Rc,)
         viewing value
-        let refcount = (extractvalue value REF_INDEX)
-        load refcount
-
-    fn clone (value)
-        viewing value
-        let refcount = (extractvalue value REF_INDEX)
+        let refcount =
+            getelementptr
+                extractvalue value METADATA_INDEX
+                \ 0 STRONGRC_INDEX
         let rc = (add (load refcount) 1)
         store rc refcount
         dupe value
@@ -62,6 +139,7 @@ typedef Rc
     inline wrap (value)
         ((gen-type (typeof value)) . wrap) value
 
+    let _view = view
     inline view (self)
         ptrtoref (deref (extractvalue self PAYLOAD_INDEX))
 
@@ -88,6 +166,10 @@ typedef Rc
         spice "box-cast" (selfT otherT)
             selfT as:= type
             otherT as:= type
+            static-if (not const?)
+                let WeakT = ('@ selfT 'WeakType)
+                if ((otherT == Weak) or (otherT == (WeakT as type)))
+                    return WeakT
             let selfT = (('@ selfT 'Type) as type)
             let conv = (f selfT otherT const?)
             if (operator-valid? conv)
@@ -99,19 +181,22 @@ typedef Rc
     let __as = (make-cast-op as-converter false)
 
     fn __drop (self)
-        let refcount = (deref (extractvalue self REF_INDEX))
+        let md = (extractvalue self METADATA_INDEX)
+        let refcount = (getelementptr md 0 STRONGRC_INDEX)
         let rc = (sub (load refcount) 1)
         assert (rc >= 0)
-        if (rc > 0)
-            store rc refcount
-        else
+        store rc refcount
+        if (rc == 0)
             let payload = (view self)
             __drop payload
             free (reftoptr payload)
-            free refcount
+            let weakrefcount = (getelementptr md 0 WEAKRC_INDEX)
+            if ((load weakrefcount) == 0)
+                free md
+            # otherwise last weak reference will clean this up
 
-    unlet gen-type
+    unlet _view
 
 do
-    let Rc
+    let Rc Weak
     locals;

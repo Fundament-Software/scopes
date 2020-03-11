@@ -102,7 +102,8 @@ define-sugar-macro test-error
     list do
         list let tmp '=
             list test-function
-                list fn '() cond
+                #list fn '() cond
+                list inline '() cond
         list if tmp
         list 'else
             cons assertion-error!
