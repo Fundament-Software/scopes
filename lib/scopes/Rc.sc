@@ -13,18 +13,29 @@ let
     REF_INDEX = 1
 
 typedef Rc
+    let RefType = i32
+
     @@ memo
     inline gen-type (T)
-        let content-type = (tuple T i32)
+        let storage-type =
+            tuple
+                mutable pointer T
+                mutable pointer RefType
         typedef (.. "<RC " (tostring T) ">") < this-type
-            \ :: (mutable pointer content-type)
+            \ :: storage-type
+
             let Type = T
 
             fn wrap (value)
-                let ptr = (malloc content-type)
-                store value (getelementptr ptr 0 PAYLOAD_INDEX)
-                store 1 (getelementptr ptr 0 REF_INDEX)
-                bitcast ptr this-type
+                let ref = (malloc RefType)
+                let ptr = (malloc T)
+                store value ptr
+                store 1 ref
+                let self = (nullof storage-type)
+                dump self
+                let self = (insertvalue self ptr PAYLOAD_INDEX)
+                let self = (insertvalue self ref REF_INDEX)
+                bitcast self this-type
 
             inline __typecall (cls args...)
                 wrap (T args...)
@@ -38,12 +49,12 @@ typedef Rc
 
     fn refcount (value)
         viewing value
-        let refcount = (getelementptr (storagecast value) 0 REF_INDEX)
+        let refcount = (extractvalue value REF_INDEX)
         load refcount
 
     fn clone (value)
         viewing value
-        let refcount = (getelementptr (storagecast value) 0 REF_INDEX)
+        let refcount = (extractvalue value REF_INDEX)
         let rc = (add (load refcount) 1)
         store rc refcount
         dupe value
@@ -52,7 +63,7 @@ typedef Rc
         ((gen-type (typeof value)) . wrap) value
 
     inline view (self)
-        ptrtoref (getelementptr (view self) 0 PAYLOAD_INDEX)
+        ptrtoref (deref (extractvalue self PAYLOAD_INDEX))
 
     inline __countof (self)
         countof (view self)
@@ -88,14 +99,16 @@ typedef Rc
     let __as = (make-cast-op as-converter false)
 
     fn __drop (self)
-        let refcount = (getelementptr (storagecast self) 0 REF_INDEX)
+        let refcount = (deref (extractvalue self REF_INDEX))
         let rc = (sub (load refcount) 1)
         assert (rc >= 0)
         if (rc > 0)
             store rc refcount
         else
-            __drop (view self)
-            free self
+            let payload = (view self)
+            __drop payload
+            free (reftoptr payload)
+            free refcount
 
     unlet gen-type
 

@@ -3037,7 +3037,9 @@ repeat:
         case FN_Free: {
             CHECKARGS(1, 1);
             READ_AUTOMOVE_STORAGETYPEOF(T);
+            SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(T));
             //SCOPES_CHECK_RESULT(verify_writable(T));
+
             if (cast<PointerType>(T)->storage_class != SYM_Unnamed) {
                 SCOPES_ERROR(InvalidArgumentTypeForBuiltin, b, T);
             }

@@ -40,4 +40,10 @@ do
 
 One.test-refcount-balanced;
 
+# recursive declarations
+do
+    using import struct
+    struct Node
+        parent : (Rc this-type)
+
 ;
