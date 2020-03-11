@@ -180,7 +180,8 @@ typedef+ Rc
     let __static-imply = (make-cast-op imply-converter true)
     let __as = (make-cast-op as-converter false)
 
-    fn __drop (self)
+    fn _drop (self)
+        returning void
         let md = (extractvalue self METADATA_INDEX)
         let refcount = (getelementptr md 0 STRONGRC_INDEX)
         let rc = (sub (load refcount) 1)
@@ -195,7 +196,10 @@ typedef+ Rc
                 free md
             # otherwise last weak reference will clean this up
 
-    unlet _view
+    inline __drop (self)
+        _drop (deref self)
+
+    unlet _view _drop
 
 do
     let Rc Weak
