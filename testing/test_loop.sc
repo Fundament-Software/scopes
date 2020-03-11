@@ -124,4 +124,16 @@ do
     test (v == 5)
     test (w == 6)
 
+do
+    # loop in fold must use standard repeat
+    fold (a b c = 1 2 3) for i in (range 10)
+        unlet repeat
+        unlet break
+        loop (a b = 1 2)
+            if (a < 5)
+                repeat (a + 1) (b + 1)
+            else
+                break a b
+        _ a b c
+
 true

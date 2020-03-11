@@ -364,7 +364,14 @@ struct Expander {
         LabelTemplateRef break_label = ref(anchor,
             LabelTemplate::from(LK_Break, KW_Break, loop));
 
-        Expander bodyexp(Scope::from(nullptr, env), astscope);
+        auto subenv = Scope::bind_from(ConstInt::symbol_from(KW_Repeat),
+            ConstInt::builtin_from(KW_Repeat), nullptr, env);
+        subenv = Scope::bind_from(ConstInt::symbol_from(KW_Break),
+            ConstInt::builtin_from(KW_Break), nullptr, subenv);
+        // ensure the local scope does not contain special symbols
+        subenv = Scope::from(nullptr, subenv);
+
+        Expander bodyexp(subenv, astscope);
 
         auto expr = Expression::unscoped_from();
         {
