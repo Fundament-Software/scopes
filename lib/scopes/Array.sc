@@ -196,6 +196,17 @@ typedef+ Array
         let idx = (deref &count)
         dupe (deref (self._items @ idx))
 
+    """"Remove element at index from array `self` and return it.
+    fn remove (self index)
+        let &count = self._count
+        assert (index < &count) "can't pop from empty array"
+        &count -= 1
+        let result =
+            dupe (deref (self._items @ index))
+        for i in (range index &count)
+            assign (dupe (self._items @ (i + 1))) (self._items @ i)
+        result
+
     """"Clear the array and reset its element count to zero. This will drop
         all elements that have been previously contained by the array.
     fn clear (self)

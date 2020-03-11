@@ -162,6 +162,11 @@ typedef+ Rc
     spice __repr (self)
         'tag `(forward-repr (view self)) ('anchor args)
 
+    inline __== (self other)
+        static-if ((typeof self) == (typeof other))
+            inline (self other)
+                (extractvalue self PAYLOAD_INDEX) == (extractvalue other PAYLOAD_INDEX)
+
     inline make-cast-op (f const?)
         spice "box-cast" (selfT otherT)
             selfT as:= type
