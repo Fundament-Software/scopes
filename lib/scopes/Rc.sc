@@ -92,14 +92,20 @@ typedef+ Weak
     case (cls, T : type)
         (gen-type T) . WeakType
 
-    fn __drop (self)
+    fn _drop (self)
         let md = (extractvalue self METADATA_INDEX)
         let refcount = (getelementptr md 0 WEAKRC_INDEX)
         let rc = (sub (load refcount) 1)
         assert (rc >= 0)
         store rc refcount
         if (rc == 0)
-            free md
+            let strongrefcount = (getelementptr md 0 STRONGRC_INDEX)
+            if ((load strongrefcount) == 0)
+                free md
+            # otherwise last strong reference will clean this up
+
+    inline __drop (self)
+        _drop (deref self)
 
     fn upgrade (self)
         viewing self
@@ -163,7 +169,7 @@ typedef+ Rc
         'tag `(forward-repr (view self)) ('anchor args)
 
     inline __== (self other)
-        static-if ((typeof self) == (typeof other))
+        static-if (self == other)
             inline (self other)
                 (extractvalue self PAYLOAD_INDEX) == (extractvalue other PAYLOAD_INDEX)
 
@@ -191,15 +197,17 @@ typedef+ Rc
         let refcount = (getelementptr md 0 STRONGRC_INDEX)
         let rc = (sub (load refcount) 1)
         assert (rc >= 0)
-        store rc refcount
         if (rc == 0)
             let payload = (view self)
             __drop payload
             free (reftoptr payload)
+            store 0 refcount
             let weakrefcount = (getelementptr md 0 WEAKRC_INDEX)
             if ((load weakrefcount) == 0)
                 free md
             # otherwise last weak reference will clean this up
+        else
+            store rc refcount
 
     inline __drop (self)
         _drop (deref self)

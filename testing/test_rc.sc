@@ -73,4 +73,79 @@ do
     struct Node
         parent : (Rc this-type)
 
+# using weak and strong references to build a tree
+    this tests if a complex tree of weak and strong references is cleaned up properly
+do
+    using import struct
+    using import Option
+    using import Array
+
+    global deleted_names : (GrowingArray string)
+
+    struct DemoNode
+        let RcType = (Rc this-type)
+        let WeakType = RcType.WeakType
+        parent : (Option WeakType)
+        children : (GrowingArray RcType)
+        _name : string
+
+        inline... new
+        case (name : string,)
+            RcType
+                _name = name
+        case (parent : RcType, name : string, )
+            let self =
+                RcType
+                    parent = parent
+                    _name = name
+            'append parent.children (Rc.clone self)
+            self
+
+        inline __== (self other)
+            if ((typeof self) == (typeof other))
+
+        inline __drop (self)
+            print "deleting" ('name self)
+            'append deleted_names ('name self)
+            super-type.__drop self
+
+        inline name (self)
+            self._name
+
+        inline __repr (self)
+            deref self._name
+
+    let root = (DemoNode.new "root")
+    do
+        let n1 = (DemoNode.new root "n1")
+        let n2 = (DemoNode.new root "n2")
+        let n3 = (DemoNode.new root "n3")
+
+        let n11 = (DemoNode.new n1 "n11")
+        let n21 = (DemoNode.new n2 "n21")
+        let n22 = (DemoNode.new n2 "n22")
+        let n31 = (DemoNode.new n3 "n31")
+        let n32 = (DemoNode.new n3 "n32")
+        let n33 = (DemoNode.new n3 "n33")
+
+        let n321 = (DemoNode.new n32 "n321")
+        let n322 = (DemoNode.new n32 "n322")
+        ;
+
+    drop root
+    print "ok"
+    test ((countof deleted_names) == 12)
+    test ((deleted_names @ 0) == "root")
+    test ((deleted_names @ 1) == "n1")
+    test ((deleted_names @ 2) == "n11")
+    test ((deleted_names @ 3) == "n2")
+    test ((deleted_names @ 4) == "n21")
+    test ((deleted_names @ 5) == "n22")
+    test ((deleted_names @ 6) == "n3")
+    test ((deleted_names @ 7) == "n31")
+    test ((deleted_names @ 8) == "n32")
+    test ((deleted_names @ 9) == "n321")
+    test ((deleted_names @ 10) == "n322")
+    test ((deleted_names @ 11) == "n33")
+
 ;
