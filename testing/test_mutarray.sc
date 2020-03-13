@@ -191,12 +191,12 @@ fn test-remove ()
     One.test-refcount-balanced;
 
     local a : (Array One)
-    'append a (One 0)
-    'append a (One 1)
-    'append a (One 2)
-    'append a (One 3)
-    'append a (One 4)
-    'append a (One 5)
+    'insert a (One 0)
+    'insert a (One 1)
+    'insert a (One 2)
+    'insert a (One 3)
+    'insert a (One 4)
+    'insert a (One 5)
     test ((countof a) == 6)
     let q = ('pop a)
     test (('value q) == 5)
@@ -212,6 +212,13 @@ fn test-remove ()
     test (('value (a @ 1)) == 1)
     test (('value (a @ 2)) == 3)
     test (('value (a @ 3)) == 4)
+    'insert a (One 6) 2
+    test ((countof a) == 5)
+    test (('value (a @ 0)) == 0)
+    test (('value (a @ 1)) == 1)
+    test (('value (a @ 2)) == 6)
+    test (('value (a @ 3)) == 3)
+    test (('value (a @ 4)) == 4)
     ;
 
 test-remove;

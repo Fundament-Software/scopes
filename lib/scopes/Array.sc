@@ -188,6 +188,28 @@ typedef+ Array
             assign value (self._items @ idx)
         dest
 
+    """"Insert `value` at `index` into the array `self` and return a reference
+        to the new element. When the `array` is of `GrowingArray` type, this
+        operation will transparently resize the array's storage.
+        This operation offsets the index of each following element by 1.
+        If index is omitted, `insert` operates like `append`.
+    define insert
+        fn _insert (self value index)
+            let count = (deref self._count)
+            assert (index <= count) "insertion index out of bounds"
+            append-slots self 1:usize
+            let items = self._items
+            for i in (rrange index count)
+                assign (dupe (items @ i)) (items @ (i + 1))
+            let slot = (self._items @ index)
+            assign value slot
+            slot
+        inline... insert
+        case (self, value)
+            append self value
+        case (self, value, index)
+            _insert self value index
+
     """"Remove element with highest index from array `self` and return it.
     fn pop (self)
         let &count = self._count
@@ -197,14 +219,16 @@ typedef+ Array
         dupe (deref (self._items @ idx))
 
     """"Remove element at index from array `self` and return it.
+        This operation offsets the index of each following element by -1.
     fn remove (self index)
         let &count = self._count
         assert (index < &count) "can't pop from empty array"
         &count -= 1
+        let items = self._items
         let result =
-            dupe (deref (self._items @ index))
+            dupe (deref (items @ index))
         for i in (range index &count)
-            assign (dupe (self._items @ (i + 1))) (self._items @ i)
+            assign (dupe (items @ (i + 1))) (items @ i)
         result
 
     """"Clear the array and reset its element count to zero. This will drop
