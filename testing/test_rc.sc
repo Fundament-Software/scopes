@@ -16,6 +16,12 @@ do
     dump k
 
     do
+        # Rc comparisons are object comparisons
+        let m = ((Rc i32) 3)
+        test (k == k)
+        test (k != m)
+
+    do
         test ((Rc.strong-count k) == 1)
         let k2 = (Rc.clone k)
         test ((Rc.strong-count k) == 2)
