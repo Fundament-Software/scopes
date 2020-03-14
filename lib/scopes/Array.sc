@@ -94,21 +94,22 @@ typedef+ Array
         assert (self._count > 0) "empty array has no last element"
         self._items @ (self._count - 1:usize)
 
+    @@ memo
     inline gen-sort (key)
         let key =
             static-if (none? key)
                 inline (x) x
             else key
 
-        fn siftDown (items start end)
+        fn siftDown (items start end ...)
             loop (root = start)
                 if ((iLeftChild root) > end)
                     break;
                 let child = (iLeftChild root)
                 let v_root = (items @ root)
-                let k_root = (key v_root)
+                let k_root = (key v_root ...)
                 let v_child = (items @ child)
-                let k_child = (key v_child)
+                let k_child = (key v_child ...)
                 inline step2 (iswap v_swap k_swap)
                     if (iswap == root)
                         break;
@@ -118,7 +119,7 @@ typedef+ Array
                     let child1 = (child + 1:i64)
                     if (child1 <= end)
                         let v_child1 = (items @ child1)
-                        let k_child1 = (key v_child1)
+                        let k_child1 = (key v_child1 ...)
                         if (k_swap < k_child1)
                             step2 child1 v_child1 k_child1
                     step2 iswap v_swap k_swap
@@ -127,14 +128,14 @@ typedef+ Array
                 else
                     step1 root v_root k_root
 
-        fn "sort-array" (items count)
+        fn "sort-array" (items count ...)
             let count-1 = (count - 1:i64)
 
             # heapify
             loop (start = (iParent count-1))
                 if (start < 0:i64)
                     break;
-                siftDown items start count-1
+                siftDown items start count-1 ...
                 repeat (start - 1:i64)
 
             loop (end = count-1)
@@ -144,15 +145,15 @@ typedef+ Array
                 let v_end = (items @ end)
                 swap v_0 v_end
                 let end = (end - 1:i64)
-                siftDown items 0:i64 end
+                siftDown items 0:i64 end ...
                 repeat end
 
     """"Sort elements of array `self` from smallest to largest, either using
         the `<` operator supplied by the element type, or by using the key
         supplied by the callable `key`, which is expected to return a comparable
         value for each element value supplied.
-    inline sort (self key)
-        (gen-sort key) (deref self._items) ((deref self._count) as i64)
+    inline sort (self key ...)
+        (gen-sort key) (deref self._items) ((deref self._count) as i64) ...
 
     fn append-slots (self n)
         let idx = (deref self._count)
