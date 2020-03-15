@@ -154,4 +154,19 @@ do
     test ((deleted_names @ 10) == "n322")
     test ((deleted_names @ 11) == "n33")
 
+do
+    # singleton test
+    T := (Rc i32)
+
+    fn singleton ()
+        using import Option
+        global data : (Option T)
+        if (not data)
+            data = (T 17)
+        deref ('unwrap data)
+
+    local example : T = (Rc.clone (singleton))
+    test (example == (singleton))
+    ;
+
 ;
