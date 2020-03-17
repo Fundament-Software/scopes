@@ -136,4 +136,12 @@ do
                 break a b
         _ a b c
 
+do
+    # reverse loops
+    for i in (rrange 0 10)
+        test ((i >= 0) & (i < 10))
+    # unsigned values
+    for i in (rrange 0:u32 10:u32)
+        test ((i >= 0:u32) & (i < 10:u32))
+
 true

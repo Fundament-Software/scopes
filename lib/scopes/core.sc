@@ -4362,12 +4362,12 @@ inline rrange (a b c)
         static-branch (none? b)
             inline () a
             inline () b
-    let to = (((to - from + (step - 1)) // step) * step - step + from)
+    let to = (((to - from + (step - 1)) // step) * step + from)
     Generator
-        inline () to
-        inline (x) (x >= from)
-        inline (x) x
-        inline (x) (x - step)
+        inline () (_ to (to - step))
+        inline (x0 x-1) (x0 > from)
+        inline (x0 x-1) x-1
+        inline (x0 x-1) (_ x-1 (x-1 - step))
 
 let parse-compile-flags =
     spice-macro

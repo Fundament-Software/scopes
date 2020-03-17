@@ -219,6 +219,14 @@ fn test-remove ()
     test (('value (a @ 2)) == 6)
     test (('value (a @ 3)) == 3)
     test (('value (a @ 4)) == 4)
+    'insert a (One 7) 0
+    test ((countof a) == 6)
+    test (('value (a @ 0)) == 7)
+    test (('value (a @ 1)) == 0)
+    test (('value (a @ 2)) == 1)
+    test (('value (a @ 3)) == 6)
+    test (('value (a @ 4)) == 3)
+    test (('value (a @ 5)) == 4)
     ;
 
 test-remove;
