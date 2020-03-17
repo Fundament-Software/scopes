@@ -4,17 +4,21 @@ using import Option
 
 # Option unwrap method
 do
-    let optT = (Option i32)
-    let opt = (optT 1234)
+    let optT = (Option One)
+    let opt = (optT (One 1234))
     let opt2 = (optT)
     let result =
         try ('try-unwrap opt)
-        else 0
-    test (result == 1234)
+        else
+            error "unwrap failed"
+    test (result == (One 1234))
+    let fallback = (One 12345)
     let result =
-        try ('try-unwrap opt2)
-        else 12345
-    test (result == 12345)
+        try (deref ('try-unwrap opt2))
+        else (view fallback)
+    test (result == (One 12345))
+    ;
 
+One.test-refcount-balanced;
 
 ;

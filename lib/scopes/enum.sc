@@ -34,7 +34,7 @@ fn _extract-payload (enum-value extractT)
             let ptrET = ('change-storage-class
                 ('mutable (pointer.type extractT)) 'Function)
             spice-quote
-                let ptr = (alloca payload-cls)
+                let ptr = (alloca (qualifiersof raw-payload))
                 store raw-payload ptr
                 let ptr = (bitcast ptr ptrET)
                 load ptr
