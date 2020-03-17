@@ -196,4 +196,18 @@ do
     local example : RcT = k
     # error: value of type %1000:<Rc T> must be unique
 
+do
+    using import struct
+
+    struct T
+        a = 0
+
+    RcT := (Rc T)
+
+    let k = (Rc.clone (RcT 17))
+
+    local container : RcT
+    dump (typeof container) (typeof k)
+    container = k
+
 ;

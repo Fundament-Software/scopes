@@ -152,9 +152,12 @@ typedef+ Rc
     inline __countof (self)
         countof (view self)
 
-    spice __= (selfT otherT)
-        inline (lhs rhs)
-            (view lhs) = rhs
+    inline __= (selfT otherT)
+        static-if (selfT == otherT)
+            super-type.__= selfT otherT
+        else
+            inline (lhs rhs)
+                (view lhs) = rhs
 
     inline __@ (self keys...)
         @ (view self) keys...
