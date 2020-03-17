@@ -213,6 +213,10 @@ typedef One :: (tuple i32 (mutable pointer i32))
     fn refcount ()
         deref _refcount
 
+    fn reset-refcount ()
+        _refcount = 0
+        ;
+
     fn test-refcount-balanced ()
         # this also fixes the refcount for subsequent tests
         let balanced? = (_refcount == 0)

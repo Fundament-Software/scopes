@@ -156,17 +156,44 @@ do
 
 do
     # singleton test
-    T := (Rc i32)
+    T := (Rc One)
 
     fn singleton ()
         using import Option
         global data : (Option T)
         if (not data)
             data = (T 17)
-        deref ('unwrap data)
+        'unwrap data
 
     local example : T = (Rc.clone (singleton))
     test (example == (singleton))
     ;
+test ((One.refcount) == 1)
+One.reset-refcount;
+
+
+do
+    using import struct
+
+    # singleton test
+    typedef Inner :: i32
+        inline __typecall (cls v)
+            bitcast v this-type
+
+    struct T
+        a : Inner
+
+    RcT := (Rc T)
+
+    fn singleton ()
+        using import Option
+        global data : (Option RcT)
+        if (not data)
+            data = (RcT (a = (Inner 17)))
+        'unwrap data
+
+    let k = (Rc.clone (singleton))
+    local example : RcT = k
+    # error: value of type %1000:<Rc T> must be unique
 
 ;

@@ -140,7 +140,7 @@ typedef+ Rc
                 \ 0 STRONGRC_INDEX
         let rc = (add (load refcount) 1)
         store rc refcount
-        dupe value
+        deref (dupe value)
 
     inline wrap (value)
         ((gen-type (typeof value)) . wrap) value
