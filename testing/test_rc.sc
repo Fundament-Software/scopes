@@ -49,8 +49,8 @@ do
     test ((Rc.strong-count w) == 1)
     test ((Rc.weak-count w) == 1)
 
-    let v = ('upgrade w)
-    let p = ('unwrap v)
+    let v = ('force-upgrade w)
+    let p = v
 
     test ((Rc.strong-count c) == 2)
     test ((Rc.weak-count c) == 1)
@@ -67,7 +67,7 @@ do
     test ((Rc.strong-count w) == 0)
     test ((Rc.weak-count w) == 1)
 
-    test (not ('upgrade w))
+    test-error ('upgrade w)
 
     ;
 
@@ -163,7 +163,7 @@ do
         global data : (Option T)
         if (not data)
             data = (T 17)
-        'unwrap data
+        'force-unwrap data
 
     local example : T = (Rc.clone (singleton))
     test (example == (singleton))
@@ -190,7 +190,7 @@ do
         global data : (Option RcT)
         if (not data)
             data = (RcT (a = (Inner 17)))
-        'unwrap data
+        'force-unwrap data
 
     let k = (Rc.clone (singleton))
     local example : RcT = k

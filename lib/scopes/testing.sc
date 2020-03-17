@@ -84,8 +84,12 @@ define-sugar-macro test-error
             false
         except (err)
             io-write! "ASSERT OK: "
-            print
-                'format err
+            static-if ((typeof err) == Error)
+                print
+                    'format err
+            else
+                print
+                    typeof err
             true
 
     inline assertion-error! (msg)

@@ -10,8 +10,6 @@
     module provides a strong reference type `Rc`, as well as a weak reference
     type `Weak`.
 
-using import Option
-
 let
     PAYLOAD_INDEX = 0
     METADATA_INDEX = 1
@@ -72,6 +70,10 @@ inline gen-type (T)
             wrap (T args...)
     RcType
 
+typedef UpgradeError : (tuple)
+    inline __typecall (cls)
+        bitcast none this-type
+
 typedef+ ReferenceCounted
     fn strong-count (value)
         viewing value
@@ -96,7 +98,7 @@ typedef+ Weak
         let md = (extractvalue self METADATA_INDEX)
         let refcount = (getelementptr md 0 WEAKRC_INDEX)
         let rc = (sub (load refcount) 1)
-        assert (rc >= 0)
+        assert (rc >= 0) "corrupt refcount encountered"
         store rc refcount
         if (rc == 0)
             let strongrefcount = (getelementptr md 0 STRONGRC_INDEX)
@@ -114,15 +116,28 @@ typedef+ Weak
                 extractvalue self METADATA_INDEX
                 \ 0 STRONGRC_INDEX
         let rc = (load refcount)
-        assert (rc >= 0)
-        let RcType = ((typeof self) . RcType)
-        let OptionType = (Option RcType)
+        assert (rc >= 0) "corrupt refcount encountered"
         if (rc == 0)
-            OptionType none
-        else
-            let rc = (add rc 1)
-            store rc refcount
-            OptionType (bitcast (dupe self) RcType)
+            raise (UpgradeError)
+        let RcType = ((typeof self) . RcType)
+        let rc = (add rc 1)
+        store rc refcount
+        bitcast (dupe self) RcType
+
+    fn force-upgrade (self)
+        viewing self
+        let refcount =
+            getelementptr
+                extractvalue self METADATA_INDEX
+                \ 0 STRONGRC_INDEX
+        let rc = (load refcount)
+        assert (rc >= 0) "corrupt refcount encountered"
+        assert (rc > 0) "upgrading Weak failed"
+        let RcType = ((typeof self) . RcType)
+        let rc = (add rc 1)
+        store rc refcount
+        bitcast (dupe self) RcType
+
 
 typedef+ Rc
     inline... __typecall
@@ -200,7 +215,7 @@ typedef+ Rc
         let md = (extractvalue self METADATA_INDEX)
         let refcount = (getelementptr md 0 STRONGRC_INDEX)
         let rc = (sub (load refcount) 1)
-        assert (rc >= 0)
+        assert (rc >= 0) "corrupt refcount encountered"
         if (rc == 0)
             let payload = (view self)
             __drop payload
@@ -219,5 +234,5 @@ typedef+ Rc
     unlet _view _drop
 
 do
-    let Rc Weak
+    let Rc Weak UpgradeError
     locals;
