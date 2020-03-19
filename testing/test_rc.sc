@@ -42,6 +42,17 @@ do
     test ((Rc.strong-count c) == 1)
     test ((Rc.weak-count c) == 0)
 
+    let nullweak = ((Weak vec3))
+    test ((Rc.strong-count nullweak) == 0)
+    test ((Rc.weak-count nullweak) == 1)
+    let nullweak2 = ((Weak vec3))
+    test ((Rc.weak-count nullweak) == 1)
+    test ((Rc.weak-count nullweak2) == 1)
+    test-error ('upgrade nullweak2)
+    let nullweak3 = ('clone nullweak)
+    test (nullweak == nullweak2)
+    test (nullweak == nullweak3)
+
     let w = (c as Weak)
 
     test ((Rc.strong-count c) == 1)
@@ -58,6 +69,12 @@ do
     test ((Rc.weak-count w) == 1)
     test ((Rc.strong-count p) == 2)
     test ((Rc.weak-count p) == 1)
+
+    let w2 = (Rc.clone w)
+    test ((Rc.strong-count p) == 2)
+    test ((Rc.weak-count p) == 2)
+    test (w == w2)
+    drop w2
 
     print c
     test (c.xz == (vec2 1 3))
