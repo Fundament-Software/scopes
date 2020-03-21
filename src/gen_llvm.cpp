@@ -2390,9 +2390,15 @@ struct LLVMIRGenerator {
         LLVMValueRef func = LLVMGetBasicBlockParent(old_bb);
         LLVMMetadataRef disp = LLVMGetSubprogram(func);
 
+        LLVMMetadataRef scope = disp;
+        if (active_function.anchor()->path != anchor->path) {
+            LLVMMetadataRef difile = source_file_to_scope(anchor->path);
+            scope = LLVMDIBuilderCreateLexicalBlock(di_builder, disp, difile, 1, 1);
+        }
+
         LLVMMetadataRef result = LLVMDIBuilderCreateDebugLocation(
             LLVMGetGlobalContext(),
-            anchor->lineno, anchor->column, disp, nullptr);
+            anchor->lineno, anchor->column, scope, nullptr);
 
         return result;
     }
