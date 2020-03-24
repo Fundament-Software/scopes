@@ -35,6 +35,37 @@ const char *abi_class_to_string(ABIClass class_) {
 #undef DEF_ABI_CLASS_NAMES
 
 #ifdef SCOPES_WIN32
+
+ABIClass merge_abi_classes(ABIClass class1, ABIClass class2) {
+    if (class1 == class2)
+        return class1;
+
+    if (class1 == ABI_CLASS_NO_CLASS)
+        return class2;
+    if (class2 == ABI_CLASS_NO_CLASS)
+        return class1;
+
+    if (class1 == ABI_CLASS_MEMORY || class2 == ABI_CLASS_MEMORY)
+        return ABI_CLASS_MEMORY;
+
+    if ((class1 == ABI_CLASS_INTEGERSI && class2 == ABI_CLASS_SSESF)
+        || (class2 == ABI_CLASS_INTEGERSI && class1 == ABI_CLASS_SSESF))
+        return ABI_CLASS_INTEGERSI;
+    if (class1 == ABI_CLASS_INTEGER || class1 == ABI_CLASS_INTEGERSI
+        || class2 == ABI_CLASS_INTEGER || class2 == ABI_CLASS_INTEGERSI)
+        return ABI_CLASS_INTEGER;
+
+    if (class1 == ABI_CLASS_X87
+        || class1 == ABI_CLASS_X87UP
+        || class1 == ABI_CLASS_COMPLEX_X87
+        || class2 == ABI_CLASS_X87
+        || class2 == ABI_CLASS_X87UP
+        || class2 == ABI_CLASS_COMPLEX_X87)
+        return ABI_CLASS_MEMORY;
+
+    return ABI_CLASS_SSE;
+}
+
 #else
 // x86-64 PS ABI based on https://www.uclibc.org/docs/psABI-x86_64.pdf
 
