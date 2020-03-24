@@ -96,19 +96,16 @@ do
     struct Node
         parent : (Rc this-type)
 
-# using weak and strong references to build a tree
-    this tests if a complex tree of weak and strong references is cleaned up properly
+# using strong references to build a tree
+    this tests if a complex tree of strong references is cleaned up properly
 do
     using import struct
-    using import Option
     using import Array
 
     global deleted_names : (GrowingArray string)
 
     struct DemoNode
         let RcType = (Rc this-type)
-        let WeakType = RcType.WeakType
-        parent : (Option WeakType)
         children : (GrowingArray RcType)
         _name : string
 
@@ -119,7 +116,6 @@ do
         case (parent : RcType, name : string, )
             let self =
                 RcType
-                    parent = parent
                     _name = name
             'append parent.children (Rc.clone self)
             self
@@ -153,6 +149,7 @@ do
 
         let n321 = (DemoNode.new n32 "n321")
         let n322 = (DemoNode.new n32 "n322")
+
         ;
 
     drop root
@@ -170,6 +167,110 @@ do
     test ((deleted_names @ 9) == "n321")
     test ((deleted_names @ 10) == "n322")
     test ((deleted_names @ 11) == "n33")
+
+# variation of same test to build a tree
+    this tests if a complex tree of strong and weak references is updated correctly
+do
+    using import struct
+    using import Array
+    using import enum
+
+    struct DemoNode
+        enum DemoNodeError
+            ChildNotFound
+            ChildHasNoParent
+
+        let RcType = (Rc this-type)
+        let WeakType = RcType.WeakType
+        parent : WeakType
+        children : (GrowingArray RcType)
+        _name : string
+
+        inline... new
+        case (name : string,)
+            RcType
+                _name = name
+        case (parent : RcType, name : string, )
+            let self =
+                RcType
+                    parent = parent
+                    _name = name
+            'append parent.children (Rc.clone self)
+            self
+
+        inline __== (self other)
+            if ((typeof self) == (typeof other))
+
+        inline __drop (self)
+            print "deleting" ('name self)
+            super-type.__drop self
+
+        inline name (self)
+            self._name
+
+        inline __repr (self)
+            deref self._name
+
+        fn child-index (self child)
+            for i elem in (enumerate self.children)
+                if (elem == child)
+                    return i
+            else
+                raise (DemoNodeError.ChildNotFound)
+
+        fn unparent (self)
+            let oldparent =
+                try ('upgrade self.parent)
+                else
+                    raise (DemoNodeError.ChildHasNoParent)
+            let i = ('child-index oldparent self)
+            self.parent = (WeakType)
+            'remove oldparent.children i
+
+        fn... reparent (self newparent)
+            let self =
+                try (unparent self)
+                else
+                    error "reparent failed"
+            self.parent = newparent
+            'append newparent.children self
+
+    let root = (DemoNode.new "root")
+    do
+        let n1 = (DemoNode.new root "n1")
+        let n2 = (DemoNode.new root "n2")
+        let n3 = (DemoNode.new root "n3")
+
+        let n11 = (DemoNode.new n1 "n11")
+        let n21 = (DemoNode.new n2 "n21")
+        let n22 = (DemoNode.new n2 "n22")
+        let n31 = (DemoNode.new n3 "n31")
+        let n32 = (DemoNode.new n3 "n32")
+        let n33 = (DemoNode.new n3 "n33")
+
+        let n321 = (DemoNode.new n32 "n321")
+        let n322 = (DemoNode.new n32 "n322")
+        ;
+
+    fn... print-tree (node, indent = "")
+        returning void
+        print
+            indent .. ('name node)
+            Rc.strong-count node
+        test ((Rc.strong-count node) == 1)
+        indent := indent .. "  "
+        for child in node.children
+            this-function child indent
+
+    print-tree root
+    do
+        let node = (root . children @ 1 . children @ 0)
+        DemoNode.reparent node root
+        ;
+    print-tree root
+
+    drop root
+    print "ok"
 
 do
     # singleton test

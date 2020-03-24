@@ -122,8 +122,7 @@ typedef+ Weak
             fn (self other)
                 == (extractvalue self METADATA_INDEX) (extractvalue other METADATA_INDEX)
 
-
-    fn clone (self)
+    fn... clone (self : Weak,)
         viewing self
         let md = (extractvalue self METADATA_INDEX)
         if (ptrtoint md usize)
@@ -146,7 +145,7 @@ typedef+ Weak
         let RcType = ((typeof self) . RcType)
         let rc = (add rc 1)
         store rc refcount
-        bitcast (dupe self) RcType
+        deref (bitcast (dupe self) RcType)
 
     fn force-upgrade (self)
         viewing self
@@ -159,7 +158,7 @@ typedef+ Weak
         let RcType = ((typeof self) . RcType)
         let rc = (add rc 1)
         store rc refcount
-        bitcast (dupe self) RcType
+        deref (bitcast (dupe self) RcType)
 
 
 typedef+ Rc
@@ -177,7 +176,9 @@ typedef+ Rc
             getelementptr
                 extractvalue value METADATA_INDEX
                 \ 0 STRONGRC_INDEX
-        let rc = (add (load refcount) 1)
+        let rc = (load refcount)
+        assert (rc >= 0) "corrupt refcount encountered"
+        let rc = (add rc 1)
         store rc refcount
         deref (dupe value)
     case (value : Weak,)
