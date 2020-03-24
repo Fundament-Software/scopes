@@ -176,10 +176,6 @@ do
     using import enum
 
     struct DemoNode
-        enum DemoNodeError
-            ChildNotFound
-            ChildHasNoParent
-
         let RcType = (Rc this-type)
         let WeakType = RcType.WeakType
         parent : WeakType
@@ -216,22 +212,20 @@ do
                 if (elem == child)
                     return i
             else
-                raise (DemoNodeError.ChildNotFound)
+                assert false "unexpected error in child-index()"
+                unreachable;
 
         fn unparent (self)
             let oldparent =
                 try ('upgrade self.parent)
                 else
-                    raise (DemoNodeError.ChildHasNoParent)
+                    return (Rc.clone self)
             let i = ('child-index oldparent self)
             self.parent = (WeakType)
             'remove oldparent.children i
 
         fn... reparent (self newparent)
-            let self =
-                try (unparent self)
-                else
-                    error "reparent failed"
+            let self = (unparent self)
             self.parent = newparent
             'append newparent.children self
 
