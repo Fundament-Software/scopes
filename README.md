@@ -5,7 +5,7 @@ Welcome to Scopes
 
 Scopes is a retargetable programming language & infrastructure.
 
-See [Tags](tags) for releases.
+See [Tags](https://hg.sr.ht/~duangle/scopes/tags) for releases.
 
 Features
 --------
