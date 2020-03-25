@@ -32,4 +32,11 @@ Editor Support
 Help & Support
 --------------
 
-For questions, you can [write a mail](mailto:support@duangle.com) or join the #scopes IRC channel on [Freenode](https://freenode.net/). Our bugtracker is presently offline.
+For questions:
+
+* [Write a mail](mailto:support@duangle.com)
+* Join the #scopes IRC channel on [Freenode](https://freenode.net/)
+
+For bug reports:
+
+* [submit a ticket](https://todo.sr.ht/~duangle/scopes)
