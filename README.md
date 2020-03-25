@@ -32,11 +32,12 @@ Editor Support
 Help & Support
 --------------
 
-For questions:
+For help, questions and feedback:
 
-* [Write a mail](mailto:support@duangle.com)
+* Join the [mailing list](https://lists.sr.ht/~duangle/scopes)
 * Join the #scopes IRC channel on [Freenode](https://freenode.net/)
+* Write an [e-mail](mailto:support@duangle.com)
 
 For bug reports:
 
-* [submit a ticket](https://todo.sr.ht/~duangle/scopes)
+* [Submit a ticket](https://todo.sr.ht/~duangle/scopes)
