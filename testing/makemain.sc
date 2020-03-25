@@ -6,11 +6,14 @@ using import testing
 bin-dir := compiler-dir .. "/bin"
 include-dir := compiler-dir .. "/include"
 
-include
-    options "-I" include-dir
-""""#include "scopes/scopes.h"
+let lib =
+    include
+        options "-I" include-dir
+        """"#include "scopes/scopes.h"
 
-    int system(const char *command);
+            int system(const char *command);
+
+using lib.extern
 
 #-----------------
 
@@ -18,13 +21,13 @@ fn get-executable-ptr ()
     bitcast (static-typify this-function) voidstar
 
 fn main (argc argv)
-    sc_main (get-executable-ptr) argc argv
-    return 0
+    sc_init (get-executable-ptr) argc argv
+    return (sc_main)
 
 #-----------------
 
 objfile := bin-dir .. "/newscopes.o"
-compile-object 
+compile-object
     default-target-triple
     compiler-file-kind-object
     objfile
