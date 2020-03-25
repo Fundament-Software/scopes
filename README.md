@@ -1,11 +1,11 @@
-![scopes_logo_210px.png](/~duangle/scopes/browse/default/extras/images/scopes_logo_210px.png)
+![scopes_logo_210px.png](https://hg.sr.ht/~duangle/scopes/raw/default/extras/images/scopes_logo_210px.png)
 
 Welcome to Scopes
 -----------------
 
 Scopes is a retargetable programming language & infrastructure.
 
-See [Tags](/~duangle/scopes/tags) for releases.
+See [Tags](tags) for releases.
 
 Features
 --------
