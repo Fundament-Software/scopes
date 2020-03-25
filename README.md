@@ -34,7 +34,7 @@ Help & Support
 
 For help, questions and feedback:
 
-* Join the [mailing list](https://lists.sr.ht/~duangle/scopes)
+* Subscribe to the [mailing list](https://lists.sr.ht/~duangle/scopes)
 * Join the #scopes IRC channel on [Freenode](https://freenode.net/)
 * Write an [e-mail](mailto:support@duangle.com)
 
