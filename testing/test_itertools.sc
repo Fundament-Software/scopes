@@ -1,4 +1,5 @@
 using import itertools
+using import testing
 
 for x y z in (dim 1 2 3)
     print x y z
@@ -51,7 +52,7 @@ print
             string.collector 256
         '()
 
-assert
+test
     ==
         ->>
             range 26
@@ -88,7 +89,7 @@ let x y z w =
         inline (x) (x * 2)
         \ 1 2 3 4
 
-assert ((+ x y z w) == 20)
+test ((+ x y z w) == 20)
 
 print
     # generate 10 sample indices
@@ -134,9 +135,29 @@ print
     # /dev/null
     drain
 
-# chain expressions
---> "test"
-    .. "blah"
-    .. __ "bleh"
-    __ == "blahtestbleh"
-    assert
+do
+    using import chaining
+
+    # chain expressions
+    --> "test"
+        .. "blah"
+        .. __ "bleh"
+        __ == "blahtestbleh"
+        test
+
+do
+    # permutated ranges
+    using import Map
+
+    local used : (Set u64)
+    N := 4
+    for i A in (enumerate (permutate-range N))
+        let k =
+            |
+                va-map
+                    inline (n) ((A @ n) as u64 << (8 * n))
+                    va-range N
+        test (not ('in? used k))
+        'insert used k
+        print i (unpack A)
+

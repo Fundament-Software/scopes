@@ -181,6 +181,56 @@ define zip (spice-macro (fn (args) (ltr-multiop args `zip 2)))
 define span (spice-macro (fn (args) (rtl-multiop args `span 2)))
 define join (spice-macro (fn (args) (rtl-multiop args `join 2)))
 
+# based on https://en.wikipedia.org/wiki/Heap%27s_algorithm
+@@ memo
+inline permutate-range (n element-type)
+    """"Return a generator that iterates all permutations of the range from 0
+        to `n`, where `n` must be smaller than 256, and returns a vector of
+        `element-type` for each iteration. If `element-type` is omitted, the
+        default element type will be i32.
+
+        The generator will perform `n!` iterations to complete.
+    static-assert (n < 256) "permutation vector too large"
+    let element-type =
+        static-if (none? element-type) i32
+        else element-type
+    let A = (vectorof element-type (va-range n))
+    let limit = (* (va-range 1 (n + 1)))
+    Generator
+        inline ()
+            _ 0 A
+        inline (k A) (k < limit)
+        inline (k A) A
+        fn (k A)
+            k1 := (k + 1)
+            :: swap
+            va-map
+                inline (i)
+                    let i1 = (i + 1:i8)
+                    let div =
+                        static-if (i1 < 2) 1
+                        else
+                            * 1 (va-range 1 i1)
+                    ci := k // div % i1
+                    if (ci < i)
+                        # the solution for i is likely
+                            A055881 a(n) = largest m such that m! divides n.
+
+                            unfortunately none of the solutions provided on OEIS
+                            seem to be more efficient than ours.
+                        #assert (i == (A055881 k))
+                        merge swap
+                            static-if (i % 2 == 0) 0
+                            else ci
+                            i
+                va-range n
+            return k1 A
+            swap (j1 j2) ::
+            let q1 q2 = (A @ j1) (A @ j2)
+            let A = (insertelement A q1 j2)
+            let A = (insertelement A q2 j1)
+            return k1 A
+
 #---------------------------------------------------------------------------
 # collectors
 #---------------------------------------------------------------------------
@@ -265,53 +315,6 @@ inline cat (coll)
                         break state...
     static-if (none? coll) _cat
     else (_cat coll)
-
-""""Expands a processing chain into nested expressions so that each expression
-    is passed as tailing argument to the following expression.
-
-    `__` can be used as a placeholder token to position the previous expression.
-
-    example::
-
-        --> x
-            f
-            g
-            h 2 __
-            k
-
-    expands to::
-
-        k
-            h 2
-                g
-                    f x
-sugar --> (expr ...)
-    fn placeholder? (elem)
-        (('typeof elem) == Symbol) and (elem as Symbol == '__)
-
-    fold (outp = expr) for expr in ...
-        let anchor = ('anchor expr)
-        'tag
-            match ('typeof expr)
-            case list
-                let prev-outp = outp
-                let expr = (expr as list)
-                let outp found =
-                    fold (outp found = '() false) for elem in expr
-                        if (placeholder? elem)
-                            if found
-                                hide-traceback;
-                                error@ ('anchor elem) "while expanding expression" "duplicate placeholder token"
-                            _ (cons prev-outp outp) true
-                        else
-                            _ (cons elem outp) found
-                if found
-                    `[('reverse outp)]
-                else
-                    `[(.. expr (list prev-outp))]
-            default
-                `[(list expr outp)]
-            anchor
 
 inline ->> (generator collector...)
     collect
@@ -615,7 +618,7 @@ unlet cascade1 retain1
 
 do
     let span dim bitdim imap ipair join zip span join collect each compose cat
-        \ --> ->> flatten map reduce drain limit gate filter take cascade mux
-        \ demux retain
+        \ ->> flatten map reduce drain limit gate filter take cascade mux
+        \ demux retain permutate-range
 
     locals;
