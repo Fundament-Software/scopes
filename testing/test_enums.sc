@@ -233,13 +233,13 @@ do
     enum Atom
         Empty1
         Empty2
-        Number : i32
+        Number : i32 i32
         Var : Symbol
 
     test ((Atom.Empty1) == (Atom.Empty1))
     test ((Atom.Empty1) != (Atom.Empty2))
-    test ((Atom.Number 1) != (Atom.Number 2))
-    test ((Atom.Number 1) == (Atom.Number 1))
+    test ((Atom.Number 1 2) != (Atom.Number 2 2))
+    test ((Atom.Number 1 3) == (Atom.Number 1 3))
 
 ;
 

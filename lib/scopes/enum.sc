@@ -65,11 +65,7 @@ inline gen-dispatch-from-tag (f)
                 let field = (('getarg field-types i) as type)
                 let lit = ('@ field 'Literal)
                 let extractT = ('@ field 'Type)
-                let payloads... =
-                    va-map
-                        inline (self)
-                            f self extractT
-                        self...
+                let payloads... = (f extractT self...)
                 sc_switch_append_case sw lit ('tag `(arg payloads...) anchor)
         sw
 
@@ -78,12 +74,18 @@ typedef Enum
     spice __unsafe-dispatch2 (self other enum-value handlers...)
         call
             gen-dispatch-from-tag
-                inline (self T)
-                    _extract-payload self T false
+                inline (T self other)
+                    _
+                        _extract-payload self T false
+                        _extract-payload other T false
             \ enum-value handlers... self other
     spice __dispatch (self handlers...)
         let tag = `(extractvalue self 0)
-        call (gen-dispatch-from-tag _extract-payload) tag handlers... self
+        call
+            gen-dispatch-from-tag
+                inline (T self)
+                    _extract-payload self T
+            \ tag handlers... self
 
 fn define-field-runtime (T name field-type index-value)
     let fields = ('@ T '__fields__)
