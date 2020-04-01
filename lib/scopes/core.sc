@@ -43,7 +43,8 @@ let square-list = spice-unquote-arguments
 let intptr = u64
 
 fn swap (a b)
-    """"safely exchanges the contents of two references
+    """"safely exchanges the contents of two views
+    viewing a b
     let tmp = (deref (dupe b))
     assign (dupe a) b
     assign tmp a
@@ -2438,7 +2439,19 @@ let opaque =
     # inverted compare attempts regular compare
     __!= = (box-pointer (simple-binary-op (inline (lhs rhs) (not (== lhs rhs)))))
     # default assignment operator
-    __= = (box-pointer (simple-binary-op (inline (lhs rhs) (__drop lhs) (assign rhs lhs))))
+    __= =
+        box-pointer
+            simple-binary-op
+                spice-macro
+                    fn (args)
+                        let argc = ('argcount args)
+                        verify-count argc 2 2
+                        let lhs = ('getarg args 0)
+                        let rhs = ('getarg args 1)
+                        let anchor = ('anchor args)
+                        spice-quote
+                            [('tag `(__drop lhs) anchor)]
+                            [('tag `(assign rhs lhs) anchor)]
     # default dereference
     __toptr =
         box-pointer

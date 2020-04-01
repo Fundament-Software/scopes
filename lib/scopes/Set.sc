@@ -13,6 +13,7 @@
 
 using import enum
 using import struct
+using import Map
 
 # declare void @llvm.memcpy.p0i8.p0i8.i64(i8* <dest>, i8* <src>,
                                         i64 <len>, i1 <isvolatile>)
@@ -96,19 +97,17 @@ typedef Set < Struct
         let capacity = (mask + 1:u64)
         let pos = (keypos keyhash mask)
         loop (i dist = 0:u64 0:u64)
-            if (i == capacity)
-                break;
+            assert (i != capacity) "capacity exceeded"
             let index = (addpos pos i mask)
             if (valid-slot? self index) # already occupied
-                let pos_key = (deref (self._keys @ index))
+                let pos_key = (self._keys @ index)
                 let pos_keyhash = ((hash (deref pos_key)) as u64)
                 let pd = (keydistance pos_keyhash index mask)
                 repeat (i + 1:u64)
                     + 1:u64
                         if (dist > pd)
                             # swap out
-                            self._keys @ index = key
-                            key = pos_key
+                            swap pos_key key
                             keyhash = pos_keyhash
                             dupe pd
                         else
@@ -117,7 +116,7 @@ typedef Set < Struct
                 set-slot self index
                 assign key (self._keys @ index)
                 self._count += 1
-                break;
+                break index
 
     inline erase_pos (self pos mask)
         let hash = ((typeof self) . HashFunction)
@@ -179,8 +178,9 @@ typedef Set < Struct
                     unset-slot self i
                     self._count -= 1:u64
                     # extract as new uniques
-                    let key = (deref key)
+                    let key = (dupe (deref key))
                     insert_entry self key keyhash
+                    ;
                 newmask
 
     fn reserve (self new-capacity)
@@ -193,13 +193,13 @@ typedef Set < Struct
         let new-valid = (malloc-array BitfieldType new-validsize)
         let new-keys = (malloc-array cls.KeyType new-capacity)
         llvm.memcpy.p0i8.p0i8.i64
-            bitcast new-valid (mutable rawstring)
-            bitcast old-valid rawstring
+            bitcast (view new-valid) (mutable rawstring)
+            bitcast (view old-valid) rawstring
             (validsize * (sizeof BitfieldType)) as i64
             false
         llvm.memcpy.p0i8.p0i8.i64
-            bitcast new-keys (mutable rawstring)
-            bitcast old-keys rawstring
+            bitcast (view new-keys) (mutable rawstring)
+            bitcast (view old-keys) rawstring
             (capacity * (sizeof cls.KeyType)) as i64
             false
         for i in (range validsize new-validsize)
@@ -239,11 +239,11 @@ typedef Set < Struct
         let keyhash = ((hash key) as u64)
         lookup self key keyhash
             inline "ok" (idx)
-                return;
+                return (deref (self._keys @ idx))
             inline "fail" ()
-                insert_entry self key keyhash
                 auto-rehash self
-                return;
+                let index = (insert_entry self key keyhash)
+                deref (self._keys @ index)
 
     fn dump (self)
         for i in (range 0:u64 (self._mask + 1:u64))
@@ -258,6 +258,24 @@ typedef Set < Struct
         lookup self key ((hash key) as u64)
             inline "ok" (idx) true
             inline "fail" () false
+
+    fn getdefault (self key value)
+        """"returns the value associated with key or raises an error
+        let hash = ((typeof self) . HashFunction)
+        lookup self key ((hash key) as u64)
+            inline "ok" (idx)
+                return (deref (self._keys @ idx))
+            inline "fail" ()
+                return (view value)
+
+    fn get (self key)
+        """"returns the value associated with key or raises an error
+        let hash = ((typeof self) . HashFunction)
+        lookup self key ((hash key) as u64)
+            inline "ok" (idx)
+                return (deref (self._keys @ idx))
+            inline "fail" ()
+                raise (MapError.KeyNotFound)
 
     fn discard (self key)
         """"erases a key -> value association from the map; if the map

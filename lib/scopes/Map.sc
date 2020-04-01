@@ -304,12 +304,14 @@ typedef Map < Struct
         print "terseness" (terseness self) "mask" self._mask "count" self._count
 
     fn in? (self key)
+        let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx) true
             inline "fail" () false
 
     fn getdefault (self key value)
         """"returns the value associated with key or raises an error
+        let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx)
                 return (deref (self._values @ idx))
@@ -318,6 +320,7 @@ typedef Map < Struct
 
     fn get (self key)
         """"returns the value associated with key or raises an error
+        let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx)
                 return (deref (self._values @ idx))
@@ -327,6 +330,7 @@ typedef Map < Struct
     fn discard (self key)
         """"erases a key -> value association from the map; if the map
             does not contain this key, nothing happens.
+        let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx)
                 erase_pos self idx
