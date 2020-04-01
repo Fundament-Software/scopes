@@ -227,4 +227,19 @@ do
             C
             B
             C
+
+do
+    # comparing unique enums
+    enum Atom
+        Empty1
+        Empty2
+        Number : i32
+        Var : Symbol
+
+    test ((Atom.Empty1) == (Atom.Empty1))
+    test ((Atom.Empty1) != (Atom.Empty2))
+    test ((Atom.Number 1) != (Atom.Number 2))
+    test ((Atom.Number 1) == (Atom.Number 1))
+
 ;
+

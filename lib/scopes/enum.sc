@@ -10,7 +10,7 @@
     sugar.
 
 # typechecking-time function
-fn _extract-payload (enum-value extractT)
+fn... _extract-payload (enum-value, extractT, unpack? = true)
     extractT as:= type
     # don't bother if it's a unit tag
     if (extractT == Nothing)
@@ -40,21 +40,21 @@ fn _extract-payload (enum-value extractT)
                 load ptr
     let ET = ('strip-qualifiers extractT)
     let extracted =
-        if (ET < tuple)
+        if ((ET < tuple) & unpack?)
             `(unpack extracted)
         else extracted
 
-# tagged union / sum type
-typedef Enum
-    spice __dispatch (self handlers...)
-        let qcls = ('qualified-typeof self)
+@@ memo
+inline gen-dispatch-from-tag (f)
+    fn "dispatch-from-tag" (tag handlers self...)
+        let first-self = self...
+        let qcls = ('qualified-typeof first-self)
         let cls = ('strip-qualifiers qcls)
         let fields = (('@ cls '__fields) as type)
         let field-types = ('@ cls '__fields__)
         let field-type-args = ('args field-types)
-        let tag = `(extractvalue self 0)
         let sw = (sc_switch_new tag)
-        for arg in ('args handlers...)
+        for arg in ('args handlers)
             let anchor = ('anchor arg)
             let key arg = ('dekey arg)
             if (key == unnamed)
@@ -65,9 +65,25 @@ typedef Enum
                 let field = (('getarg field-types i) as type)
                 let lit = ('@ field 'Literal)
                 let extractT = ('@ field 'Type)
-                let payload = (_extract-payload self extractT)
-                sc_switch_append_case sw lit ('tag `(arg payload) anchor)
+                let payloads... =
+                    va-map
+                        inline (self)
+                            f self extractT
+                        self...
+                sc_switch_append_case sw lit ('tag `(arg payloads...) anchor)
         sw
+
+# tagged union / sum type
+typedef Enum
+    spice __unsafe-dispatch2 (self other enum-value handlers...)
+        call
+            gen-dispatch-from-tag
+                inline (self T)
+                    _extract-payload self T false
+            \ enum-value handlers... self other
+    spice __dispatch (self handlers...)
+        let tag = `(extractvalue self 0)
+        call (gen-dispatch-from-tag _extract-payload) tag handlers... self
 
 fn define-field-runtime (T name field-type index-value)
     let fields = ('@ T '__fields__)
@@ -255,6 +271,7 @@ fn finalize-enum-runtime (T storage)
         case (args...)
             va-map __drop args...
             ;
+        inline cmp-default () false
         # build repr function
         spice-quote
             inline __repr (self)
@@ -274,10 +291,28 @@ fn finalize-enum-runtime (T storage)
                                     let field = (('getarg field-types i) as type)
                                     let name = (('@ field 'Name) as Symbol)
                                     sc_keyed_new name drop-any
-        spice-quote
+            inline __== (A B)
+                static-if (A == B)
+                    inline Enum== (a b)
+                        let tag-a = (extractvalue a 0)
+                        let tag-b = (extractvalue b 0)
+                        if (icmp== tag-a tag-b)
+                            '__unsafe-dispatch2 a b tag-a
+                                spice-unquote
+                                    sc_argument_list_map_new (numfields + 1)
+                                        inline (i)
+                                            if (i == numfields)
+                                                # default field
+                                                `cmp-default
+                                            else
+                                                let field = (('getarg field-types i) as type)
+                                                let name = (('@ field 'Name) as Symbol)
+                                                sc_keyed_new name `==
+                        else false
         'set-symbols T
             __repr = __repr
             __drop = __drop
+            __== = __==
         let fields = (alloca-array type numfields)
         for i in (range numfields)
             let field = (('getarg field-types i) as type)

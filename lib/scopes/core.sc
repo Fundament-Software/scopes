@@ -2209,6 +2209,14 @@ inline floordiv (a b)
 
 'set-symbols Nothing
     __tobool = (box-pointer (inline () false))
+    __== =
+        box-pointer
+            spice-binary-op-macro
+                inline (lhsT rhsT)
+                    inline always-true (a b) true
+                    if (ptrcmp== rhsT Nothing)
+                        return `always-true
+                    `()
 
 #---------------------------------------------------------------------------
 # null type
