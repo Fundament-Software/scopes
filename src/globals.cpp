@@ -1044,6 +1044,11 @@ bool sc_list_compare(const sc_list_t *a, const sc_list_t *b) {
 // Anchors
 ////////////////////////////////////////////////////////////////////////////////
 
+const sc_anchor_t *sc_anchor_new(sc_symbol_t path, int lineno, int column, int offset) {
+    using namespace scopes;
+    return Anchor::from(path, lineno, column, offset);
+}
+
 sc_symbol_t sc_anchor_path(const sc_anchor_t *anchor) {
     using namespace scopes;
     return anchor->path;
@@ -2529,6 +2534,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_list_reverse, TYPE_List, TYPE_List);
     DEFINE_EXTERN_C_FUNCTION(sc_list_compare, TYPE_Bool, TYPE_List, TYPE_List);
 
+    DEFINE_EXTERN_C_FUNCTION(sc_anchor_new, TYPE_Anchor, TYPE_Symbol, TYPE_I32, TYPE_I32, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_anchor_path, TYPE_Symbol, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_anchor_lineno, TYPE_I32, TYPE_Anchor);
     DEFINE_EXTERN_C_FUNCTION(sc_anchor_column, TYPE_I32, TYPE_Anchor);
