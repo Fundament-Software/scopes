@@ -181,6 +181,9 @@ do
             A.b;
 
 do
+    # forward declaration
+    enum Options
+
     # test if payload type has holes
     enum Options
         A : i32 i64 i64

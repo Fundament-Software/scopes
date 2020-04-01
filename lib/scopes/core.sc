@@ -2173,6 +2173,7 @@ inline floordiv (a b)
                     'getarg args 1
                 let self = (unbox-pointer self type)
                 let key = (unbox-symbol key Symbol)
+                hide-traceback;
                 return (sc_type_at self key)
 
 'set-symbols Scope
