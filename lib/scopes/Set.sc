@@ -49,10 +49,14 @@ typedef Set < Struct
     let BitfieldType = u64
 
     @@ memo
-    inline gen-type (key-type value-type)
+    inline gen-type (key-type hash-function)
         let parent-type = this-type
+        let hash-function =
+            static-if (none? hash-function) hash
+            else hash-function
         struct (.. "<Set " (tostring key-type) ">") < parent-type
             let KeyType = key-type
+            let HashFunction = hash-function
 
             _valid : (mutable pointer BitfieldType)
             _keys : (mutable pointer KeyType)
@@ -82,6 +86,7 @@ typedef Set < Struct
         self._count / (self._mask + 1:u64)
 
     inline insert_entry (self key keyhash mask)
+        let hash = ((typeof self) . HashFunction)
         let mask =
             static-if (none? mask) (deref self._mask)
             else mask
@@ -115,6 +120,7 @@ typedef Set < Struct
                 break;
 
     inline erase_pos (self pos mask)
+        let hash = ((typeof self) . HashFunction)
         let mask =
             static-if (none? mask) self._mask
             else mask
@@ -140,6 +146,7 @@ typedef Set < Struct
     inline lookup (self key keyhash successf failf mask)
         """"finds the index and address of an entry associated with key or
             invokes label failf on failure
+        let hash = ((typeof self) . HashFunction)
         let mask =
             static-if (none? mask) (deref self._mask)
             else mask
@@ -154,6 +161,7 @@ typedef Set < Struct
             repeat (nextpos pos mask) (dist + 1:u64)
 
     fn rehash (self newmask)
+        let hash = ((typeof self) . HashFunction)
         let oldmask = (deref self._mask)
         self._mask = newmask
         let mask =
@@ -227,6 +235,7 @@ typedef Set < Struct
 
     fn insert (self key)
         """"inserts a new key into set
+        let hash = ((typeof self) . HashFunction)
         let keyhash = ((hash key) as u64)
         lookup self key keyhash
             inline "ok" (idx)
@@ -245,6 +254,7 @@ typedef Set < Struct
         print "terseness" (terseness self) "mask" self._mask "count" self._count
 
     fn in? (self key)
+        let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx) true
             inline "fail" () false
@@ -252,6 +262,7 @@ typedef Set < Struct
     fn discard (self key)
         """"erases a key -> value association from the map; if the map
             does not contain this key, nothing happens.
+        let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx)
                 erase_pos self idx

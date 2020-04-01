@@ -49,11 +49,15 @@ typedef Map < Struct
     let BitfieldType = u64
 
     @@ memo
-    inline gen-type (key-type value-type)
+    inline gen-type (key-type value-type hash-function)
         let parent-type = this-type
+        let hash-function =
+            static-if (none? hash-function) hash
+            else hash-function
         struct (.. "<Map " (tostring key-type) "=" (tostring value-type) ">") < parent-type
             let KeyType = key-type
             let ValueType = value-type
+            let HashFunction = hash-function
 
             _valid : (mutable pointer BitfieldType)
             _keys : (mutable pointer KeyType)
@@ -84,6 +88,7 @@ typedef Map < Struct
         self._count / (self._mask + 1:u64)
 
     inline insert_entry (self key keyhash value mask)
+        let hash = ((typeof self) . HashFunction)
         let mask =
             static-if (none? mask) (deref self._mask)
             else mask
@@ -122,6 +127,7 @@ typedef Map < Struct
                 break;
 
     inline erase_pos (self pos mask)
+        let hash = ((typeof self) . HashFunction)
         let mask =
             static-if (none? mask) self._mask
             else mask
@@ -151,6 +157,7 @@ typedef Map < Struct
     inline lookup (self key keyhash successf failf mask)
         """"finds the index and address of an entry associated with key or
             invokes label failf on failure
+        let hash = ((typeof self) . HashFunction)
         let mask =
             static-if (none? mask) (deref self._mask)
             else mask
@@ -165,6 +172,7 @@ typedef Map < Struct
             repeat (nextpos pos mask) (dist + 1:u64)
 
     fn rehash (self newmask)
+        let hash = ((typeof self) . HashFunction)
         let oldmask = (deref self._mask)
         self._mask = newmask
         let mask =
@@ -251,6 +259,7 @@ typedef Map < Struct
         """"inserts a new key -> value association into map; key can be the
             output of any custom hash function. If the key already exists,
             it will be updated.
+        let hash = ((typeof self) . HashFunction)
         let keyhash = ((hash key) as u64)
         lookup self key keyhash
             inline "ok" (idx)
