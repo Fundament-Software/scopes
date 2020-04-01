@@ -3,10 +3,10 @@
     This file is distributed under the MIT License.
     See LICENSE.md for details.
 
-""""Map
+""""Set
     ===
 
-    This module implements a key -> value store using hashtables.
+    This module implements mathematical sets using hashtables.
 
 # generic Hashmap implementing Robin Hood Hashing, see
      http://sebastiansylvan.com/2013/05/08/robin-hood-hashing-should-be-your-default-hash-table-implementation/
@@ -40,10 +40,10 @@ fn... keypos
 case (k : u64, mask : u64)
     k & mask
 
-enum MapError
-    KeyNotFound
+#-------------------------------------------------------------------------------
 
-typedef Map < Struct
+let _dump = dump
+typedef Set < Struct
     let MinCapacity = 16:u64
     let MinMask = (MinCapacity - 1:u64)
     let BitfieldType = u64
@@ -51,13 +51,11 @@ typedef Map < Struct
     @@ memo
     inline gen-type (key-type value-type)
         let parent-type = this-type
-        struct (.. "<Map " (tostring key-type) "=" (tostring value-type) ">") < parent-type
+        struct (.. "<Set " (tostring key-type) ">") < parent-type
             let KeyType = key-type
-            let ValueType = value-type
 
             _valid : (mutable pointer BitfieldType)
             _keys : (mutable pointer KeyType)
-            _values : (mutable pointer ValueType)
             _count : u64
             _mask : u64
             _capacity : u64
@@ -83,14 +81,13 @@ typedef Map < Struct
         """"computes the hashmap load as a normal between 0.0 and 1.0
         self._count / (self._mask + 1:u64)
 
-    inline insert_entry (self key keyhash value mask)
+    inline insert_entry (self key keyhash mask)
         let mask =
             static-if (none? mask) (deref self._mask)
             else mask
         assert (self._count <= mask) "map full"
         local key = key
         local keyhash = keyhash
-        local value = value
         let capacity = (mask + 1:u64)
         let pos = (keypos keyhash mask)
         loop (i dist = 0:u64 0:u64)
@@ -105,19 +102,15 @@ typedef Map < Struct
                     + 1:u64
                         if (dist > pd)
                             # swap out
-                            let pos_value = (deref (self._values @ index))
                             self._keys @ index = key
-                            self._values @ index = value
                             key = pos_key
                             keyhash = pos_keyhash
-                            value = pos_value
                             dupe pd
                         else
                             dist
             else # free
                 set-slot self index
                 assign key (self._keys @ index)
-                assign value (self._values @ index)
                 self._count += 1
                 break;
 
@@ -133,17 +126,13 @@ typedef Map < Struct
                 let index = (addpos pos i mask)
                 let index_prev = (prevpos index mask)
                 let atkey = (self._keys @ index)
-                let atvalue = (self._values @ index)
                 let prev_key = (self._keys @ index_prev)
-                let prev_value = (self._values @ index_prev)
                 let pd = (keydistance ((hash atkey) as u64) index mask)
                 if ((pd == 0) or (not (valid-slot? self index)))
                     unset-slot self index_prev
                     drop prev_key
-                    drop prev_value
                     merge done
                 assign atkey prev_key
-                assign atvalue prev_value
                 i + 1:u64
         self._count = self._count - 1:u32
         ;
@@ -173,7 +162,7 @@ typedef Map < Struct
         for i in (range 0:u64 (mask + 1:u64))
             if (not (valid-slot? self i))
                 continue;
-            let key value = (self._keys @ i) (self._values @ i)
+            let key = (self._keys @ i)
             let keyhash = ((hash key) as u64)
             lookup self key keyhash
                 inline "ok" (idx)
@@ -183,8 +172,7 @@ typedef Map < Struct
                     self._count -= 1:u64
                     # extract as new uniques
                     let key = (deref key)
-                    let value = (deref value)
-                    insert_entry self key keyhash value
+                    insert_entry self key keyhash
                 newmask
 
     fn reserve (self new-capacity)
@@ -192,12 +180,10 @@ typedef Map < Struct
         let capacity = (deref self._capacity)
         let old-valid = (deref self._valid)
         let old-keys = (deref self._keys)
-        let old-values = (deref self._values)
         let validsize = ((capacity + 63:u64) // 64:u64)
         let new-validsize = ((new-capacity + 63:u64) // 64:u64)
         let new-valid = (malloc-array BitfieldType new-validsize)
         let new-keys = (malloc-array cls.KeyType new-capacity)
-        let new-values = (malloc-array cls.ValueType new-capacity)
         llvm.memcpy.p0i8.p0i8.i64
             bitcast new-valid (mutable rawstring)
             bitcast old-valid rawstring
@@ -208,19 +194,12 @@ typedef Map < Struct
             bitcast old-keys rawstring
             (capacity * (sizeof cls.KeyType)) as i64
             false
-        llvm.memcpy.p0i8.p0i8.i64
-            bitcast new-values (mutable rawstring)
-            bitcast old-values rawstring
-            (capacity * (sizeof cls.ValueType)) as i64
-            false
         for i in (range validsize new-validsize)
             new-valid @ i = 0:u64
         free old-valid
         free old-keys
-        free old-values
         assign new-valid self._valid
         assign new-keys self._keys
-        assign new-values self._values
         self._capacity = new-capacity
         return;
 
@@ -242,26 +221,46 @@ typedef Map < Struct
             if (valid-slot? self i)
                 unset-slot self i
                 __drop (self._keys @ i)
-                __drop (self._values @ i)
         self._count = 0:u64
         self._mask = MinMask
         return;
 
-    fn set (self key value)
-        """"inserts a new key -> value association into map; key can be the
-            output of any custom hash function. If the key already exists,
-            it will be updated.
+    fn insert (self key)
+        """"inserts a new key into set
         let keyhash = ((hash key) as u64)
         lookup self key keyhash
             inline "ok" (idx)
-                self._values @ idx = value
                 return;
             inline "fail" ()
-                insert_entry self key keyhash value
+                insert_entry self key keyhash
                 auto-rehash self
                 return;
 
-    inline key-value-generator (self)
+    fn dump (self)
+        for i in (range 0:u64 (self._mask + 1:u64))
+            if (valid-slot? self i)
+                print i (self._keys @ i)
+            else
+                print i "<empty>"
+        print "terseness" (terseness self) "mask" self._mask "count" self._count
+
+    fn in? (self key)
+        lookup self key ((hash key) as u64)
+            inline "ok" (idx) true
+            inline "fail" () false
+
+    fn discard (self key)
+        """"erases a key -> value association from the map; if the map
+            does not contain this key, nothing happens.
+        lookup self key ((hash key) as u64)
+            inline "ok" (idx)
+                erase_pos self idx
+                auto-rehash self
+                return;
+            inline "fail" ()
+                return;
+
+    inline set-generator (self)
         inline next (i)
             let fin = (deref self._mask)
             loop (i = i)
@@ -276,55 +275,14 @@ typedef Map < Struct
                 if (valid-slot? self 0:u64) 0:u64
                 else (next 0:u64)
             inline (i) (i <= self._mask)
-            inline (i)
-                _ (deref (self._keys @ i)) (deref (self._values @ i))
+            inline (i) (deref (self._keys @ i))
             next
 
     inline __as (cls T)
         static-if (T == Generator)
-            key-value-generator
+            set-generator
         else
             ;
-
-    fn dump (self)
-        for i in (range 0:u64 (self._mask + 1:u64))
-            if (valid-slot? self i)
-                print i (self._keys @ i) "=" (self._values @ i)
-            else
-                print i "<empty>"
-        print "terseness" (terseness self) "mask" self._mask "count" self._count
-
-    fn in? (self key)
-        lookup self key ((hash key) as u64)
-            inline "ok" (idx) true
-            inline "fail" () false
-
-    fn getdefault (self key value)
-        """"returns the value associated with key or raises an error
-        lookup self key ((hash key) as u64)
-            inline "ok" (idx)
-                return (deref (self._values @ idx))
-            inline "fail" ()
-                return (view value)
-
-    fn get (self key)
-        """"returns the value associated with key or raises an error
-        lookup self key ((hash key) as u64)
-            inline "ok" (idx)
-                return (deref (self._values @ idx))
-            inline "fail" ()
-                raise (MapError.KeyNotFound)
-
-    fn discard (self key)
-        """"erases a key -> value association from the map; if the map
-            does not contain this key, nothing happens.
-        lookup self key ((hash key) as u64)
-            inline "ok" (idx)
-                erase_pos self idx
-                auto-rehash self
-                return;
-            inline "fail" ()
-                return;
 
     inline __tobool (self)
         self._count != 0:usize
@@ -332,19 +290,18 @@ typedef Map < Struct
     inline __countof (self)
         (deref self._count) as usize
 
-    fn __drop (self)
-        for i in (range 0:u64 (self._mask + 1:u64))
-            if (valid-slot? self i)
-                __drop (self._keys @ i)
-                __drop (self._values @ i)
-        free self._valid
-        free self._keys
-        free self._values
+    let __drop =
+        fn "__drop" (self)
+            for i in (range 0:u64 (self._mask + 1:u64))
+                if (valid-slot? self i)
+                    __drop (self._keys @ i)
+            free self._valid
+            free self._keys
 
     inline __typecall (cls opts...)
         static-if (cls == this-type)
-            let key-type value-type = opts...
-            gen-type key-type value-type
+            let key-type = opts...
+            gen-type key-type
         else
             let numsets = ((MinCapacity + 63:u64) // 64:u64)
             let validset = (malloc-array BitfieldType numsets)
@@ -354,17 +311,16 @@ typedef Map < Struct
                 Struct.__typecall cls
                     _valid = validset
                     _keys = (malloc-array cls.KeyType MinCapacity)
-                    _values = (malloc-array cls.ValueType MinCapacity)
                     _count = 0:usize
                     _mask = MinMask
                     _capacity = MinCapacity
             self
 
     unlet unset-slot rehash auto-rehash lookup insert_entry reserve
-        \ erase_pos key-value-generator gen-type set-slot valid-slot?
+        \ erase_pos set-generator valid-slot? gen-type set-slot
 
 do
-    let Map MapError
+    let Set
     locals;
 
 

@@ -147,7 +147,7 @@ do
 
 do
     # permutated ranges
-    using import Map
+    using import Set
 
     local used : (Set u64)
     N := 4

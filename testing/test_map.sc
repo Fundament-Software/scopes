@@ -62,6 +62,8 @@ iter-pairs2
 
 #------------------------------------------------------------------------------
 
+using import Set
+
 # set set
 local set : (Set i32)
 iter-pairs
