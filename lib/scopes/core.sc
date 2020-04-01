@@ -3707,6 +3707,10 @@ let hash-storage =
         inline "hash.from-bytes" (data size)
             bitcast (sc_hashbytes data size) hash
 
+'set-symbols Nothing
+    __hash =
+        inline "Nothing.__hash" (self) (nullof hash)
+
 va-lfold none
     inline (key T)
         'set-symbol T '__hash hash-storage

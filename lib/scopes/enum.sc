@@ -274,13 +274,14 @@ fn finalize-enum-runtime (T storage)
             va-map __drop args...
             ;
         inline cmp-default () false
+        inline hash-default () (nullof hash)
         # build repr function
         spice-quote
-            inline __repr (self)
+            fn __repr (self)
                 let val = (extractvalue self 0)
                 spice-unquote
                     build-repr-switch-case index-type val field-types false
-            inline __drop (self)
+            fn __drop (self)
                 #print "dropping option" self
                 '__dispatch self
                     spice-unquote
@@ -293,9 +294,24 @@ fn finalize-enum-runtime (T storage)
                                     let field = (('getarg field-types i) as type)
                                     let name = (('@ field 'Name) as Symbol)
                                     sc_keyed_new name drop-any
+            fn __hash (self)
+                let tag = (extractvalue self 0)
+                inline hash-with-tag (self)
+                    hash tag self
+                '__dispatch self
+                    spice-unquote
+                        sc_argument_list_map_new (numfields + 1)
+                            inline (i)
+                                if (i == numfields)
+                                    # default field
+                                    `hash-default
+                                else
+                                    let field = (('getarg field-types i) as type)
+                                    let name = (('@ field 'Name) as Symbol)
+                                    sc_keyed_new name hash-with-tag
             inline __== (A B)
                 static-if (A == B)
-                    inline Enum== (a b)
+                    fn Enum== (a b)
                         let tag-a = (extractvalue a 0)
                         let tag-b = (extractvalue b 0)
                         if (icmp== tag-a tag-b)
@@ -315,6 +331,7 @@ fn finalize-enum-runtime (T storage)
             __repr = __repr
             __drop = __drop
             __== = __==
+            __hash = __hash
         let fields = (alloca-array type numfields)
         for i in (range numfields)
             let field = (('getarg field-types i) as type)

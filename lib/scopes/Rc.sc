@@ -220,6 +220,9 @@ typedef+ Rc
             inline (self other)
                 == (extractvalue self PAYLOAD_INDEX) (extractvalue other PAYLOAD_INDEX)
 
+    inline __hash (self)
+        hash (extractvalue self PAYLOAD_INDEX)
+
     inline make-cast-op (f const?)
         spice "box-cast" (selfT otherT)
             selfT as:= type

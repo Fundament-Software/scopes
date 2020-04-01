@@ -232,7 +232,7 @@ do
             C
 
 do
-    # comparing unique enums
+    # comparing and hashing unique enums
     enum Atom
         Empty1
         Empty2
@@ -243,6 +243,11 @@ do
     test ((Atom.Empty1) != (Atom.Empty2))
     test ((Atom.Number 1 2) != (Atom.Number 2 2))
     test ((Atom.Number 1 3) == (Atom.Number 1 3))
+
+    test ((hash (Atom.Empty1)) == (hash (Atom.Empty1)))
+    test ((hash (Atom.Empty1)) != (hash (Atom.Empty2)))
+    test ((hash (Atom.Number 1 2)) != (hash (Atom.Number 2 2)))
+    test ((hash (Atom.Number 1 3)) == (hash (Atom.Number 1 3)))
 
 ;
 
