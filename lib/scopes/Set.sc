@@ -107,7 +107,7 @@ typedef Set < Struct
                     + 1:u64
                         if (dist > pd)
                             # swap out
-                            swap pos_key key
+                            swap pos_key (view key)
                             keyhash = pos_keyhash
                             dupe pd
                         else

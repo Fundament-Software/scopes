@@ -42,9 +42,8 @@ let square-list = spice-unquote-arguments
 # first we alias u64 to the integer type that can hold a pointer
 let intptr = u64
 
-fn swap (a b)
-    """"safely exchanges the contents of two views
-    viewing a b
+inline swap (a b)
+    """"safely exchanges the contents of two references
     let tmp = (deref (dupe b))
     assign (dupe a) b
     assign tmp a
