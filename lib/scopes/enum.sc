@@ -69,6 +69,9 @@ inline gen-dispatch-from-tag (f)
                 sc_switch_append_case sw lit ('tag `(arg payloads...) anchor)
         sw
 
+inline illegal-case ()
+    assert false "invalid enum tag; structure possibly corrupted"
+
 @@ memo
 inline gen-apply-from-tag (f)
     fn "apply-from-tag" (tag handler self...)
@@ -89,7 +92,7 @@ inline gen-apply-from-tag (f)
             let extractT = ('@ field 'Type)
             let payloads... = (f extractT self...)
             sc_switch_append_case sw lit ('tag `(handler FT payloads...) anchor)
-        sc_switch_append_default sw `(handler)
+        sc_switch_append_default sw `(illegal-case)
         sw
 
 # tagged union / sum type
