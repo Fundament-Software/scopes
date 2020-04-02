@@ -239,6 +239,11 @@ do
         Number : i32 i32
         Var : Symbol
 
+    'apply (Atom.Number)
+        inline (cls values...)
+            dump cls values...
+            print values...
+
     test ((Atom.Empty1) == (Atom.Empty1))
     test ((Atom.Empty1) != (Atom.Empty2))
     test ((Atom.Number 1 2) != (Atom.Number 2 2))

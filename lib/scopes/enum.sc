@@ -69,6 +69,29 @@ inline gen-dispatch-from-tag (f)
                 sc_switch_append_case sw lit ('tag `(arg payloads...) anchor)
         sw
 
+@@ memo
+inline gen-apply-from-tag (f)
+    fn "apply-from-tag" (tag handler self...)
+        let first-self = self...
+        let qcls = ('qualified-typeof first-self)
+        let cls = ('strip-qualifiers qcls)
+        let fields = (('@ cls '__fields) as type)
+        let field-types = ('@ cls '__fields__)
+        let field-type-args = ('args field-types)
+        let sw = (sc_switch_new tag)
+        let numfields = ('argcount field-types)
+        let anchor = ('anchor handler)
+        for i in (range numfields)
+            let ET = ('key-type ('element@ fields i) unnamed)
+            let FT = ('getarg field-types i)
+            let field = (FT as type)
+            let lit = ('@ field 'Literal)
+            let extractT = ('@ field 'Type)
+            let payloads... = (f extractT self...)
+            sc_switch_append_case sw lit ('tag `(handler FT payloads...) anchor)
+        sc_switch_append_default sw `(handler)
+        sw
+
 # tagged union / sum type
 typedef Enum
     spice __unsafe-dispatch2 (self other enum-value handlers...)
@@ -86,6 +109,13 @@ typedef Enum
                 inline (T self)
                     _extract-payload self T
             \ tag handlers... self
+    spice apply (self handler)
+        let tag = `(extractvalue self 0)
+        call
+            gen-apply-from-tag
+                inline (T self)
+                    _extract-payload self T
+            \ tag handler self
 
 fn define-field-runtime (T name field-type index-value)
     let fields = ('@ T '__fields__)
