@@ -96,6 +96,7 @@ typedef Set < Struct
         local keyhash = keyhash
         let capacity = (mask + 1:u64)
         let pos = (keypos keyhash mask)
+        local result = -1:u64
         loop (i dist = 0:u64 0:u64)
             assert (i != capacity) "capacity exceeded"
             let index = (addpos pos i mask)
@@ -107,6 +108,8 @@ typedef Set < Struct
                     + 1:u64
                         if (dist > pd)
                             # swap out
+                            if (result == -1:u64)
+                                result = index
                             swap pos_key (view key)
                             keyhash = pos_keyhash
                             dupe pd
@@ -116,7 +119,9 @@ typedef Set < Struct
                 set-slot self index
                 assign key (self._keys @ index)
                 self._count += 1
-                break index
+                if (result == -1:u64)
+                    result = index
+                break result
 
     inline erase_pos (self pos mask)
         let hash = ((typeof self) . HashFunction)
@@ -239,7 +244,7 @@ typedef Set < Struct
         let keyhash = ((hash key) as u64)
         lookup self key keyhash
             inline "ok" (idx)
-                return (deref (self._keys @ idx))
+                deref (self._keys @ idx)
             inline "fail" ()
                 auto-rehash self
                 let index = (insert_entry self key keyhash)
