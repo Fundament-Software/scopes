@@ -1722,8 +1722,8 @@ sc_int_raises_t sc_type_countof(const sc_type_t *T) {
     case TK_Image:
     case TK_SampledImage:
         return { true, nullptr, 1 };
-    case TK_Array: return { true, nullptr, (int)cast<ArrayType>(T)->count };
-    case TK_Vector: return { true, nullptr, (int)cast<VectorType>(T)->count };
+    case TK_Array: return { true, nullptr, (int)cast<ArrayType>(T)->count() };
+    case TK_Vector: return { true, nullptr, (int)cast<VectorType>(T)->count() };
     case TK_Tuple: return { true, nullptr, (int)cast<TupleType>(T)->values.size() };
     case TK_Function:  return { true, nullptr, (int)(cast<FunctionType>(T)->argument_types.size()) };
     default: break;

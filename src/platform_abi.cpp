@@ -266,12 +266,12 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
     case TK_Vector: {
         auto tt = cast<VectorType>(T);
         return classify_array_like(size_of(T).assert_ok(),
-            storage_type(tt->element_type).assert_ok(), tt->count, classes, offset);
+            storage_type(tt->element_type).assert_ok(), tt->count(), classes, offset);
     } break;
     case TK_Array: {
         auto tt = cast<ArrayType>(T);
         return classify_array_like(size_of(T).assert_ok(),
-            storage_type(tt->element_type).assert_ok(), tt->count, classes, offset);
+            storage_type(tt->element_type).assert_ok(), tt->count(), classes, offset);
     } break;
     case TK_Tuple: {
         auto tt = cast<TupleType>(T);

@@ -86,7 +86,7 @@ typedef Set < Struct
         """"computes the hashmap load as a normal between 0.0 and 1.0
         self._count / (self._mask + 1:u64)
 
-    inline insert_entry (self key keyhash mask)
+    fn... insert_entry (self, key, keyhash, mask = none)
         let hash = ((typeof self) . HashFunction)
         let mask =
             static-if (none? mask) (deref self._mask)

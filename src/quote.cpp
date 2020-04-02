@@ -504,7 +504,7 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
     case TK_Vector: {
         auto vt = cast<VectorType>(ST);
         auto argT = vt->element_type;
-        auto numvals = (int)vt->count;
+        auto numvals = (int)vt->count();
         //auto numelems = ConstInt::from(anchor, TYPE_I32, numvals);
         ValueRef result = REF(Undef::from(T));
         for (int i = 0; i < numvals; ++i) {
@@ -520,7 +520,7 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
     case TK_Array: {
         auto at = cast<ArrayType>(ST);
         auto argT = at->element_type;
-        auto numvals = (int)at->count;
+        auto numvals = (int)at->count();
         //auto numelems = ConstInt::from(anchor, TYPE_I32, numvals);
         ValueRef result = REF(Undef::from(T));
         for (int i = 0; i < numvals; ++i) {
@@ -611,7 +611,7 @@ ValueRef wrap_value(const Type *T, const ValueRef &value) {
             auto at = cast<VectorType>(ST);
             auto result = REF(Expression::unscoped_from());
             auto ET = at->element_type;
-            auto numvals = (int)at->count;
+            auto numvals = (int)at->count();
             auto numelems = REF(ConstInt::from(TYPE_I32, numvals));
             auto buf = REF(CallTemplate::from(g_alloca_array, {
                     REF(ConstPointer::type_from(TYPE_ValueRef)),
@@ -638,7 +638,7 @@ ValueRef wrap_value(const Type *T, const ValueRef &value) {
             auto at = cast<ArrayType>(ST);
             auto result = REF(Expression::unscoped_from());
             auto ET = at->element_type;
-            auto numvals = (int)at->count;
+            auto numvals = (int)at->count();
             auto numelems = REF(ConstInt::from(TYPE_I32, numvals));
             auto buf = REF(CallTemplate::from(g_alloca_array, {
                     REF(ConstPointer::type_from(TYPE_ValueRef)),

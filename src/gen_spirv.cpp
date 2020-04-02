@@ -536,7 +536,7 @@ struct SPIRVGenerator {
                 ty = builder.makeRuntimeArray(etype);
             } else {
                 ty = builder.makeArrayType(etype,
-                    builder.makeUintConstant(ai->count), 0);
+                    builder.makeUintConstant(ai->count()), 0);
             }
             builder.addDecoration(ty,
                 spv::DecorationArrayStride,
@@ -546,12 +546,12 @@ struct SPIRVGenerator {
         case TK_Vector: {
             auto vi = cast<VectorType>(type);
 
-            if ((vi->count <= 1) || (vi->is_unsized())) {
-                SCOPES_ERROR(CGenUnsupportedVectorSize, vi->element_type, vi->count);
+            if (vi->count() <= 1) {
+                SCOPES_ERROR(CGenUnsupportedVectorSize, vi->element_type, vi->count());
             }
             return builder.makeVectorType(
                 SCOPES_GET_RESULT(type_to_spirv_type(vi->element_type)),
-                vi->count);
+                vi->count());
         } break;
         case TK_Arguments: {
             if (type == empty_arguments_type())

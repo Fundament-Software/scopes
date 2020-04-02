@@ -35,10 +35,11 @@ struct ArrayLikeType : CompositeType {
     SCOPES_RESULT(const Type *) type_at_index(size_t i) const;
 
     bool is_unsized() const;
+    size_t count() const;
 
     const Type *element_type;
-    size_t count;
     size_t stride;
+    size_t _count;
 };
 
 //------------------------------------------------------------------------------

@@ -777,11 +777,11 @@ struct LLVMIRGenerator {
                 SCOPES_GET_RESULT(_type_to_llvm_type(cast<PointerType>(type)->element_type)), 0);
         case TK_Array: {
             auto ai = cast<ArrayType>(type);
-            return LLVMArrayType(SCOPES_GET_RESULT(_type_to_llvm_type(ai->element_type)), ai->count);
+            return LLVMArrayType(SCOPES_GET_RESULT(_type_to_llvm_type(ai->element_type)), ai->count());
         } break;
         case TK_Vector: {
             auto vi = cast<VectorType>(type);
-            return LLVMVectorType(SCOPES_GET_RESULT(_type_to_llvm_type(vi->element_type)), vi->count);
+            return LLVMVectorType(SCOPES_GET_RESULT(_type_to_llvm_type(vi->element_type)), vi->count());
         } break;
         case TK_Arguments: {
             if (type == empty_arguments_type())

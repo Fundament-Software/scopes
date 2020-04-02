@@ -20,14 +20,14 @@ struct Hash {
         return
             hash2(
                 std::hash<const Type *>{}(s->element_type),
-                std::hash<size_t>{}(s->count));
+                std::hash<size_t>{}(s->_count));
     }
 };
 
 struct KeyEqual {
     bool operator()( const VectorType *lhs, const VectorType *rhs ) const {
         return lhs->element_type == rhs->element_type
-            && lhs->count == rhs->count;
+            && lhs->_count == rhs->_count;
     }
 };
 } // namespace VectorSet
@@ -41,7 +41,12 @@ static std::unordered_set<const VectorType *, VectorSet::Hash, VectorSet::KeyEqu
 void VectorType::stream_name(StyledStream &ss) const {
     ss << "<";
     stream_type_name(ss, element_type);
-    ss << " x " << count << ">";
+    ss << " x ";
+    if (is_unsized())
+        ss << "?";
+    else
+        ss << _count;
+    ss << ">";
 }
 
 VectorType::VectorType(const Type *_element_type, size_t _count)
@@ -50,7 +55,7 @@ VectorType::VectorType(const Type *_element_type, size_t _count)
         size = 0;
         align = align_of(element_type).assert_ok();
     } else {
-        size = ceilpow2(stride * count);
+        size = ceilpow2(stride * count());
         align = size;
     }
 }
@@ -59,7 +64,7 @@ SCOPES_RESULT(const Type *) vector_type(const Type *element_type, size_t count) 
     SCOPES_RESULT_TYPE(const Type *);
     SCOPES_TYPE_KEY(VectorType, key);
     key->element_type = element_type;
-    key->count = count;
+    key->_count = count;
     auto it = vectors.find(key);
     if (it != vectors.end())
         return *it;
@@ -108,7 +113,7 @@ SCOPES_RESULT(void) verify_real_vector(const Type *type, size_t fixedsz) {
     SCOPES_RESULT_TYPE(void);
     if (type->kind() == TK_Vector) {
         auto T = cast<VectorType>(type);
-        if (T->count == fixedsz)
+        if (T->_count == fixedsz)
             return {};
     }
     SCOPES_ERROR(FixedVectorSizeMismatch, fixedsz, type);
@@ -120,8 +125,8 @@ SCOPES_RESULT(void) verify_vector_sizes(const Type *type1, const Type *type2) {
     bool type2v = (type2->kind() == TK_Vector);
     if (type1v == type2v) {
         if (type1v) {
-            if (cast<VectorType>(type1)->count
-                    == cast<VectorType>(type2)->count) {
+            if (cast<VectorType>(type1)->_count
+                    == cast<VectorType>(type2)->_count) {
                 return {};
             }
         } else {

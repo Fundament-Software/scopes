@@ -18,14 +18,14 @@ struct Hash {
         return
             hash2(
                 std::hash<const Type *>{}(s->element_type),
-                std::hash<size_t>{}(s->count));
+                std::hash<size_t>{}(s->_count));
     }
 };
 
 struct KeyEqual {
     bool operator()( const ArrayType *lhs, const ArrayType *rhs ) const {
         return lhs->element_type == rhs->element_type
-            && lhs->count == rhs->count;
+            && lhs->_count == rhs->_count;
     }
 };
 } // namespace ArraySet
@@ -43,13 +43,13 @@ void ArrayType::stream_name(StyledStream &ss) const {
     if (is_unsized())
         ss << "?";
     else
-        ss << count;
+        ss << _count;
     ss << "]";
 }
 
 ArrayType::ArrayType(const Type *_element_type, size_t _count)
     : ArrayLikeType(TK_Array, _element_type, _count) {
-    size = (is_unsized()?0:(stride * count));
+    size = stride * count();
     align = align_of(element_type).assert_ok();
 }
 
@@ -59,7 +59,7 @@ SCOPES_RESULT(const Type *) array_type(const Type *element_type, size_t count) {
     SCOPES_RESULT_TYPE(const Type *);
     SCOPES_TYPE_KEY(ArrayType, key);
     key->element_type = element_type;
-    key->count = count;
+    key->_count = count;
     auto it = arrays.find(key);
     if (it != arrays.end())
         return *it;

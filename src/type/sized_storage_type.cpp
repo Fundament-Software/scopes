@@ -22,25 +22,29 @@ bool ArrayLikeType::classof(const Type *T) {
     return false;
 }
 
-ArrayLikeType::ArrayLikeType(TypeKind kind, const Type *_element_type, size_t _count)
-    : CompositeType(kind), element_type(_element_type), count(_count) {
+ArrayLikeType::ArrayLikeType(TypeKind kind, const Type *_element_type, size_t count)
+    : CompositeType(kind), element_type(_element_type), _count(count) {
     stride = size_of(element_type).assert_ok();
 }
 
 SCOPES_RESULT(void *) ArrayLikeType::getelementptr(void *src, size_t i) const {
     SCOPES_RESULT_TYPE(void *);
-    SCOPES_CHECK_RESULT(verify_range(i, count));
+    SCOPES_CHECK_RESULT(verify_range(i, _count));
     return (void *)((char *)src + stride * i);
 }
 
 SCOPES_RESULT(const Type *) ArrayLikeType::type_at_index(size_t i) const {
     SCOPES_RESULT_TYPE(const Type *);
-    SCOPES_CHECK_RESULT(verify_range(i, count));
+    SCOPES_CHECK_RESULT(verify_range(i, _count));
     return element_type;
 }
 
+size_t ArrayLikeType::count() const {
+    return is_unsized()?0:_count;
+}
+
 bool ArrayLikeType::is_unsized() const {
-    return count == UNSIZED_COUNT;
+    return _count == UNSIZED_COUNT;
 }
 
 //------------------------------------------------------------------------------

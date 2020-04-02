@@ -175,9 +175,9 @@ SCOPES_RESULT(ConstRef) nullof(const Type *T) {
     case TK_Array: {
         auto at = cast<ArrayType>(ST);
         ConstantPtrs fields;
-        if (at->count) {
+        if (at->count()) {
             auto elem = SCOPES_GET_RESULT(nullof(at->element_type));
-            for (size_t i = 0; i < at->count; ++i) {
+            for (size_t i = 0; i < at->count(); ++i) {
                 fields.push_back(elem.unref());
             }
         }
@@ -186,9 +186,9 @@ SCOPES_RESULT(ConstRef) nullof(const Type *T) {
     case TK_Vector: {
         auto at = cast<VectorType>(ST);
         ConstantPtrs fields;
-        if (at->count) {
+        if (at->count()) {
             auto elem = SCOPES_GET_RESULT(nullof(at->element_type));
-            for (size_t i = 0; i < at->count; ++i) {
+            for (size_t i = 0; i < at->count(); ++i) {
                 fields.push_back(elem.unref());
             }
         }
@@ -1531,7 +1531,7 @@ SCOPES_RESULT(const Type *) bool_op_return_type(const Type *T) {
     T = SCOPES_GET_RESULT(storage_type(T));
     if (T->kind() == TK_Vector) {
         auto vi = cast<VectorType>(T);
-        return vector_type(TYPE_Bool, vi->count);
+        return vector_type(TYPE_Bool, vi->_count);
     } else {
         return TYPE_Bool;
     }
@@ -2654,8 +2654,8 @@ repeat:
             auto vi = cast<VectorType>(TV1);
             auto mask_vi = cast<VectorType>(TMask);
             SCOPES_CHECK_RESULT(verify(TYPE_I32, mask_vi->element_type));
-            size_t incount = vi->count * 2;
-            size_t outcount = mask_vi->count;
+            size_t incount = vi->count() * 2;
+            size_t outcount = mask_vi->count();
             std::vector<uint32_t> outmask;
             outmask.reserve(outcount);
             for (size_t i = 0; i < outcount; ++i) {
