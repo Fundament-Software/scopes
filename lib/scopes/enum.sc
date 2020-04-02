@@ -327,11 +327,16 @@ fn finalize-enum-runtime (T storage)
                                                 let name = (('@ field 'Name) as Symbol)
                                                 sc_keyed_new name `==
                         else false
-        'set-symbols T
-            __repr = __repr
-            __drop = __drop
-            __== = __==
-            __hash = __hash
+        fn set-symbol (T key value)
+            # only set symbol when it's not already set
+            try ('@ T key)
+                return;
+            else
+                'set-symbol T key value
+        set-symbol T '__repr __repr
+        set-symbol T '__drop __drop
+        set-symbol T '__== __==
+        set-symbol T '__hash __hash
         let fields = (alloca-array type numfields)
         for i in (range numfields)
             let field = (('getarg field-types i) as type)
