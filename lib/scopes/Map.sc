@@ -103,19 +103,17 @@ typedef Map < Struct
                 break;
             let index = (addpos pos i mask)
             if (valid-slot? self index) # already occupied
-                let pos_key = (deref (self._keys @ index))
+                let pos_key = (self._keys @ index)
                 let pos_keyhash = ((hash (deref pos_key)) as u64)
                 let pd = (keydistance pos_keyhash index mask)
                 repeat (i + 1:u64)
                     + 1:u64
                         if (dist > pd)
                             # swap out
-                            let pos_value = (deref (self._values @ index))
-                            self._keys @ index = key
-                            self._values @ index = value
-                            key = pos_key
+                            let pos_value = (self._values @ index)
+                            swap pos_key (view key)
+                            swap pos_value (view value)
                             keyhash = pos_keyhash
-                            value = pos_value
                             dupe pd
                         else
                             dist

@@ -71,6 +71,7 @@ inline gen-dispatch-from-tag (f)
 
 inline illegal-case ()
     assert false "invalid enum tag; structure possibly corrupted"
+    unreachable;
 
 @@ memo
 inline gen-apply-from-tag (f)
