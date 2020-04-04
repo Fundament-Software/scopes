@@ -188,8 +188,8 @@ typedef Map < Struct
                     unset-slot self i
                     self._count -= 1:u64
                     # extract as new uniques
-                    let key = (deref key)
-                    let value = (deref value)
+                    let key = (dupe (deref key))
+                    let value = (dupe (deref value))
                     insert_entry self key keyhash value
                 newmask
 
@@ -205,18 +205,18 @@ typedef Map < Struct
         let new-keys = (malloc-array cls.KeyType new-capacity)
         let new-values = (malloc-array cls.ValueType new-capacity)
         llvm.memcpy.p0i8.p0i8.i64
-            bitcast new-valid (mutable rawstring)
-            bitcast old-valid rawstring
+            bitcast (view new-valid) (mutable rawstring)
+            bitcast (view old-valid) rawstring
             (validsize * (sizeof BitfieldType)) as i64
             false
         llvm.memcpy.p0i8.p0i8.i64
-            bitcast new-keys (mutable rawstring)
-            bitcast old-keys rawstring
+            bitcast (view new-keys) (mutable rawstring)
+            bitcast (view old-keys) rawstring
             (capacity * (sizeof cls.KeyType)) as i64
             false
         llvm.memcpy.p0i8.p0i8.i64
-            bitcast new-values (mutable rawstring)
-            bitcast old-values rawstring
+            bitcast (view new-values) (mutable rawstring)
+            bitcast (view old-values) rawstring
             (capacity * (sizeof cls.ValueType)) as i64
             false
         for i in (range validsize new-validsize)
