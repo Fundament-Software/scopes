@@ -1731,6 +1731,18 @@ sc_int_raises_t sc_type_countof(const sc_type_t *T) {
     SCOPES_C_ERROR(RTUncountableStorageType, T);
 }
 
+sc_bool_raises_t sc_type_is_unsized(const sc_type_t *T) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(bool);
+    T = SCOPES_C_GET_RESULT(storage_type(T));
+    switch(T->kind()) {
+    case TK_Array: SCOPES_C_RETURN(cast<ArrayType>(T)->is_unsized());
+    case TK_Vector: SCOPES_C_RETURN(cast<VectorType>(T)->is_unsized());
+    default: break;
+    }
+    SCOPES_C_RETURN(false);
+}
+
 sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(const Type *);
@@ -2457,6 +2469,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_alignof, TYPE_USize, TYPE_Type);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_offsetof, TYPE_USize, TYPE_Type, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_countof, TYPE_I32, TYPE_Type);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_is_unsized, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_kind, TYPE_I32, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_debug_abi, _void, TYPE_Type);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_storage, TYPE_Type, TYPE_Type);

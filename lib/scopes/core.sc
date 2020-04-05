@@ -1035,6 +1035,7 @@ run-stage; # 3
     plain? = sc_type_is_plain
     element@ = sc_type_element_at
     element-count = sc_type_countof
+    unsized? = sc_type_is_unsized
     storageof = sc_type_storage
     kind = sc_type_kind
     sizeof = sc_type_sizeof
@@ -3153,6 +3154,8 @@ let
                 else
                     hide-traceback;
                     error "integer type expected"
+    unsized? =
+        make-const-type-property-function sc_type_is_unsized
     storageof = (make-const-type-property-function sc_type_storage)
     superof = (make-const-type-property-function sc_typename_type_get_super)
     sizeof = (make-const-type-property-function sc_type_sizeof)
@@ -4630,7 +4633,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
             inline passthru (self) self
             spice-cast-macro
                 fn "array.__rimply" (cls T)
-                    if (('element-count T) == -1) # unsized array
+                    if ('unsized? T)
                         if (('kind cls) == type-kind-array)
                             if (('element@ cls 0) == ('element@ T 0))
                                 return `passthru
@@ -4639,7 +4642,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
     __typematch =
         spice-cast-macro
             fn "array.__typematch" (cls T)
-                if (('element-count cls) == -1) # unsized array
+                if ('unsized? cls) # unsized array
                     if (('kind T) == type-kind-array)
                         if (('element@ T 0) == ('element@ cls 0))
                             return `true
@@ -5913,7 +5916,7 @@ spice overloaded-fn-append (T args...)
                                 repeat (i + 1)
                                     .. str
                                         ? (i == 0) "" " "
-                                        repr ('typeof ('getarg args... i))
+                                        repr ('qualified-typeof ('getarg args... i))
                             break str
                     ") to overloaded function with types"
                     do

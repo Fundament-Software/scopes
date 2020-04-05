@@ -415,6 +415,7 @@ SCOPES_LIBEXPORT sc_size_raises_t sc_type_sizeof(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_size_raises_t sc_type_alignof(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_size_raises_t sc_type_offsetof(const sc_type_t *T, int index);
 SCOPES_LIBEXPORT sc_int_raises_t sc_type_countof(const sc_type_t *T);
+SCOPES_LIBEXPORT sc_bool_raises_t sc_type_is_unsized(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i);
 SCOPES_LIBEXPORT sc_int_raises_t sc_type_field_index(const sc_type_t *T, sc_symbol_t name);
 SCOPES_LIBEXPORT sc_symbol_raises_t sc_type_field_name(const sc_type_t *T, int index);
