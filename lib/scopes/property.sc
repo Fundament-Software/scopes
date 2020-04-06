@@ -20,7 +20,7 @@ inline property (getter setter)
                 fn test-getter (value)
                     getter value
                 let F = (static-typify test-getter T)
-                returnof (typeof F)
+                unqualified (returnof (typeof F))
 
             inline __imply (cls destT)
                 static-if (imply? value-type destT)

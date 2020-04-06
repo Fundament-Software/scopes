@@ -448,7 +448,7 @@ let storagecast =
             verify-count argcount 1 1
             let self = (sc_getarg args 0)
             let T = (sc_type_storage (sc_value_type self))
-            return `(bitcast self T)
+            return (sc_valueref_tag (sc_value_anchor args) `(bitcast self T))
 
 """".. spice:: (&? value)
 
