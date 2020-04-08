@@ -2174,8 +2174,12 @@ inline floordiv (a b)
                     'getarg args 1
                 let self = (unbox-pointer self type)
                 let key = (unbox-symbol key Symbol)
-                hide-traceback;
-                return (sc_type_at self key)
+                let f =
+                    try ('@ self '__typeattr)
+                    else
+                        hide-traceback;
+                        return (sc_type_at self key)
+                'tag `(f args) ('anchor args)
 
 'set-symbols Scope
     __== = (box-pointer (simple-binary-op ptrcmp==))
@@ -6115,11 +6119,15 @@ sugar from (src 'let params...)
             list sugar-quote entry
             this-function rest
 
+    let load-from-expr =
+        cons load-from src
+            quotify params...
+
+    let anchor = ('anchor src)
     cons let
         .. params...
             list '=
-                cons load-from src
-                    quotify params...
+                'tag `load-from-expr anchor
 
 define zip (spice-macro (fn (args) (ltr-multiop args `zip 2)))
 
