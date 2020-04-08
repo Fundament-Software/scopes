@@ -1,5 +1,4 @@
 
-
 let T =
     do
         let k = (typename "T")
@@ -17,3 +16,26 @@ assert (A == i32)
 assert (B == u32)
 assert ((test) == 303)
 
+do
+    using import struct
+    using import testing
+
+    struct Q
+        value : i32
+
+        fn set (self value)
+            self.value = value
+
+        fn get (self)
+            self.value
+
+    local t : Q
+    from (methodsof t) let set get
+
+    test ((get) == 0)
+    set 100
+    test ((get) == 100)
+
+
+
+;

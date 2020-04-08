@@ -2295,6 +2295,19 @@ let
     lslice = (unbalanced-binary-op-dispatch '__lslice usize "apply left-slice operator with")
     rslice = (unbalanced-binary-op-dispatch '__rslice usize "apply right-slice operator with")
 
+let typeattr =
+    spice-macro
+        fn "typeattr" (args)
+            let argc = ('argcount args)
+            verify-count argc 2 2
+            let self key =
+                'getarg args 0
+                'getarg args 1
+            let self = (unbox-pointer self type)
+            let key = (unbox-symbol key Symbol)
+            hide-traceback;
+            return (sc_type_at self key)
+
 let getattr =
     spice-macro
         fn (args)
@@ -6967,6 +6980,24 @@ let global =
                         store init val
                         qval
 
+#-------------------------------------------------------------------------------
+# spice for MethodsAccessor in next stage
+#-------------------------------------------------------------------------------
+
+spice MethodsAccessor-typeattr (cls name)
+    let cls = (cls as type)
+    let context = ('@ cls 'Context)
+    let ContextType = ('typeof context)
+    let func = `(getattr ContextType name)
+    let func = (sc_prove func)
+    spice-quote
+        inline boundmethod (...)
+            func context ...
+    sc_template_set_name boundmethod
+        Symbol
+            .. (tostring ContextType) "." (name as Symbol as string)
+    boundmethod
+
 run-stage; # 11
 
 #-------------------------------------------------------------------------------
@@ -7517,6 +7548,23 @@ typedef+ Accessor
         Closure->Accessor closure
 
 #-------------------------------------------------------------------------------
+# implicit attribute binding
+#-------------------------------------------------------------------------------
+
+typedef MethodsAccessor
+    let __typeattr = MethodsAccessor-typeattr
+
+""""This function can be used in conjunction with `from`:
+
+    from (methodsof <object>) let method1 method2
+
+    now the imported methods are implicitly bound to <object> and can be
+    called directly.
+spice methodsof (context)
+    typedef BoundMethodsAccessor < MethodsAccessor
+        let Context = context
+
+#-------------------------------------------------------------------------------
 # hex/oct/bin conversion
 #-------------------------------------------------------------------------------
 
@@ -7586,7 +7634,7 @@ let e = e:f32
 
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
-    \ tuple== gen-arrayof
+    \ tuple== gen-arrayof MethodsAccessor-typeattr
 
 run-stage; # 12
 
