@@ -6990,18 +6990,13 @@ spice MethodsAccessor-typeattr (cls name)
     let context = ('@ cls 'Context)
     let ContextType = ('typeof context)
     let anchor = ('anchor args)
-    let func = ('tag `(getattr ContextType name) anchor)
-    let func =
-        do
-            hide-traceback;
-            sc_prove func
     spice-quote
         inline boundmethod (...)
-            func context ...
+            name context ...
     sc_template_set_name boundmethod
         Symbol
             .. (tostring ContextType) "." (name as Symbol as string)
-    'tag boundmethod ('anchor func)
+    'tag boundmethod anchor
 
 run-stage; # 11
 
