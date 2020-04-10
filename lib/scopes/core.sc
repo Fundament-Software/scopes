@@ -268,7 +268,7 @@ let va-lfold va-lifold =
                 let v = (sc_keyed_new unnamed arg)
                 _ (add i 1)
                     if use-indices
-                        `(f [(sub i 2)] k v ret)
+                        sc_valueref_tag anchor `(f [(sub i 2)] k v ret)
                     else
                         sc_valueref_tag anchor `(f k v ret)
         _
@@ -6000,6 +6000,7 @@ sugar fn... (name...)
         spice-quote
             init-overloaded-function
                 typename [(fn-name as string)] OverloadedFunction
+    let outtype = ('tag outtype ('anchor expr-head))
     let bodyscope = (Scope sugar-scope)
     let bodyscope =
         'bind bodyscope 'this-function outtype
@@ -6988,7 +6989,8 @@ spice MethodsAccessor-typeattr (cls name)
     let cls = (cls as type)
     let context = ('@ cls 'Context)
     let ContextType = ('typeof context)
-    let func = ('tag `(getattr ContextType name) ('anchor args))
+    let anchor = ('anchor args)
+    let func = ('tag `(getattr ContextType name) anchor)
     let func =
         do
             hide-traceback;
@@ -6999,7 +7001,7 @@ spice MethodsAccessor-typeattr (cls name)
     sc_template_set_name boundmethod
         Symbol
             .. (tostring ContextType) "." (name as Symbol as string)
-    boundmethod
+    'tag boundmethod ('anchor func)
 
 run-stage; # 11
 
