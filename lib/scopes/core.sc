@@ -6121,7 +6121,7 @@ sugar from (src 'let params...)
         sc_argument_list_map_new count
             inline (i)
                 let key = ('getarg keys... i)
-                `(getattr src key)
+                'tag `(getattr src key) ('anchor key)
 
     fn quotify (params)
         if (empty? params)
@@ -6988,8 +6988,11 @@ spice MethodsAccessor-typeattr (cls name)
     let cls = (cls as type)
     let context = ('@ cls 'Context)
     let ContextType = ('typeof context)
-    let func = `(getattr ContextType name)
-    let func = (sc_prove func)
+    let func = ('tag `(getattr ContextType name) ('anchor args))
+    let func =
+        do
+            hide-traceback;
+            sc_prove func
     spice-quote
         inline boundmethod (...)
             func context ...
