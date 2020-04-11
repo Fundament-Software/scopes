@@ -85,14 +85,14 @@ typedef+ ReferenceCounted
         let md = (extractvalue value METADATA_INDEX)
         if (not (ptrtoint md usize))
             return 0
-        load (getelementptr md 0 STRONGRC_INDEX)
+        dupe (load (getelementptr md 0 STRONGRC_INDEX))
 
     fn weak-count (value)
         viewing value
         let md = (extractvalue value METADATA_INDEX)
         if (not (ptrtoint md usize))
             return 1
-        load (getelementptr md 0 WEAKRC_INDEX)
+        dupe (load (getelementptr md 0 WEAKRC_INDEX))
 
 typedef+ Weak
     inline... __typecall

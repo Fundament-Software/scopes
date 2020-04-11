@@ -46,7 +46,7 @@ typedef CaptureTemplate
         if (otherT < Capture)
             let ft = (('@ otherT 'FunctionType) as type)
             let count = ('element-count ft)
-            let typeargs = 
+            let typeargs =
                 sc_argument_list_map_new (count - 1)
                     inline (i)
                         let i = (i + 1)
@@ -62,7 +62,7 @@ typedef CaptureTemplate
         static-typify
             fn (env args...)
                 innerf
-                    load (bitcast env T*)
+                    ptrtoref (bitcast env T*)
                     args...
             \ voidstar types...
 
@@ -105,9 +105,10 @@ spice unpack-capture (capture)
 spice pack-capture (argtuple func)
     let T = ('typeof argtuple)
     let CaptureT =
-        @@ spice-quote
-        typedef [(.. "CaptureT" ('string T))] < CaptureTemplate : T
-            let __call = func
+        typename.type (.. "CaptureT" ('string T)) CaptureTemplate
+    'set-storage CaptureT T
+    'set-symbols CaptureT
+        __call = func
     spice-quote
         bitcast argtuple CaptureT
 
