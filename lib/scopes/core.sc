@@ -6698,10 +6698,12 @@ define append-to-scope
                 let scope =
                     'bind-with-docstring scope key values (docstr as string)
                 return `scope
-            # for non-constant values, we need to create a new scope
-            let packedscope =
-                if constant-scope? `(Scope [(packedscope as Scope)])
-                else packedscope
+            # since scopes are immutable now, we do not have to separate scopes
+                this way, and can just branch out into a new dynamic scope.
+                #for non-constant values, we need to create a new scope
+                let packedscope =
+                    if constant-scope? `(Scope [(packedscope as Scope)])
+                    else packedscope
             if (('argcount values) != 1)
                 let block = (sc_expression_new)
                 let acount = ('argcount values)
