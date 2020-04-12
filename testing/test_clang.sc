@@ -114,3 +114,22 @@ do
         } EnumType;
 
     test ((tostring mod.typedef.EnumType) == "EnumType")
+
+do
+    vvv bind i
+    vvv include
+    """"#include <stdint.h>
+        struct inotify_event {
+            int      wd;
+            uint32_t mask;
+            uint32_t cookie;
+            uint32_t len;
+            char     name[];
+        };
+        unsigned long int query_inotify_event_size () {
+            return sizeof(struct inotify_event);
+        }
+
+    print (storageof i.struct.inotify_event)
+    print (sizeof i.struct.inotify_event) (i.extern.query_inotify_event_size)
+    test ((sizeof i.struct.inotify_event) == (i.extern.query_inotify_event_size))

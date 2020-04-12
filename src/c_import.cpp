@@ -572,8 +572,14 @@ public:
             break;
         case clang::Type::IncompleteArray: {
             const IncompleteArrayType *ATy = cast<IncompleteArrayType>(Ty);
+            #if 0
+            // returning a pointer here breaks structs trailing in unsized arrays
             QualType ETy = ATy->getElementType();
             return pointer_type(SCOPES_GET_RESULT(TranslateType(ETy)), PointerFlags(ETy), SYM_Unnamed);
+            #else
+            const Type *at = SCOPES_GET_RESULT(TranslateType(ATy->getElementType()));
+            return array_type(at, UNSIZED_COUNT);
+            #endif
         } break;
         case clang::Type::ConstantArray: {
             const ConstantArrayType *ATy = cast<ConstantArrayType>(Ty);
