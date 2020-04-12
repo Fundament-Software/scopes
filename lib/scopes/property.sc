@@ -27,6 +27,9 @@ inline property (getter setter)
                     inline (self)
                         imply (getter (bitcast self T)) destT
 
+            inline __unpack (self)
+                unpack (getter (bitcast self T))
+
             inline __typecall (cls value)
                 bitcast (view value) cls
 
