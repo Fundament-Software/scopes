@@ -509,32 +509,11 @@ sugar enum (name body...)
         [finalize-enum] this-type [storage]
         this-type
 
-sugar dispatch (value)
-    loop (next outp = next-expr '())
-        sugar-match next
-        case (('case (name is Symbol) (args...) body...) rest...)
-            let anchor = ('anchor ('@ next))
-            let _inline = ('tag `inline anchor)
-            repeat rest...
-                cons
-                    qq [name] =
-                        [_inline] "#hidden" [args...] (unquote-splice body...)
-                    outp
-        case (('default body...) rest...)
-            let anchor = ('anchor ('@ next))
-            let _inline = ('tag `inline anchor)
-            return
-                qq '__dispatch [value] (unquote-splice ('reverse outp))
-                    [_inline] "#hidden" () (unquote-splice body...)
-                rest...
-        default
-            error "missing default case"
-
 typedef+ Enum
     # wrap for usage outside spices
     spice unsafe-extract-payload (enum-value extractT)
         _extract-payload enum-value extractT
 
 do
-    let enum dispatch Enum
+    let enum Enum
     locals;
