@@ -3701,21 +3701,36 @@ let hash-storage =
             let T =
                 if ('opaque? OT) OT
                 else ('storageof OT)
-            let conv_u64 =
-                switch ('kind T)
-                case type-kind-integer
-                    `(zext (bitcast value T) u64)
-                case type-kind-pointer
-                    `(ptrtoint value u64)
-                default
-                    if (type== T f32)
-                        `(zext (bitcast value u32) u64)
-                    elseif (type== T f64)
-                        `(bitcast value u64)
-                    else
-                        error
-                            .. "can't hash storage of type " (repr OT)
-            `(bitcast (sc_hash conv_u64 [('sizeof T)]) hash)
+            let bits = ('bitcount T)
+            if (bits <= 64)
+                let conv_u64 =
+                    switch ('kind T)
+                    case type-kind-integer
+                        `(zext (bitcast value T) u64)
+                    case type-kind-pointer
+                        `(ptrtoint value u64)
+                    default
+                        if (type== T f32)
+                            `(zext (bitcast value u32) u64)
+                        elseif (type== T f64)
+                            `(bitcast value u64)
+                        else
+                            error
+                                .. "can't hash storage of type " (repr OT)
+                `(bitcast (sc_hash conv_u64 [('sizeof T)]) hash)
+            else
+                let chunk-count = ((bits + (64 - 1)) // 64)
+                let first-chunk = `(sc_hash (itrunc (value >> 64) u64) [('sizeof T)])
+                let hash-chain =
+                    loop (chunk-index computed = 1 first-chunk)
+                        if (chunk-index == chunk-count)
+                            break computed
+                        let chunk =
+                            `(sc_hash (itrunc (value >> (64 * chunk-index)) u64) [('sizeof T)])
+                        _ (chunk-index + 1) computed `(sc_hash2x64 computed chunk)
+
+                `(bitcast hash-chain hash)
+
 
 'set-symbols hash
     __hash = (inline (self) self)
