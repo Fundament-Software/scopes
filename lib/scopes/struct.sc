@@ -172,7 +172,9 @@ sugar struct (name body...)
         [do]
             unquote-splice body
             [fold-locals] this-type [append-to-type]
-        [finalize-struct] this-type [packed?]
+        unquote
+            let expr = (qq [finalize-struct] this-type [packed?])
+            'tag `expr ('anchor name)
         this-type
 
 do

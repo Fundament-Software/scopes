@@ -2327,8 +2327,8 @@ let getattr =
                         sc_prove `(conv rhs)
                     else
                         cast-error "can't coerce secondary argument of type " rhsT Symbol
+            let sym = (unbox-symbol rhs Symbol)
             label skip-accessor-lookup
-                let sym = (unbox-symbol rhs Symbol)
                 let prop =
                     try ('@ lhsT sym)
                     else (merge skip-accessor-lookup)
@@ -2343,7 +2343,8 @@ let getattr =
             let f =
                 try ('@ lhsT '__getattr)
                 else
-                    unary-op-error "get attribute from" lhsT
+                    # produce a more helpful error message
+                    '@ lhsT sym
             'tag `(f lhs rhs) ('anchor args)
 
 let drop =

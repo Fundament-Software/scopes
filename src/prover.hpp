@@ -90,6 +90,8 @@ SCOPES_RESULT(const Type *) ref_to_ptr(const Type *T);
 
 SCOPES_RESULT(ConstRef) nullof(const Type *T);
 
+
+
 } // namespace scopes
 
 #endif // SCOPES_AST_PROVER_HPP
