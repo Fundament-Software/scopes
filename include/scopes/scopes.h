@@ -144,9 +144,8 @@ SCOPES_TYPEDEF_RESULT_RAISES(sc_bool_i32_i32_raises, sc_bool_i32_i32_tuple_t);
 // prototypes
 
 typedef sc_valueref_raises_t (*sc_ast_macro_func_t)(sc_valueref_t);
+typedef sc_valueref_raises_t (*sc_typecast_func_t)(sc_valueref_t, const sc_type_t *);
 typedef sc_list_scope_raises_t (*sc_syntax_wildcard_func_t)(const sc_list_t *, const sc_scope_t *);
-
-
 
 // booting
 
@@ -175,6 +174,7 @@ SCOPES_LIBEXPORT sc_void_raises_t sc_compile_object(const sc_string_t *target_tr
 SCOPES_LIBEXPORT void sc_enter_solver_cli ();
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_eval_inline(const sc_anchor_t *anchor, const sc_list_t *expr, const sc_scope_t *scope);
 SCOPES_LIBEXPORT sc_rawstring_i32_array_tuple_t sc_launch_args();
+SCOPES_LIBEXPORT void sc_set_typecast_handler(sc_typecast_func_t func);
 
 // value
 

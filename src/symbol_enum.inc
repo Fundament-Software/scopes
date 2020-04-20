@@ -776,7 +776,6 @@ namespace scopes {
     T(SYM_ReturnHandler, "__return") \
     T(SYM_CopyHandler, "__copy") \
     T(SYM_DerefHandler, "__deref") \
-    T(SYM_BoolHandler, "__tobool") \
     T(SYM_QuoteHandler, "__quote") \
     T(SYM_UnionFields, "__fields") \
     \

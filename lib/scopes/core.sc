@@ -7668,6 +7668,21 @@ let e:f64 = 2.718281828459045:f64
 let e = e:f32
 
 #-------------------------------------------------------------------------------
+# typecast handler
+#-------------------------------------------------------------------------------
+
+sc_set_typecast_handler
+    fn "typecast-handler" (value cls)
+        let vT = ('qualified-typeof value)
+        let f =
+            imply-converter vT cls ('constant? value)
+        if (operator-valid? f)
+            return `(f value)
+        else
+            error@ ('anchor value) "while converting"
+                .. "can't coerce value of type " ('__repr `vT) " to type " ('__repr `cls)
+
+#-------------------------------------------------------------------------------
 
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor

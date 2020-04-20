@@ -85,6 +85,7 @@ test-modules
     .test_testing
     .test_try
     .test_tuple_array
+    .test_typecast
     .test_typedef
     .test_typed_symbol
     .test_union

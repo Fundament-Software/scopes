@@ -10,6 +10,7 @@
 #include "result.hpp"
 #include "type.hpp"
 #include "value.hpp"
+#include "scopes/scopes.h"
 
 #include <stdint.h>
 
@@ -90,6 +91,7 @@ SCOPES_RESULT(const Type *) ref_to_ptr(const Type *T);
 
 SCOPES_RESULT(ConstRef) nullof(const Type *T);
 
+void set_typecast_handler(sc_typecast_func_t func);
 
 
 } // namespace scopes

@@ -201,6 +201,11 @@ sc_rawstring_i32_array_tuple_t sc_launch_args() {
     return {(int)scopes_argc, scopes_argv};
 }
 
+void sc_set_typecast_handler(sc_typecast_func_t func) {
+    using namespace scopes;
+    set_typecast_handler(func);
+}
+
 sc_valueref_list_scope_raises_t sc_expand(sc_valueref_t expr, const sc_list_t *next, const sc_scope_t *scope) {
     using namespace scopes;
     return convert_result(expand(expr, next, scope));
@@ -2280,6 +2285,9 @@ void init_globals(int argc, char *argv[]) {
     const Type *_void = empty_arguments_type();
     const Type *voidstar = native_ro_pointer_type(_void);
 
+    const Type *TYPE_typecast_func = native_ro_pointer_type(
+        raising_function_type(TYPE_ValueRef, { TYPE_ValueRef, TYPE_Type }));
+
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, arguments_type({TYPE_I32, TYPE_I32, TYPE_I32}));
     DEFINE_EXTERN_C_FUNCTION(sc_cache_misses, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_expand, arguments_type({TYPE_ValueRef, TYPE_List, TYPE_Scope}), TYPE_ValueRef, TYPE_List, TYPE_Scope);
@@ -2296,6 +2304,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_object, _void, TYPE_String, TYPE_I32, TYPE_String, TYPE_Scope, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_enter_solver_cli, _void);
     DEFINE_EXTERN_C_FUNCTION(sc_launch_args, arguments_type({TYPE_I32,native_ro_pointer_type(rawstring)}));
+    DEFINE_EXTERN_C_FUNCTION(sc_set_typecast_handler, _void, TYPE_typecast_func);
 
     DEFINE_EXTERN_C_FUNCTION(sc_prompt, arguments_type({TYPE_Bool, TYPE_String}), TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_save_history, _void, TYPE_String);

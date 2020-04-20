@@ -115,6 +115,29 @@ static std::unordered_set<Function *, FunctionSet::Hash, FunctionSet::KeyEqual> 
 
 //------------------------------------------------------------------------------
 
+static sc_typecast_func_t g_typecast_handler = nullptr;
+void set_typecast_handler(sc_typecast_func_t func) {
+    g_typecast_handler = func;
+}
+
+static bool has_typecast_handler() {
+    return g_typecast_handler != nullptr;
+}
+
+static SCOPES_RESULT(TypedValueRef) run_typecast_handler(
+    const ASTContext &ctx, const TypedValueRef &value, const Type *T) {
+    SCOPES_RESULT_TYPE(TypedValueRef);
+    assert(g_typecast_handler);
+    T = strip_qualifiers(T);
+    auto result = g_typecast_handler(value, T);
+    if (!result.ok) {
+        SCOPES_RETURN_ERROR(result.except);
+    } else {
+        auto expr = result._0;
+        return SCOPES_GET_RESULT(prove(ctx, expr));
+    }
+}
+
 // reduce typekind to compatible
 static TypeKind canonical_typekind(TypeKind k) {
     if (k == TK_Real)
@@ -1634,12 +1657,8 @@ static SCOPES_RESULT(void) build_tobool (
     const ASTContext &ctx, const Anchor *anchor, TypedValueRef &val) {
     SCOPES_RESULT_TYPE(void);
     auto T = strip_qualifiers(val->get_type());
-    if (T != TYPE_Bool) {
-        ValueRef handler;
-        if (T->lookup(SYM_BoolHandler, handler)) {
-            auto expr = ref(anchor, CallTemplate::from(handler, { val }));
-            val = SCOPES_GET_RESULT(prove(ctx, expr));
-        }
+    if ((T != TYPE_Bool) && has_typecast_handler()) {
+        val = SCOPES_GET_RESULT(run_typecast_handler(ctx, ref(anchor, val), TYPE_Bool));
     }
     return {};
 }
@@ -3436,6 +3455,9 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
                 SCOPES_ERROR(UnclosedPass);
             }
             auto newlit = SCOPES_GET_RESULT(prove(ctx, _case.literal));
+            if ((newlit->get_type() != casetype) && has_typecast_handler()) {
+                newlit = SCOPES_GET_RESULT(run_typecast_handler(ctx, newlit, casetype));
+            }
             if (!newlit.isa<ConstInt>()) {
                 SCOPES_ERROR(ValueKindMismatch, VK_ConstInt, newlit->kind());
             }
@@ -3498,7 +3520,7 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
                 SCOPES_TRACE_PROVE_ARG(newcond);
                 newcond = ref(newcond.anchor(),
                     ExtractArgument::from(newcond, 0));
-                SCOPES_CHECK_RESULT(build_tobool(subctx, newcond.anchor(), newcond));
+                SCOPES_CHECK_RESULT(build_tobool(subctx, clause.cond.anchor(), newcond));
                 SCOPES_CHECK_RESULT(build_deref_automove(subctx, newcond, newcond));
                 auto condT = strip_qualifiers(newcond->get_type());
                 if (condT != TYPE_Bool) {
