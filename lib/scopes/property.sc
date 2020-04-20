@@ -22,19 +22,32 @@ inline property (getter setter)
                 let F = (static-typify test-getter T)
                 unqualified (returnof (typeof F))
 
+            inline get (self)
+                getter (bitcast self T)
+
             inline __imply (cls destT)
-                static-if (imply? value-type destT)
+                static-if (destT == immutable) get
+                elseif (imply? value-type destT)
                     inline (self)
-                        imply (getter (bitcast self T)) destT
+                        imply (get self) destT
 
             inline __unpack (self)
-                unpack (getter (bitcast self T))
+                unpack (get self)
 
             inline __typecall (cls value)
                 bitcast (view value) cls
 
             inline __getattr (self key)
-                getattr (getter (bitcast self T)) key
+                getattr (get self) key
+
+            inline __toptr (self)
+                & (get self)
+
+            inline __toref (self)
+                @ (get self)
+
+            inline __methodcall (name self ...)
+                name (get self) ...
 
             inline __= (cls destT)
                 inline (self value)

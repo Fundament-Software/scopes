@@ -113,6 +113,10 @@ typedef+ Weak
                 free md
             # otherwise last strong reference will clean this up
 
+    inline __rimply (T cls)
+        static-if (T == Nothing)
+            inline (value) (cls)
+
     inline __drop (self)
         _drop (deref self)
 

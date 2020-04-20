@@ -7489,6 +7489,14 @@ do
                     elseif (T == integer)
                         return `storagecast
                     `()
+        __static-imply =
+            spice-cast-macro
+                fn "CEnum-imply" (vT T)
+                    let ST = ('storageof vT)
+                    let f = (integer-static-imply ST T)
+                    if (operator-valid? f)
+                        return `(inline (self) (f (storagecast self)))
+                    `()
         __rimply =
             spice-cast-macro
                 fn "CEnum-imply" (vT T)
