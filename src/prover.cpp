@@ -3115,7 +3115,7 @@ repeat:
             default: assert(false); break;
             }
             auto op = ICmp::from(pred, _A, _B);
-            op->hack_change_value(VIEWTYPE1(op->get_type(), _A, _B));
+            //op->hack_change_value(VIEWTYPE1(op->get_type(), _A, _B));
             return TypedValueRef(call.anchor(), op);
         } break;
         case OP_FCmpOEQ:
@@ -3143,7 +3143,7 @@ repeat:
             default: assert(false); break;
             }
             auto op = FCmp::from(pred, _A, _B);
-            op->hack_change_value(VIEWTYPE1(op->get_type(), _A, _B));
+            //op->hack_change_value(VIEWTYPE1(op->get_type(), _A, _B));
             return TypedValueRef(call.anchor(), op);
         } break;
 #define IARITH_NUW_NSW_OPS(NAME) \
