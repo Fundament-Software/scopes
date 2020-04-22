@@ -98,6 +98,8 @@ inline gen-apply-from-tag (f)
 
 # tagged union / sum type
 typedef Enum
+    inline literal (self)
+        extractvalue self 0
     spice __unsafe-dispatch2 (self other enum-value handlers...)
         call
             gen-dispatch-from-tag
@@ -122,6 +124,7 @@ typedef Enum
             \ tag handler self
 
 fn define-field-runtime (T name field-type index-value)
+    let FieldType = (('@ T 'FieldType) as type)
     let fields = ('@ T '__fields__)
     let index = (('@ T '__index__) as u64)
     let index-anchor = ('anchor index-value)
@@ -132,7 +135,7 @@ fn define-field-runtime (T name field-type index-value)
     let FT = (typename.type
         (.. "enum-field<" (name as Symbol as string) ":"
             (tostring (field-type as type)) "=" (tostring index-value) ">")
-        typename)
+        FieldType)
     'set-opaque FT
     'set-symbols FT
         Name = name
@@ -361,6 +364,13 @@ fn finalize-enum-runtime (T storage)
                                                 let name = (('@ field 'Name) as Symbol)
                                                 sc_keyed_new name `==
                         else false
+                elseif (B == type)
+                    inline (a b)
+                        static-assert (b < A.FieldType)
+                        let tag = (extractvalue a 0)
+                        let lit = b.Literal
+                        tag == lit
+
         fn set-symbol (T key value)
             # only set symbol when it's not already set
             try ('@ T key)
@@ -485,6 +495,9 @@ sugar enum (name body...)
         fn init-fields-runtime (T)
             sc_type_set_symbol T '__fields__ (sc_argument_list_new 0 null)
             sc_type_set_symbol T '__index__ (sc_const_int_new u64 0:u64)
+            let FT = (typename.type "FieldType" typename)
+            'set-opaque FT
+            sc_type_set_symbol T 'FieldType FT
 
         if ('constant? enum-type)
             init-fields-runtime (enum-type as type)
