@@ -7210,10 +7210,16 @@ fn constructor (cls args...)
                             merge skip
                         let field = ('getarg struct-fields i)
                         let field = (field as type)
+                        let elem constructor? =
+                            try (_ ('@ field 'Default) false)
+                            else
+                                try (_ ('@ field 'Constructor) true)
+                                else
+                                    merge skip
                         let elem =
-                            try ('@ field 'Default)
-                            except (err)
-                                merge skip
+                            if constructor?
+                                'tag `(elem) ('anchor elem)
+                            else elem
                         merge success elem
                         skip ::
                         # default initializer
@@ -7679,6 +7685,7 @@ sc_set_typecast_handler
         if (operator-valid? f)
             return `(f value)
         else
+            hide-traceback;
             error@ ('anchor value) "while converting"
                 .. "can't coerce value of type " ('__repr `vT) " to type " ('__repr `cls)
 

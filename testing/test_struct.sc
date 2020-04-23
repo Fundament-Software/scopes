@@ -157,6 +157,8 @@ do
     ;
 test (drop_count == 2)
 
+fn unconst (x) x
+
 # default values
 struct Defaults
     # member with default value
@@ -174,11 +176,14 @@ struct Defaults
 
     x = (1 + 2)
 
+    k = (unconst 55)
+
 let val = (Defaults)
 test (val.x == 3)
 test (val.y == 4)
 test (val.z == 5)
 test (val.w == 10)
+test (val.k == 55)
 
 # test packing
 do

@@ -8,23 +8,47 @@
 
     Support for defining structs through the `struct` sugar.
 
+fn isolate-expression (expr)
+    # check if evaluated expression is constant
+    spice-quote
+        fn field-constructor ()
+            static-if (constant? expr)
+                unreachable;
+            else expr
+    let f = (sc_typify_template field-constructor 0 null)
+    let FT = ('return-type ('element@ ('typeof f) 0))
+    if (FT == noreturn)
+        _ (sc_prove expr) false
+    else
+        _ f true
+
 sugar struct (name body...)
     fn define-field-runtime (T anchor name field-type default-value)
         let fields = ('@ T '__fields__)
         let default-anchor = ('anchor default-value)
         let field-type = (field-type as type)
-        let field-type default-value =
+        let default-value constructor? =
+            do
+                let default-type = ('typeof default-value)
+                if (default-type == Nothing)
+                    _ default-value false
+                else
+                    isolate-expression
+                        if (field-type == Unknown)
+                            'tag `(default-value) default-anchor
+                        else
+                            'tag `(imply (default-value) field-type) default-anchor
+        let field-type =
             if (field-type == Unknown)
-                let value = (sc_prove default-value)
-                _ ('typeof value) value
-            elseif (('typeof default-value) != Nothing)
-                let value = (sc_prove ('tag
-                    `(imply default-value field-type) default-anchor))
-                _ field-type value
-            else
-                _ field-type default-value
-        if (not ('constant? default-value))
-            error@ default-anchor "while checking default initializer"
+                if constructor?
+                    let retval =
+                        'return-type ('element@ ('typeof default-value) 0)
+                    retval
+                else ('typeof default-value)
+            else field-type
+        #if (not ('constant? default-value))
+            hide-traceback;
+            error@ anchor "while checking default initializer"
                 "initializer must be constant"
         let FT = (typename.type
             (.. "struct-field<" (name as Symbol as string) ":"
@@ -33,8 +57,11 @@ sugar struct (name body...)
         'set-opaque FT
         'set-symbol FT 'Type
             sc_key_type (name as Symbol) (field-type as type)
-        if (('typeof default-value) != Nothing)
-            'set-symbol FT 'Default default-value
+        if constructor?
+            'set-symbol FT 'Constructor default-value
+        else
+            if (('typeof default-value) != Nothing)
+                'set-symbol FT 'Default default-value
         let FT = ('tag `FT anchor)
         let fields =
             sc_argument_list_join_values fields FT
@@ -48,6 +75,7 @@ sugar struct (name body...)
         let T = (struct-type as type)
         let default-value =
             if (('argcount default-value...) == 0) `none
+            elseif (('typeof default-value...) != Closure) `(inline () default-value...)
             else default-value...
         define-field-runtime T anchor name field-type default-value
 
@@ -137,12 +165,14 @@ sugar struct (name body...)
                     case ((name as Symbol) ': T '= default...)
                         let newexpr =
                             qq [define-field] [('tag `'this-type anchor)] '[name] [T]
-                                unquote-splice default...
+                                [inline] ()
+                                    unquote-splice default...
                         `newexpr
                     case ((name as Symbol) '= default...)
                         let newexpr =
                             qq [define-field] [('tag `'this-type anchor)] '[name] [Unknown]
-                                unquote-splice default...
+                                [inline] ()
+                                    unquote-splice default...
                         `newexpr
                     default expr
                 else expr
