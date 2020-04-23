@@ -15,7 +15,8 @@ fn isolate-expression (expr)
             static-if (constant? expr)
                 unreachable;
             else expr
-    let f = (sc_typify_template field-constructor 0 null)
+    cl := (sc_prove field-constructor) as Closure
+    let f = (sc_typify cl 0 null)
     let FT = ('return-type ('element@ ('typeof f) 0))
     if (FT == noreturn)
         _ (sc_prove expr) false
