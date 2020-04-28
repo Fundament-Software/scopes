@@ -24,6 +24,20 @@ spice element-prefix (element-type)
     default
         error "illegal element type"
 
+spice element-one (element-type)
+    match (element-type as type)
+    case bool `true
+    case i8 `1:i8
+    case i16 `1:i16
+    case i32 `1:i32
+    case u8 `1:u8
+    case u16 `1:u16
+    case u32 `1:u32
+    case f32 `1.0
+    case f64 `1.0:f64
+    default
+        error "illegal element type"
+
 run-stage;
 
 typedef vec-type < immutable
@@ -44,6 +58,15 @@ inline construct-vec-type (element-type size)
     let VT = (vector element-type size)
     typedef (.. prefix "vec" (tostring size)) < gvec-type : VT
         let ElementType = element-type
+        let Zero = (nullof element-type)
+        let One = (element-one element-type)
+        let LiteralShuffleMask =
+            bitcast
+                vectorof element-type Zero One
+                    va-map
+                        inline () Zero
+                        va-range (size - 2)
+                this-type
 
 inline construct-mat-type (element-type cols rows)
     static-assert ((typeof cols) == i32)
@@ -115,6 +138,9 @@ let mat4 dmat4 imat4 umat4 bmat4 = mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4
 #-------------------------------------------------------------------------------
 # VECTORS
 #-------------------------------------------------------------------------------
+
+let MASK_ZERO = 4
+let MASK_ONE = 5
 
 typedef vec-type-accessor
     do
@@ -352,21 +378,22 @@ typedef+ vec-type
         vec-type-binary-op-dispatch '__<= '__r<= '__vector<=
 
     fn build-access-mask (name)
-        let element-set-xyzw = "^[xyzw]{1,4}$"
-        let element-set-rgba = "^[rgba]{1,4}$"
-        let element-set-stpq = "^[stpq]{1,4}$"
-        let element-set-any = "^([xyzw]|[stpq]|[rgba]){1,4}$"
+        let element-set-xyzw = "^[xyzw01]{1,4}$"
+        let element-set-rgba = "^[rgba01]{1,4}$"
+        let element-set-stpq = "^[stpq01]{1,4}$"
+        let element-set-any = "^([xyzw01]|[stpq01]|[rgba01]){1,4}$"
 
         let s = (name as string)
         let sz = ((countof s) as i32)
         if (sz > 4)
             error "too many characters in accessor (try 1 <= x <= 4)"
         let set =
-            if ('match? element-set-xyzw s) "xyzw"
-            elseif ('match? element-set-rgba s) "rgba"
-            elseif ('match? element-set-stpq s) "stpq"
+            if ('match? element-set-xyzw s) "xyzw01"
+            elseif ('match? element-set-rgba s) "rgba01"
+            elseif ('match? element-set-stpq s) "stpq01"
             else
                 error "try one of xyzw | rgba | stpq"
+        inline literal? (x) (x > 3)
         fn find-index (set c)
             loop (k = 0)
                 let sc = (set @ (k as usize))
@@ -374,15 +401,18 @@ typedef+ vec-type
                     break k
                 k + 1
         if (sz == 1)
-            return sz `[(find-index set (s @ 0))]
+            let k = (find-index set (s @ 0))
+            return sz `k (literal? k)
         # 2 - 4 arguments
         let entries = (alloca-array Value sz)
+        local literals? = false
         for i in (range sz)
             let ui = (i as usize)
             let k = (find-index set (s @ ui))
+            literals? |= (literal? k)
             entries @ ui = `k
         let VT = (vector.type i32 sz)
-        return sz (sc_const_aggregate_new VT sz entries)
+        return sz (sc_const_aggregate_new VT sz entries) literals?
 
     @@ memoize
     fn expand-mask (lhsz rhsz)
@@ -434,19 +464,31 @@ typedef+ vec-type
 
     spice __getattr (self name)
         let name = (name as Symbol as string)
-        let sz mask = (build-access-mask name)
+        let sz mask literals? = (build-access-mask name)
         let QT = ('qualified-typeof self)
+        let T = ('typeof self)
         if (sz == 1)
-            `(extractelement self mask)
-        elseif ('refer? QT)
+            if literals?
+                let mask = (mask as i32)
+                switch mask
+                case MASK_ZERO
+                    '@ ('typeof self) 'Zero
+                case MASK_ONE
+                    '@ ('typeof self) 'One
+                default
+                    error "illegal literal mask"
+            else
+                `(extractelement self mask)
+        elseif (('refer? QT) & (not literals?))
             spice-quote
                 bitcast self
-                    [(construct-getter-type ('typeof self) mask)]
+                    [(construct-getter-type T mask)]
         else
+            let shmask = ('@ T 'LiteralShuffleMask)
             spice-quote
                 bitcast
-                    shufflevector self self mask
-                    construct-vec-type [('element@ ('typeof self) 0)] sz
+                    shufflevector self shmask mask
+                    construct-vec-type [('element@ T 0)] sz
 
     unlet construct-getter-type assign-mask range-mask expand-mask
         \ build-access-mask

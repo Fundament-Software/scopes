@@ -8,6 +8,7 @@ do
     v.xz = (vec2 10 20)
     test (v == (vec4 10 2 20 4))
     test ((v.xz + v.yw) == (vec2 12 24))
+    test (v.w001 == (vec4 4 0 0 1))
 
     local v = (vec2 4 3)
     test (v.yyxx == (vec4 3 3 4 4))
@@ -38,6 +39,9 @@ test (v.xxyy == (vec4 0 0 1 1))
 test (v.rgb == (vec3 0 1 2))
 test (v.st == (vec2 0 1))
 test (v @ 2 == 2.0)
+test (v.0 == 0.0)
+test (v.1 == 1.0)
+test ((ivec3 4 5 6) . 0y1z == (ivec4 1 5 0 6))
 
 test ((ivec3 (vec3 5)) == (ivec3 5))
 
@@ -94,19 +98,19 @@ test
 
 do
     # do identity transformations yield the original matrix?
-    test 
+    test
         (m * (mat4)) == m
-    test 
+    test
         ((mat4) * m * (mat4)) == m
 
     # matrices can be multiplied if lhs has as many columns as rhs has rows
     do
         (mat2x3) * (mat4x2)
-        let m = 
+        let m =
             mat2x3
                 vec3 2 3 5
                 vec3 7 11 13
-        let n = 
+        let n =
             mat4x2
                 vec2 17 19
                 vec2 23 29
@@ -120,18 +124,18 @@ do
                     \ 321 500 636
                     \ 383 596 764
         (mat3x2) * (mat4x3)
-        let m = 
+        let m =
             mat3x2
                 vec2 2 3
                 vec2 5 7
                 vec2 11 13
-        let n = 
+        let n =
             mat4x3
                 vec3 17 19 23
                 vec3 29 31 37
                 vec3 41 43 47
                 vec3 53 59 61
-        test 
+        test
             == (m * n)
                 mat4x2
                     \ 382 483
@@ -146,7 +150,7 @@ do
     let n =
         transpose m
 
-    test 
+    test
         ((mat3) * m * n) == (m * n)
 
     test
