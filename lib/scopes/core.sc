@@ -5633,13 +5633,17 @@ inline va-join (a...)
     inline (b...)
         va-append-va (inline () b...) a...
 
-""""A `Generator` that iterates through all 32-bit signed integer values starting
+""""A `Generator` that iterates through all integer values starting
     at 0. This generator does never terminate; when it exceeds the maximum
-    positive integer value of 2147483647, it overflows and continues with the
-    minimum negative integer value of -2147483648.
-let infinite-range =
+    integer value, it overflows and continues with the minimum integer value
+    of that type.
+inline infinite-range (T)
+    let T =
+        static-branch (none? T)
+            inline () i32
+            inline () T
     Generator
-        inline () 0
+        inline () (nullof T)
         inline (x) true
         inline (x) x
         inline (x) (x + 1)
@@ -5662,8 +5666,8 @@ inline zip (a b)
             let it-a it-b = (va-split lsize it...)
             va-append-va (inline () (next-b (it-b))) (next-a (it-a))
 
-inline enumerate (x)
-    zip infinite-range x
+inline enumerate (x T)
+    zip (infinite-range T) x
 
 #-------------------------------------------------------------------------------
 # function memoization
