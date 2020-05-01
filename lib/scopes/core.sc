@@ -4599,16 +4599,21 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
         spice-macro
             fn "array.__typecall" (args)
                 let argc = ('argcount args)
-                verify-count argc 1 3
+                verify-count argc 1 -1
                 raising Error
                 let cls = (('getarg args 0) as type)
                 if (cls == array)
-                    verify-count argc 2 3
+                    verify-count argc 2 -1
                     let element-type = (('getarg args 1) as type)
-                    let size =
-                        if (argc == 2) -1:u64
-                        else (extract-integer ('getarg args 2))
-                    `[(sc_array_type element-type (size as usize))]
+                    if (argc == 2)
+                        `[(sc_array_type element-type -1:usize)]
+                    else
+                        let T = (ptrtoref (alloca type))
+                        T = element-type
+                        for i in (rrange 2 argc)
+                            let size = (extract-integer ('getarg args i))
+                            T = (sc_array_type T (size as usize))
+                        `T
                 else
                     verify-count argc 1 1
                     `(nullof cls)
