@@ -138,11 +138,12 @@ static SCOPES_RESULT(TypedValueRef) run_typecast_handler(
     }
 }
 
-// reduce typekind to compatible
-static TypeKind canonical_typekind(TypeKind k) {
-    if (k == TK_Real)
-        return TK_Integer;
-    return k;
+static bool typekinds_compatible(TypeKind k1, TypeKind k2) {
+    if (k1 == k2) return true;
+    if ((k1 == TK_Real) && (k2 == TK_Integer)) return true;
+    if ((k1 == TK_Integer) && (k2 == TK_Real)) return true;
+    if ((k1 == TK_Vector) && (k2 == TK_Integer)) return true;
+    return false;
 }
 
 static SCOPES_RESULT(const ReferQualifier *) verify_refer(const Type *T) {
@@ -2482,8 +2483,7 @@ repeat:
                 //DEREF(_SrcT);
                 const Type *SSrcT = SCOPES_GET_RESULT(storage_type(SrcT));
                 const Type *SDestT = SCOPES_GET_RESULT(storage_type(DestT));
-                if (canonical_typekind(SSrcT->kind())
-                        != canonical_typekind(SDestT->kind())) {
+                if (!typekinds_compatible(SSrcT->kind(), SDestT->kind())) {
                     SCOPES_ERROR(CastCategoryError, SrcT, DestT);
                 }
                 if (SSrcT != SDestT) {
@@ -2495,6 +2495,9 @@ repeat:
                     } break;
                     default: break;
                     }
+                }
+                if (size_of(SSrcT).assert_ok() != size_of(SDestT).assert_ok()) {
+                    SCOPES_ERROR(CastSizeError, SrcT, DestT);
                 }
 
                 DestT = strip_qualifiers(DestT);

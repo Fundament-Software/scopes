@@ -13,7 +13,7 @@ local arr =
 let gen =
     zip
         imap
-            infinite-range
+            infinite-range;
             inline (x) (x * 2)
         span arr
             binary-range

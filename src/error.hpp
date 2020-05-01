@@ -234,7 +234,10 @@ formatters:
         "unsupported execution mode: %0", \
         Symbol) \
     T(CastCategoryError, \
-        "cannot cast value of type %0 to %1 because both types must be of same storage category", \
+        "cannot cast value of type %0 to %1 because types are not of same storage category", \
+        PType, PType) \
+    T(CastSizeError, \
+        "cannot cast value of type %0 to %1 because types are not of same size", \
         PType, PType) \
     T(CastIncompatibleAggregateType, \
         "cannot cast value of aggregate storage type %0", \
