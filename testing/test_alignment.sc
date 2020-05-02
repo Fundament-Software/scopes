@@ -2,10 +2,12 @@
 using import testing
 
 # test alignment
-inline test-alignment (T)
+inline test-alignment (T verbose?)
     let size alignment =
         ptrtoint (getelementptr (nullof (mutable pointer T)) 1) u64
         ptrtoint (getelementptr (nullof (mutable pointer (tuple bool T))) 0 1) u64
+    static-if verbose?
+        print T "size =" size "alignment =" alignment
     if (size != (sizeof T))
         print T "size mismatch:" (sizeof T) "!=" size
     if (alignment != (alignof T))
@@ -19,6 +21,19 @@ test-alignment (vector f32 3)
 test-alignment (vector i8 3)
 test-alignment (vector f32 9)
 test-alignment (vector i8 11)
+test-alignment (vector bool 32) true
+let i1 = (integer 1 true)
+test-alignment (vector i1 32) true
+
+do
+    let K = (alloca (vector bool 4))
+    fn unconst (x) x
+    store (unconst (vectorof bool false true true false)) K
+    let PK = (bitcast K (mutable pointer u8))
+    print (PK @ 0)
+    print (PK @ 1)
+    print (PK @ 2)
+    print (PK @ 3)
 
 va-map
     inline (i)
