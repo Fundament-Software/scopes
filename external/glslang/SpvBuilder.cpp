@@ -313,9 +313,11 @@ Id Builder::makeVectorType(Id component, int size)
 Id Builder::makeMatrixType(Id component, int cols, int rows)
 {
     assert(cols <= maxMatrixSize && rows <= maxMatrixSize);
+    return makeMatrixType(makeVectorType(component, rows), cols);
+}
 
-    Id column = makeVectorType(component, rows);
-
+Id Builder::makeMatrixType(Id column, int cols)
+{
     // try to find it
     Instruction* type;
     for (int t = 0; t < (int)groupedTypes[OpTypeMatrix].size(); ++t) {

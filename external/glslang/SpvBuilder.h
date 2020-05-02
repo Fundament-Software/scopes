@@ -125,6 +125,7 @@ public:
     Id makeStructResultType(Id type0, Id type1);
     Id makeVectorType(Id component, int size);
     Id makeMatrixType(Id component, int cols, int rows);
+    Id makeMatrixType(Id column, int cols);
     Id makeArrayType(Id element, Id sizeId, int stride);  // 0 stride means no stride decoration
     Id makeRuntimeArray(Id element);
     Id makeFunctionType(Id returnType, const std::vector<Id>& paramTypes);

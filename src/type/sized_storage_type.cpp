@@ -16,6 +16,7 @@ bool ArrayLikeType::classof(const Type *T) {
     switch(T->kind()) {
     case TK_Array:
     case TK_Vector:
+    case TK_Matrix:
         return true;
     default: break;
     }

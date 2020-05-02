@@ -1341,8 +1341,9 @@ static const Type *get_element_pointer_type(const Type *T, const TypedValues &in
     for (int i = 1; i < count; ++i) {
         const Type *ST = storage_type(T).assert_ok();
         switch(ST->kind()) {
-        case TK_Array: {
-            auto ai = cast<ArrayType>(ST);
+        case TK_Array:
+        case TK_Matrix: {
+            auto ai = cast<ArrayLikeType>(ST);
             T = ai->element_type;
         } break;
         case TK_Vector: {
@@ -1377,7 +1378,9 @@ static const Type *value_type_at_index(const Type *T, int index) {
     T = storage_type(T).assert_ok();
     switch(T->kind()) {
     case TK_Pointer: return cast<PointerType>(T)->element_type;
-    case TK_Array: return cast<ArrayType>(T)->element_type;
+    case TK_Array:
+    case TK_Matrix:
+        return cast<ArrayLikeType>(T)->element_type;
     case TK_Vector: return cast<VectorType>(T)->element_type;
     case TK_Tuple: return type_key(cast<TupleType>(T)->type_at_index(index).assert_ok())._1;
     default: {

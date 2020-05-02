@@ -292,6 +292,8 @@ formatters:
     T(VectorSizeMismatch, \
         "arguments of type %0 and %1 must be of scalar type or vector type of equal size", \
         PType, PType) \
+    T(InvalidMatrixSize, \
+        "matrix type must at least have two columns") \
     T(ConditionNotBool, \
         "branching condition must be of boolean type, but is of type %0", \
         PType) \
@@ -423,7 +425,10 @@ formatters:
         "codegen: entry function must have type %0 but has type %1", \
         PType, PType) \
     T(CGenUnsupportedVectorSize, \
-        "codegen: a vector of type %0 and size %1 is unsupported", \
+        "codegen: vector of type %0 and size %1 is unsupported", \
+        PType, int) \
+    T(CGenUnsupportedMatrixSize, \
+        "codegen: matrix of type %0 and size %1 is unsupported", \
         PType, int) \
 
 // runtime

@@ -11,6 +11,7 @@
 #include "type/pointer_type.hpp"
 #include "type/array_type.hpp"
 #include "type/vector_type.hpp"
+#include "type/matrix_type.hpp"
 #include "type/tuple_type.hpp"
 #include "type/arguments_type.hpp"
 #include "type/function_type.hpp"

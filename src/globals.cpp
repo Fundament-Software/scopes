@@ -1708,6 +1708,7 @@ sc_size_raises_t sc_type_offsetof(const sc_type_t *T, int index) {
     switch(T->kind()) {
     case TK_Pointer: result = SCOPES_C_GET_RESULT(cast<PointerType>(T)->getelementptr(nullptr, (size_t)index)); break;
     case TK_Array: result = SCOPES_C_GET_RESULT(cast<ArrayType>(T)->getelementptr(nullptr, (size_t)index)); break;
+    case TK_Matrix: result = SCOPES_C_GET_RESULT(cast<MatrixType>(T)->getelementptr(nullptr, (size_t)index)); break;
     case TK_Vector: result = SCOPES_C_GET_RESULT(cast<VectorType>(T)->getelementptr(nullptr, (size_t)index)); break;
     case TK_Tuple: result = SCOPES_C_GET_RESULT(cast<TupleType>(T)->getelementptr(nullptr, (size_t)index)); break;
     default: {
@@ -1728,6 +1729,7 @@ sc_int_raises_t sc_type_countof(const sc_type_t *T) {
     case TK_SampledImage:
         return { true, nullptr, 1 };
     case TK_Array: return { true, nullptr, (int)cast<ArrayType>(T)->count() };
+    case TK_Matrix: return { true, nullptr, (int)cast<MatrixType>(T)->count() };
     case TK_Vector: return { true, nullptr, (int)cast<VectorType>(T)->count() };
     case TK_Tuple: return { true, nullptr, (int)cast<TupleType>(T)->values.size() };
     case TK_Function:  return { true, nullptr, (int)(cast<FunctionType>(T)->argument_types.size()) };
@@ -1756,6 +1758,7 @@ sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i) {
     switch(T->kind()) {
     case TK_Pointer: result = cast<PointerType>(T)->element_type; break;
     case TK_Array: result = cast<ArrayType>(T)->element_type; break;
+    case TK_Matrix: result = cast<MatrixType>(T)->element_type; break;
     case TK_Vector: result = cast<VectorType>(T)->element_type; break;
     case TK_Tuple: result = SCOPES_C_GET_RESULT(cast<TupleType>(T)->type_at_index(i)); break;
     case TK_Function: result = SCOPES_C_GET_RESULT(cast<FunctionType>(T)->type_at_index(i)); break;
@@ -2047,6 +2050,14 @@ sc_type_raises_t sc_array_type(const sc_type_t *element_type, size_t count) {
 sc_type_raises_t sc_vector_type(const sc_type_t *element_type, size_t count) {
     using namespace scopes;
     return convert_result(vector_type(element_type, count));
+}
+
+// Matrix Type
+////////////////////////////////////////////////////////////////////////////////
+
+sc_type_raises_t sc_matrix_type(const sc_type_t *element_type, size_t count) {
+    using namespace scopes;
+    return convert_result(matrix_type(element_type, count));
 }
 
 // Tuple Type
@@ -2515,6 +2526,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_array_type, TYPE_Type, TYPE_Type, TYPE_USize);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_vector_type, TYPE_Type, TYPE_Type, TYPE_USize);
+
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_matrix_type, TYPE_Type, TYPE_Type, TYPE_USize);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_tuple_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_packed_tuple_type, TYPE_Type, TYPE_I32, native_ro_pointer_type(TYPE_Type));

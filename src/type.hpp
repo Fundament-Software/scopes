@@ -41,6 +41,7 @@ struct TypedValue;
     T(TK_Pointer, "type-kind-pointer", PointerType) \
     T(TK_Array, "type-kind-array", ArrayType) \
     T(TK_Vector, "type-kind-vector", VectorType) \
+    T(TK_Matrix, "type-kind-matrix", MatrixType) \
     T(TK_Tuple, "type-kind-tuple", TupleType) \
     T(TK_Function, "type-kind-function", FunctionType) \
     /* additional GPU machine types */ \
@@ -157,6 +158,7 @@ typedef std::vector<const Type *> Types;
     T(TYPE_Pointer, "pointer") \
     T(TYPE_Array, "array") \
     T(TYPE_Vector, "vector") \
+    T(TYPE_Matrix, "matrix") \
     T(TYPE_Tuple, "tuple") \
     T(TYPE_Union, "union") \
     T(TYPE_Qualify, "Qualify") \

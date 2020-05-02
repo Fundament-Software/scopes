@@ -4908,9 +4908,7 @@ inline vector-binary-op-dispatch (symbol)
                 `(shufflevector self self mask)
     __unpack = `[(make-unpack-function extractelement)]
     __countof = __countof-aggregate
-    __@ =
-        inline (self index)
-            extractelement self index
+    __@ = extractelement
     # dynamic vector type constructor
     type =
         inline "vector.type" (element-type size)
@@ -4957,6 +4955,43 @@ let
 inline clamp (x mn mx)
     ? (> x mx) mx
         ? (< x mn) mn x
+
+#-------------------------------------------------------------------------------
+# matrices
+#-------------------------------------------------------------------------------
+
+'set-symbols matrix
+    __unpack = `[(make-unpack-function extractvalue)]
+    __countof = __countof-aggregate
+    __@ = extractvalue
+    # dynamic matrix type constructor
+    type =
+        inline "matrix.type" (element-type size)
+            sc_matrix_type element-type (size as usize)
+    # static matrix type constructor
+    __typecall =
+        spice-macro
+            fn "matrix.__typecall" (args)
+                let argc = ('argcount args)
+                verify-count argc 1 4
+                raising Error
+                let cls = (('getarg args 0) as type)
+                if (cls == matrix)
+                    verify-count argc 3 4
+                    let element-type = (('getarg args 1) as type)
+                    let columns = ((extract-integer ('getarg args 2)) as usize)
+                    let T =
+                        if (argc == 4)
+                            let rows = ((extract-integer ('getarg args 3)) as usize)
+                            sc_matrix_type
+                                sc_vector_type element-type rows
+                                columns
+                        else
+                            sc_matrix_type element-type columns
+                    `T
+                else
+                    verify-count argc 1 1
+                    `(nullof cls)
 
 #-------------------------------------------------------------------------------
 # various C related sugar

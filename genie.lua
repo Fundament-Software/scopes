@@ -148,6 +148,7 @@ project "scopesrt"
         "src/type/sized_storage_type.cpp",
         "src/type/array_type.cpp",
         "src/type/vector_type.cpp",
+        "src/type/matrix_type.cpp",
         "src/type/tuple_type.cpp",
         "src/type/qualify_type.cpp",
         "src/type/arguments_type.cpp",

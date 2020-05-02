@@ -196,8 +196,9 @@ SCOPES_RESULT(ConstRef) nullof(const Type *T) {
     case TK_Integer: return ConstRef(ConstInt::from(T, 0));
     case TK_Real: return ConstRef(ConstReal::from(T, 0.0));
     case TK_Pointer: return ConstRef(ConstPointer::from(T, nullptr));
-    case TK_Array: {
-        auto at = cast<ArrayType>(ST);
+    case TK_Array:
+    case TK_Matrix: {
+        auto at = cast<ArrayLikeType>(ST);
         ConstantPtrs fields;
         if (at->count()) {
             auto elem = SCOPES_GET_RESULT(nullof(at->element_type));
@@ -2489,6 +2490,7 @@ repeat:
                 if (SSrcT != SDestT) {
                     switch (SSrcT->kind()) {
                     case TK_Array:
+                    case TK_Matrix:
                     //case TK_Vector:
                     case TK_Tuple: {
                         SCOPES_ERROR(CastIncompatibleAggregateType, SSrcT);
@@ -2722,8 +2724,9 @@ repeat:
             READ_STORAGETYPEOF(idx);
             uint64_t iidx = -1ull;
             switch(T->kind()) {
-            case TK_Array: {
-                auto ai = cast<ArrayType>(T);
+            case TK_Array:
+            case TK_Matrix: {
+                auto ai = cast<ArrayLikeType>(T);
                 auto rq = try_qualifier<ReferQualifier>(typeof_T);
                 if (rq) {
                     SCOPES_CHECK_RESULT(verify_integer(idx));
@@ -2770,8 +2773,9 @@ repeat:
             }
             auto T = SCOPES_GET_RESULT(storage_type(AT));
             switch(T->kind()) {
-            case TK_Array: {
-                auto ai = cast<ArrayType>(T);
+            case TK_Array:
+            case TK_Matrix: {
+                auto ai = cast<ArrayLikeType>(T);
                 SCOPES_CHECK_RESULT(verify(SCOPES_GET_RESULT(storage_type(SCOPES_GET_RESULT(ai->type_at_index(idx)))), ET));
             } break;
             case TK_Tuple: {
@@ -2825,8 +2829,9 @@ repeat:
             while (argn < argcount) {
                 const Type *ST = SCOPES_GET_RESULT(storage_type(T));
                 switch(ST->kind()) {
-                case TK_Array: {
-                    auto ai = cast<ArrayType>(ST);
+                case TK_Array:
+                case TK_Matrix: {
+                    auto ai = cast<ArrayLikeType>(ST);
                     T = ai->element_type;
                     READ_STORAGETYPEOF(arg);
                     SCOPES_CHECK_RESULT(verify_integer(arg));

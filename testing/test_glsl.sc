@@ -11,6 +11,8 @@ run-stage;
 
 inout uv : vec2
     location = 0
+in transform : mat4x3
+    location = 1
 
 fn multiple-return-values ()
     if true
@@ -22,7 +24,7 @@ fn set-vertex-position ()
     local screen-tri-vertices = screen-tri-vertices
     let pos = (screen-tri-vertices @ gl_VertexID)
     multiple-return-values;
-    gl_Position = (vec4 pos.x pos.y 0 1)
+    gl_Position = (vec4 (transform * (vec4 pos.x pos.y 0 1)) 1)
     deref pos
 
 fn vertex-shader ()

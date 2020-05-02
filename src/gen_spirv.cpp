@@ -543,6 +543,18 @@ struct SPIRVGenerator {
                 SCOPES_GET_RESULT(size_of(ai->element_type)));
             return ty;
         } break;
+        case TK_Matrix: {
+            auto mi = cast<MatrixType>(type);
+
+            auto etype = SCOPES_GET_RESULT(type_to_spirv_type(mi->element_type));
+
+            spv::Id ty = builder.makeMatrixType(etype, mi->count());
+            builder.addDecoration(ty,
+                spv::DecorationMatrixStride,
+                SCOPES_GET_RESULT(size_of(mi->element_type)));
+            builder.addDecoration(ty, spv::DecorationColMajor);
+            return ty;
+        } break;
         case TK_Vector: {
             auto vi = cast<VectorType>(type);
 

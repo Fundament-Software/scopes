@@ -76,7 +76,7 @@ inline construct-mat-type (element-type cols rows)
     let prefix = (element-prefix element-type)
     let vecT =
         construct-vec-type element-type rows
-    let MT = (array vecT cols)
+    let MT = (matrix vecT cols)
     typedef (.. prefix "mat" (tostring cols) "x" (tostring rows))
         \ < mat-type : MT
         let

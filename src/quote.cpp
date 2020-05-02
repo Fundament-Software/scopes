@@ -517,8 +517,9 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
         }
         return result;
     } break;
-    case TK_Array: {
-        auto at = cast<ArrayType>(ST);
+    case TK_Array:
+    case TK_Matrix: {
+        auto at = cast<ArrayLikeType>(ST);
         auto argT = at->element_type;
         auto numvals = (int)at->count();
         //auto numelems = ConstInt::from(anchor, TYPE_I32, numvals);
@@ -634,8 +635,9 @@ ValueRef wrap_value(const Type *T, const ValueRef &value) {
                 { REF(ConstPointer::type_from(T)), numelems, buf })));
             return result;
         } break;
-        case TK_Array: {
-            auto at = cast<ArrayType>(ST);
+        case TK_Array:
+        case TK_Matrix: {
+            auto at = cast<ArrayLikeType>(ST);
             auto result = REF(Expression::unscoped_from());
             auto ET = at->element_type;
             auto numvals = (int)at->count();

@@ -210,6 +210,7 @@ repeat:
         return true;
     case TK_Array:
     case TK_Vector:
+    case TK_Matrix:
         T = cast<ArrayLikeType>(T)->element_type;
         goto repeat;
     case TK_Tuple:
@@ -266,6 +267,7 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
     case TK_Pointer: return PointerType::size();
     case TK_Array: return cast<ArrayType>(T)->size;
     case TK_Vector: return cast<VectorType>(T)->size;
+    case TK_Matrix: return cast<MatrixType>(T)->size;
     case TK_Tuple: return cast<TupleType>(T)->size;
     case TK_Typename: return size_of(SCOPES_GET_RESULT(storage_type(T)));
     default: break;
@@ -297,6 +299,7 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
     case TK_Pointer: return PointerType::size();
     case TK_Array: return cast<ArrayType>(T)->align;
     case TK_Vector: return cast<VectorType>(T)->align;
+    case TK_Matrix: return cast<MatrixType>(T)->align;
     case TK_Tuple: return cast<TupleType>(T)->align;
     case TK_Typename: return align_of(SCOPES_GET_RESULT(storage_type(T)));
     default: break;
@@ -314,6 +317,7 @@ const Type *superof(const Type *T) {
     case TK_Pointer: return TYPE_Pointer;
     case TK_Array: return TYPE_Array;
     case TK_Vector: return TYPE_Vector;
+    case TK_Matrix: return TYPE_Matrix;
     case TK_Tuple: return TYPE_Tuple;
     case TK_Typename: return cast<TypenameType>(T)->super();
     case TK_Function: return TYPE_Function;
@@ -429,6 +433,7 @@ void init_types() {
     DEFINE_OPAQUE_TYPENAME("integer", TYPE_Integer, TYPE_Immutable);
     DEFINE_OPAQUE_TYPENAME("real", TYPE_Real, TYPE_Immutable);
     DEFINE_OPAQUE_TYPENAME("vector", TYPE_Vector, TYPE_Immutable);
+    DEFINE_OPAQUE_TYPENAME("matrix", TYPE_Matrix, TYPE_Immutable);
     DEFINE_OPAQUE_TYPENAME("CEnum", TYPE_CEnum, TYPE_Immutable);
 
     DEFINE_OPAQUE_TYPENAME("array", TYPE_Array, TYPE_Aggregate);
