@@ -268,8 +268,9 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
         return classify_array_like(size_of(T).assert_ok(),
             storage_type(tt->element_type).assert_ok(), tt->count(), classes, offset);
     } break;
-    case TK_Array: {
-        auto tt = cast<ArrayType>(T);
+    case TK_Array:
+    case TK_Matrix: {
+        auto tt = cast<ArrayLikeType>(T);
         return classify_array_like(size_of(T).assert_ok(),
             storage_type(tt->element_type).assert_ok(), tt->count(), classes, offset);
     } break;
@@ -313,6 +314,7 @@ size_t abi_classify(const Type *T, ABIClass *classes) {
         return 0;
     switch(T->kind()) {
     case TK_Array:
+    case TK_Matrix:
     case TK_Tuple:
         if (sz <= 1)
             classes[0] = ABI_CLASS_INTEGERSI8;
