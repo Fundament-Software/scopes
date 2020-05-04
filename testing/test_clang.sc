@@ -6,7 +6,7 @@ let
 
 vvv bind C
 include
-    options "-DTESTVAL" TESTVAL
+    options "-DTESTVAL" TESTVAL #"-c" "clangtest.o"
     """"#ifndef TESTVAL
             #error "expected define"
         #endif
