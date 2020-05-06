@@ -7352,9 +7352,14 @@ typedef+ tuple
             let ET = (sc_type_element_at cls k)
             let ET = (sc_strip_qualifiers ET)
             let v =
-                if (('pointer? ET) and ('refer? ('qualified-typeof v)))
-                    `(imply (reftoptr v) ET)
-                else `(imply v ET)
+                # we used to convert references to pointer if the member was
+                    a pointer, but i can't remember why. it is surprising
+                    behavior, so i took it out.
+                    if (('pointer? ET) and ('refer? ('qualified-typeof v)))
+                        `(imply (reftoptr v) ET)
+                    else
+                        `(imply v ET)
+                `(imply v ET)
             store v (getelementptr fields k)
             i + 1
         let block = (sc_expression_new)
