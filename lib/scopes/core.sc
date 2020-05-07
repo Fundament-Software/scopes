@@ -2708,12 +2708,20 @@ fn pointer-as (vT T)
         if (icmp== ('kind ST) type-kind-pointer)
             if (icmp== ('pointer-storage-class vT) ('pointer-storage-class T))
                 return `(inline (self) (bitcast self T))
+    elseif (type== T intptr)
+        return `(inline (self) (ptrtoint self T))
+    `()
+
+fn pointer-ras (T vT)
+    if (type== T intptr)
+        return `(inline (self) (inttoptr self vT))
     `()
 
 'set-symbols pointer
     __call = coerce-call-arguments
     __imply = (box-pointer (spice-cast-macro pointer-imply))
     __as = (box-pointer (spice-cast-macro pointer-as))
+    __ras = (box-pointer (spice-cast-macro pointer-ras))
 
 # dotted symbol expander
 # --------------------------------------------------------------------------
