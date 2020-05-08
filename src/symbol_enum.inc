@@ -391,7 +391,7 @@ namespace scopes {
     T(FN_Frexp, "frexp") \
     T(FN_Ldexp, "ldexp") \
     T(FN_Length, "length") \
-    T(FN_Distance, "distance") \
+    /*T(FN_Distance, "distance")*/ \
     T(FN_Cross, "cross") \
     T(FN_Normalize, "normalize") \
 

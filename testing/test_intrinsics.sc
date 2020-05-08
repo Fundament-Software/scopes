@@ -33,6 +33,9 @@ test
     (length (normalize (vectorof f32 2.0 6.0 9.0))) == 1.0
 
 test
+    (distance (vectorof f32 10.0 10.0 10.0) (vectorof f32 8.0 4.0 1.0)) == 11.0
+
+test
     all?
         (cross (vectorof f32 0 0 1) (vectorof f32 0 1 0)) == (vectorof f32 -1 0 0)
 
