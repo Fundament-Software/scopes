@@ -19,6 +19,11 @@ do
 # default init
 test ((vec4) == (vec4 0 0 0 0))
 
+# constants
+test (constant? (vec4 1))
+test (constant? (vec4 1 2 3 4))
+test (constant? (vec4 (vec2 1 2) (vec2 3 4)))
+
 test ((vec4 1 2 3 4) == (vec4 1 2 3 4))
 test ((vec4 1 (vec2 2 3) 4) == (vec4 1 2 3 4))
 test ((vec4 (vec3 0) 1) == (vec4 0 0 0 1))

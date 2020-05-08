@@ -197,21 +197,28 @@ typedef vec-type-accessor
             let expandmask = ('@ lhsT 'ExpandMask)
             `(inline (lhs rhs) (asym-assign lhs rhs rhvecT assignmask expandmask))
 
+fn vector-init-size-error (vecsz flatargsz)
+    error
+        .. "number of arguments (" (repr flatargsz)
+            \ ") doesn't match number of elements (" (repr vecsz) ")"
+
 typedef+ vec-type
     spice vec-constructor2 (self ...)
         let self = (self as type)
         let ET argsz =
             'element@ self 0; 'argcount ...
         # count sum of elements
-        let flatargsz =
-            fold (total = 0) for arg in ('args ...)
+        let flatargsz const? =
+            fold (total const? = 0 false) for arg in ('args ...)
                 let argT = ('typeof arg)
-                + total
-                    if (argT < vec-type)
-                        'element-count argT
-                    else 1
+                _
+                    + total
+                        if (argT < vec-type)
+                            'element-count argT
+                        else 1
+                    const? & ('constant? arg)
         let vecsz = ('element-count self)
-        let initval = `(nullof self)
+        let initval = (sc_const_null_new self)
         if (flatargsz == 0)
             initval
         elseif (flatargsz == 1)
@@ -220,31 +227,35 @@ typedef+ vec-type
             let argT = ('typeof arg)
             let arg =
                 if (argT < vec-type)
-                    `(extractelement arg 0)
-                else `(arg as ET)
-            loop (i value = 0 initval)
-                if (i == vecsz)
-                    break value
-                repeat (i + 1)
-                    `(insertelement value arg i)
-        elseif (flatargsz == vecsz)
-            let total value =
-                fold (total value = 0 initval) for arg in ('args ...)
-                    let argT = ('typeof arg)
-                    if (argT < vec-type)
-                        let argET argvecsz =
-                            'element@ argT 0; 'element-count argT
-                        fold (total value = total value) for k in (range argvecsz)
-                            _ (total + 1)
-                                `(insertelement value ((extractelement arg k) as ET) total)
+                    if ('constant? arg)
+                        sc_const_extract_at arg 0
                     else
-                        _ (total + 1)
-                            `(insertelement value (arg as ET) total)
-            value
+                        `(extractelement arg 0)
+                else `(arg as ET)
+            let smear = vector.smear
+            `(bitcast (smear arg vecsz) self)
+        elseif (flatargsz == vecsz)
+            let values = (alloca-array Value vecsz)
+            fold (total = 0) for arg in ('args ...)
+                let argT = ('typeof arg)
+                if (argT < vec-type)
+                    let argET argvecsz =
+                        'element@ argT 0; 'element-count argT
+                    if ('constant? arg)
+                        fold (total = total) for k in (range argvecsz)
+                            values @ total = (sc_const_extract_at arg k)
+                            total + 1
+                    else
+                        fold (total = total) for k in (range argvecsz)
+                            values @ total = `(extractelement arg k)
+                            total + 1
+                else
+                    values @ total = arg
+                    total + 1
+            let args = (sc_argument_list_new vecsz values)
+            `(bitcast (vectorof ET args) self)
         else
-            error
-                .. "number of arguments (" (repr flatargsz)
-                    \ ") doesn't match number of elements (" (repr vecsz) ")"
+            vector-init-size-error vecsz flatargsz
 
     spice __typecall (self ...)
         let self = (self as type)
