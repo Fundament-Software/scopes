@@ -208,15 +208,13 @@ typedef+ vec-type
         let ET argsz =
             'element@ self 0; 'argcount ...
         # count sum of elements
-        let flatargsz const? =
-            fold (total const? = 0 false) for arg in ('args ...)
+        let flatargsz =
+            fold (total = 0) for arg in ('args ...)
                 let argT = ('typeof arg)
-                _
-                    + total
-                        if (argT < vec-type)
-                            'element-count argT
-                        else 1
-                    const? & ('constant? arg)
+                + total
+                    if (argT < vec-type)
+                        'element-count argT
+                    else 1
         let vecsz = ('element-count self)
         let initval = (sc_const_null_new self)
         if (flatargsz == 0)
@@ -227,10 +225,7 @@ typedef+ vec-type
             let argT = ('typeof arg)
             let arg =
                 if (argT < vec-type)
-                    if ('constant? arg)
-                        sc_const_extract_at arg 0
-                    else
-                        `(extractelement arg 0)
+                    `(extractelement arg 0)
                 else `(arg as ET)
             let smear = vector.smear
             `(bitcast (smear arg vecsz) self)
@@ -241,14 +236,9 @@ typedef+ vec-type
                 if (argT < vec-type)
                     let argET argvecsz =
                         'element@ argT 0; 'element-count argT
-                    if ('constant? arg)
-                        fold (total = total) for k in (range argvecsz)
-                            values @ total = (sc_const_extract_at arg k)
-                            total + 1
-                    else
-                        fold (total = total) for k in (range argvecsz)
-                            values @ total = `(extractelement arg k)
-                            total + 1
+                    fold (total = total) for k in (range argvecsz)
+                        values @ total = `(extractelement arg k)
+                        total + 1
                 else
                     values @ total = arg
                     total + 1

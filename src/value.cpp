@@ -1395,8 +1395,13 @@ ExtractValue::ExtractValue(const TypedValueRef &_value, uint32_t _index)
         value_type_at_index(_value->get_type(), _index)),
     value(_value), index(_index) {}
 
-ExtractValueRef ExtractValue::from(const TypedValueRef &value, uint32_t index) {
-    return ref(unknown_anchor(), new ExtractValue(value, index));
+TypedValueRef ExtractValue::from(const TypedValueRef &value, uint32_t index) {
+    if (value.isa<ConstAggregate>()
+        && is_plain(value->get_type())) {
+        return get_field(value.cast<ConstAggregate>(), index);
+    } else {
+        return ref(unknown_anchor(), new ExtractValue(value, index));
+    }
 }
 
 //------------------------------------------------------------------------------
@@ -1405,22 +1410,43 @@ InsertValue::InsertValue(const TypedValueRef &_value, const TypedValueRef &_elem
     : Instruction(VK_InsertValue, _value->get_type()),
         value(_value), element(_element), index(_index) {}
 
-InsertValueRef InsertValue::from(const TypedValueRef &value, const TypedValueRef &element, uint32_t index) {
-    return ref(unknown_anchor(), new InsertValue(value, element, index));
+TypedValueRef InsertValue::from(const TypedValueRef &value, const TypedValueRef &element, uint32_t index) {
+    if (value.isa<ConstAggregate>()
+        && element.isa<Const>()
+        && is_plain(value->get_type())
+        && is_plain(element->get_type())) {
+        return set_field(value.cast<ConstAggregate>(), element.cast<Const>(), index);
+    } else {
+        return ref(unknown_anchor(), new InsertValue(value, element, index));
+    }
 }
 
 //------------------------------------------------------------------------------
 
 ExtractElement::ExtractElement(const TypedValueRef &_value, const TypedValueRef &_index)
     : Instruction(VK_ExtractElement, value_type_at_index(_value->get_type(), 0)), value(_value), index(_index) {}
-ExtractElementRef ExtractElement::from(const TypedValueRef &value, const TypedValueRef &index) {
-    return ref(unknown_anchor(), new ExtractElement(value, index));
+TypedValueRef ExtractElement::from(const TypedValueRef &value, const TypedValueRef &index) {
+    if (value.isa<ConstAggregate>()
+        && index.isa<ConstInt>()
+        && is_plain(value->get_type())) {
+        return get_field(value.cast<ConstAggregate>(), index.cast<ConstInt>()->msw());
+    } else {
+        return ref(unknown_anchor(), new ExtractElement(value, index));
+    }
 }
 
 InsertElement::InsertElement(const TypedValueRef &_value, const TypedValueRef &_element, const TypedValueRef &_index)
     : Instruction(VK_InsertElement, _value->get_type()), value(_value), element(_element), index(_index) {}
-InsertElementRef InsertElement::from(const TypedValueRef &value, const TypedValueRef &element, const TypedValueRef &index) {
-    return ref(unknown_anchor(), new InsertElement(value, element, index));
+TypedValueRef InsertElement::from(const TypedValueRef &value, const TypedValueRef &element, const TypedValueRef &index) {
+    if (value.isa<ConstAggregate>()
+        && element.isa<Const>()
+        && index.isa<ConstInt>()
+        && is_plain(value->get_type())
+        && is_plain(element->get_type())) {
+        return set_field(value.cast<ConstAggregate>(), element.cast<Const>(), index.cast<ConstInt>()->msw());
+    } else {
+        return ref(unknown_anchor(), new InsertElement(value, element, index));
+    }
 }
 
 ShuffleVector::ShuffleVector(const TypedValueRef &_v1, const TypedValueRef &_v2, const std::vector<uint32_t> &_mask)
@@ -1797,8 +1823,16 @@ ConstAggregateRef ConstAggregate::ast_from(const ValueRef &node) {
     return from(TYPE_ValueRef, { ptr, ConstPointer::anchor_from(node.anchor()).unref() });
 }
 
-ConstRef get_field(const ConstAggregateRef &value, int i) {
-    return ref(value.anchor(), value->values[i]);
+ConstRef get_field(const ConstAggregateRef &value, uint32_t i) {
+    auto VT = value_type_at_index(value->get_type(), i);
+    return PureCast::from(VT, ref(value.anchor(), value->values[i])).cast<Const>();
+}
+
+ConstRef set_field(const ConstAggregateRef &value, const ConstRef &element, uint32_t i) {
+    ConstantPtrs values = value->values;
+    assert (i < values.size());
+    values[i] = element.unref();
+    return ConstAggregate::from(value->get_type(), values);
 }
 
 //------------------------------------------------------------------------------
@@ -2049,7 +2083,10 @@ TypedValue::TypedValue(ValueKind _kind, const Type *type)
 
 void TypedValue::hack_change_value(const Type *T) {
     assert(T);
-    _type = T;
+    if (_type != T) {
+        assert(!Const::classof(this)); // must not retype constants
+        _type = T;
+    }
 }
 
 const Type *TypedValue::get_type() const {

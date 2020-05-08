@@ -75,6 +75,16 @@ test ((mat4 1) != (mat4 0))
 
 test ((mat4 1) == (mat4))
 
+test (constant? (mat4))
+test (constant? (mat4 1))
+test
+    constant?
+        mat4
+            \ 10 0 0 0
+            \ 0 10 0 0
+            \ 0 0 1 0
+            vec2 0; vec2 1
+
 test
     ==
         mat4

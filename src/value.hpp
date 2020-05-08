@@ -904,7 +904,7 @@ struct ExtractValue : Instruction {
     static bool classof(const Value *T);
 
     ExtractValue(const TypedValueRef &value, uint32_t index);
-    static ExtractValueRef from(const TypedValueRef &value, uint32_t index);
+    static TypedValueRef from(const TypedValueRef &value, uint32_t index);
     TypedValueRef value;
     uint32_t index;
 };
@@ -913,7 +913,7 @@ struct InsertValue : Instruction {
     static bool classof(const Value *T);
 
     InsertValue(const TypedValueRef &value, const TypedValueRef &element, uint32_t index);
-    static InsertValueRef from(const TypedValueRef &value, const TypedValueRef &element, uint32_t index);
+    static TypedValueRef from(const TypedValueRef &value, const TypedValueRef &element, uint32_t index);
     TypedValueRef value;
     TypedValueRef element;
     uint32_t index;
@@ -925,7 +925,7 @@ struct ExtractElement : Instruction {
     static bool classof(const Value *T);
 
     ExtractElement(const TypedValueRef &value, const TypedValueRef &index);
-    static ExtractElementRef from(const TypedValueRef &value, const TypedValueRef &index);
+    static TypedValueRef from(const TypedValueRef &value, const TypedValueRef &index);
     TypedValueRef value;
     TypedValueRef index;
 };
@@ -934,7 +934,7 @@ struct InsertElement : Instruction {
     static bool classof(const Value *T);
 
     InsertElement(const TypedValueRef &value, const TypedValueRef &element, const TypedValueRef &index);
-    static InsertElementRef from(const TypedValueRef &value, const TypedValueRef &element, const TypedValueRef &index);
+    static TypedValueRef from(const TypedValueRef &value, const TypedValueRef &element, const TypedValueRef &index);
     TypedValueRef value;
     TypedValueRef element;
     TypedValueRef index;
@@ -1255,7 +1255,8 @@ struct ConstAggregate : Const {
     std::size_t _hash;
 };
 
-ConstRef get_field(const ConstAggregateRef &value, int i);
+ConstRef get_field(const ConstAggregateRef &value, uint32_t i);
+ConstRef set_field(const ConstAggregateRef &value, const ConstRef &element, uint32_t i);
 
 //------------------------------------------------------------------------------
 
