@@ -2723,62 +2723,6 @@ fn pointer-ras (T vT)
     __as = (box-pointer (spice-cast-macro pointer-as))
     __ras = (box-pointer (spice-cast-macro pointer-ras))
 
-# dotted symbol expander
-# --------------------------------------------------------------------------
-
-let dot-char = 46:i8 # "."
-let dot-sym = '.
-
-fn dotted-symbol? (env head)
-    if (== head dot-sym)
-        return false
-    let s = (as head string)
-    let sz = (countof s)
-    loop (i = 0:usize)
-        if (== i sz)
-            return false
-        elseif (== (@ s i) dot-char)
-            return true
-        + i 1:usize
-
-fn split-dotted-symbol (name)
-    let anchor = ('anchor name)
-    let s = (as (as name Symbol) string)
-    let sz = (countof s)
-    loop (i = sz)
-        if (== i 0:usize)
-            # did not find a dot - return as-is
-            return name
-        let _i = i
-        let i = (- i 1:usize)
-        if (== (@ s i) dot-char)
-            # skip trailing dot
-            if (== _i sz)
-                repeat i
-            # if a dot followed this dot, skip it
-            if (== (@ s _i) dot-char)
-                repeat i
-            # ignore prefix dot - return as-is
-            if (== i 0:usize)
-                return name
-            let k = (- i 1:usize)
-            # if a dot precedes this dot, skip it
-            if (== (@ s k) dot-char)
-                repeat i
-            # we found a good solo dot inbetween two characters
-            let ltoken = (Symbol (lslice s i))
-            let rtoken = (Symbol (rslice s _i))
-            let manchor = (sc_anchor_offset anchor (as i i32))
-            let ranchor = (sc_anchor_offset anchor (as _i i32))
-            # build expression
-            let expr =
-                list
-                    'tag `dot-sym manchor
-                    'tag `ltoken anchor
-                    'tag `rtoken ranchor
-            return ('tag `expr manchor)
-        i
-
 # infix notation support
 # --------------------------------------------------------------------------
 
@@ -2895,6 +2839,70 @@ fn parse-infix-expr (infix-table lhs state mprec)
 let parse-infix-expr =
     static-typify parse-infix-expr Scope Value list i32
 
+# dotted symbol expander
+# --------------------------------------------------------------------------
+
+let dot-char = 46:i8 # "."
+let dot-sym = '.
+
+fn dotted-symbol? (env head)
+    if (== head dot-sym)
+        return false
+    let s = (as head string)
+    let sz = (countof s)
+    loop (i = 0:usize)
+        if (== i sz)
+            return false
+        elseif (== (@ s i) dot-char)
+            return true
+        + i 1:usize
+
+fn split-dotted-symbol (env name)
+    let anchor = ('anchor name)
+    let s = (as (as name Symbol) string)
+    let sz = (countof s)
+    loop (i = sz)
+        if (== i 0:usize)
+            # did not find a dot - return as-is
+            return name
+        let _i = i
+        let i = (- i 1:usize)
+        if (== (@ s i) dot-char)
+            # skip trailing dot
+            if (== _i sz)
+                repeat i
+            # if a dot followed this dot, skip it
+            if (== (@ s _i) dot-char)
+                repeat i
+            # ignore prefix dot - return as-is
+            if (== i 0:usize)
+                return name
+            let k = (- i 1:usize)
+            # if a dot precedes this dot, skip it
+            if (== (@ s k) dot-char)
+                repeat i
+            # we found a good solo dot inbetween two characters
+            let ltoken = (Symbol (lslice s i))
+            let rtoken = (Symbol (rslice s _i))
+            let infix? =
+                try
+                    get-ifx-op env ltoken
+                    true
+                else false
+            let manchor = (sc_anchor_offset anchor (as i i32))
+            let ranchor = (sc_anchor_offset anchor (as _i i32))
+            # build expression
+            let ltoken = ('tag `ltoken anchor)
+            let expr =
+                list
+                    'tag `dot-sym manchor
+                    if infix?
+                        'tag `[(list _ ltoken)] anchor
+                    else ltoken
+                    'tag `rtoken ranchor
+            return ('tag `expr manchor)
+        i
+
 #---------------------------------------------------------------------------
 
 # install general list hook for this scope
@@ -2970,7 +2978,7 @@ fn symbol-handler (topexpr env)
             ;
     if (dotted-symbol? env name)
         let expr =
-            split-dotted-symbol sxname
+            split-dotted-symbol env sxname
         return (cons expr next) env
     label skip
         let handler =

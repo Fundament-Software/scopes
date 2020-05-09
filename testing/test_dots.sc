@@ -78,3 +78,9 @@ test
     ==
         split-test '...a...b...c...
         '(...a...b...c...)
+
+do
+    let * = (tupleof (x = 1) (y = 2))
+    # ensure dot notation does not accidentally turn into infix notation
+    test (*.x == 1)
+
