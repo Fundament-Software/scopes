@@ -2088,7 +2088,7 @@ fn powi (base exponent)
     __> = (box-pointer (simple-folding-autotype-signed-binary-op icmp>s icmp>u sc_const_int_extract))
     __>= = (box-pointer (simple-folding-autotype-signed-binary-op icmp>=s icmp>=u sc_const_int_extract))
 
-inline floordiv (a b)
+inline intdiv (a b)
     sdiv (fptosi a i32) (fptosi b i32)
 
 'set-symbols real
@@ -2104,7 +2104,7 @@ inline floordiv (a b)
     __- = (box-pointer (simple-folding-binary-op fsub sc_const_real_extract sc_const_real_new))
     __* = (box-pointer (simple-folding-binary-op fmul sc_const_real_extract sc_const_real_new))
     __/ = (box-pointer (simple-folding-binary-op fdiv sc_const_real_extract sc_const_real_new))
-    __// = (box-pointer (simple-folding-autotype-binary-op floordiv sc_const_real_extract))
+    __// = (box-pointer (simple-folding-autotype-binary-op intdiv sc_const_real_extract))
     __% = (box-pointer (simple-folding-binary-op frem sc_const_real_extract sc_const_real_new))
     __** = (box-pointer (simple-folding-binary-op powf sc_const_real_extract sc_const_real_new))
 
@@ -3486,6 +3486,7 @@ define-infix> 450 >>
 define-infix> 500 -
 define-infix> 500 +
 define-infix> 600 %
+define-infix> 600 mod
 define-infix> 600 /
 define-infix> 600 //
 define-infix> 600 *
@@ -7715,6 +7716,22 @@ fn hex (value)
 
 inline distance (a b)
     length (a - b)
+
+inline... floor
+case (x : integer,) x
+case (x : real,) (floor x)
+
+# computes the remainder of euclidean division
+fn mod (a b)
+    let abs_b = (abs b)
+    let rem = ((abs a) % abs_b)
+    ? (a < 0)
+        abs_b - rem
+        rem
+
+inline... mod
+case (a : integer, b : integer) (mod a b)
+case (a : real, b : real) (mod a b)
 
 #-------------------------------------------------------------------------------
 # constants
