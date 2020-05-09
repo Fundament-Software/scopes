@@ -7721,17 +7721,19 @@ inline... floor
 case (x : integer,) x
 case (x : real,) (floor x)
 
-# computes the remainder of euclidean division
+# computes the remainder of floor division
 fn mod (a b)
     let abs_b = (abs b)
     let rem = ((abs a) % abs_b)
-    ? (a < 0)
-        abs_b - rem
-        rem
+    +
+        ? (a < 0)
+            abs_b - rem
+            rem
+        ? (b < 0) b (0 as (typeof b))
 
 inline... mod
-case (a : integer, b : integer) (mod a b)
-case (a : real, b : real) (mod a b)
+case (a : integer, b : integer) (mod (deref a) (deref b))
+case (a : real, b : real) (mod (deref a) (deref b))
 
 #-------------------------------------------------------------------------------
 # constants
