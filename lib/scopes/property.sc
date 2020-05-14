@@ -23,7 +23,7 @@ inline property (getter setter)
                 unqualified (returnof (typeof F))
 
             inline get (self)
-                getter (bitcast self T)
+                getter (bitcast (view self) T)
 
             inline __imply (cls destT)
                 static-if (destT == immutable) get
@@ -51,7 +51,7 @@ inline property (getter setter)
 
             inline __= (cls destT)
                 inline (self value)
-                    setter (bitcast self T) value
+                    setter (bitcast (view self) T) value
 
     Accessor
         inline "generate-property" (value key)
