@@ -3727,7 +3727,7 @@ let hash-storage =
                             break computed
                         let chunk =
                             `(sc_hash (itrunc (value >> (64 * chunk-index)) u64) [('sizeof T)])
-                        _ (chunk-index + 1) computed `(sc_hash2x64 computed chunk)
+                        _ (chunk-index + 1) `(sc_hash2x64 computed chunk)
 
                 `(bitcast hash-chain hash)
 
