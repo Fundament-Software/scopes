@@ -3741,7 +3741,7 @@ let hash-storage =
                 `(bitcast (sc_hash conv_u64 [('sizeof T)]) hash)
             else
                 let chunk-count = ((bits + (64 - 1)) // 64)
-                let first-chunk = `(sc_hash (itrunc (value >> 64) u64) [('sizeof T)])
+                let first-chunk = `(sc_hash (itrunc value u64) [('sizeof T)])
                 let hash-chain =
                     loop (chunk-index computed = 1 first-chunk)
                         if (chunk-index == chunk-count)
