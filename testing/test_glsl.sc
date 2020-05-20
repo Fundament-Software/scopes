@@ -111,4 +111,23 @@ print
 
         (compile-glsl 330 'vertex (typify main))
 
+do
+    using import struct
+    using import glm
+    using import glsl
+
+    struct Uniforms plain
+        mvp : mat4
+
+    fn vert ()
+        uniform u : Uniforms
+            binding = 0
+        gl_Position = (u.mvp * (vec4))
+        ;
+
+    print
+        compile-glsl 440 'vertex (static-typify vert)
+            #'dump-disassembly
+        #compile-spirv 'vertex (static-typify vert)
+            'dump-disassembly
 ;

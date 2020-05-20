@@ -468,7 +468,9 @@ struct SPIRVGenerator {
         } */
         for (size_t i = 0; i < count; ++i) {
             Symbol key = SYM_Unnamed;
-            auto kq = try_qualifier<KeyQualifier>(ti->values[i]);
+            auto T = ti->values[i];
+            auto kq = try_qualifier<KeyQualifier>(T);
+            auto ST = storage_type(strip_qualifiers(T)).assert_ok();
             if (kq) {
                 key = kq->key;
             }
@@ -492,6 +494,16 @@ struct SPIRVGenerator {
                 builder.addMemberDecoration(id, i, spv::DecorationFlat);
             } */
             builder.addMemberDecoration(id, i, spv::DecorationOffset, ti->offsets[i]);
+            switch (ST->kind()) {
+            case TK_Matrix: {
+                auto mi = cast<MatrixType>(ST);
+                builder.addMemberDecoration(id, i,
+                    spv::DecorationMatrixStride,
+                    SCOPES_GET_RESULT(size_of(mi->element_type)));
+                builder.addMemberDecoration(id, i, spv::DecorationColMajor);
+            } break;
+            default: break;
+            }
         }
         return id;
     }
@@ -549,10 +561,6 @@ struct SPIRVGenerator {
             auto etype = SCOPES_GET_RESULT(type_to_spirv_type(mi->element_type));
 
             spv::Id ty = builder.makeMatrixType(etype, mi->count());
-            builder.addDecoration(ty,
-                spv::DecorationMatrixStride,
-                SCOPES_GET_RESULT(size_of(mi->element_type)));
-            builder.addDecoration(ty, spv::DecorationColMajor);
             return ty;
         } break;
         case TK_Vector: {
