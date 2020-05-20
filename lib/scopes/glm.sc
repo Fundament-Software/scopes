@@ -139,9 +139,6 @@ let mat4 dmat4 imat4 umat4 bmat4 = mat4x4 dmat4x4 imat4x4 umat4x4 bmat4x4
 # VECTORS
 #-------------------------------------------------------------------------------
 
-let MASK_ZERO = 4
-let MASK_ONE = 5
-
 typedef vec-type-accessor
     do
         inline binary-op-dispatch (lop rop op)
@@ -378,7 +375,7 @@ typedef+ vec-type
         vec-type-binary-op-dispatch '__>= '__r>= '__vector>=
         vec-type-binary-op-dispatch '__<= '__r<= '__vector<=
 
-    fn build-access-mask (name)
+    fn build-access-mask (name width)
         let element-set-xyzw = "^[xyzw01]{1,4}$"
         let element-set-rgba = "^[rgba01]{1,4}$"
         let element-set-stpq = "^[stpq01]{1,4}$"
@@ -389,28 +386,33 @@ typedef+ vec-type
         if (sz > 4)
             error "too many characters in accessor (try 1 <= x <= 4)"
         let set =
-            if ('match? element-set-xyzw s) "xyzw01"
-            elseif ('match? element-set-rgba s) "rgba01"
-            elseif ('match? element-set-stpq s) "stpq01"
+            if ('match? element-set-xyzw s) "xyzw"
+            elseif ('match? element-set-rgba s) "rgba"
+            elseif ('match? element-set-stpq s) "stpq"
             else
                 error "try one of xyzw | rgba | stpq"
-        inline literal? (x) (x > 3)
-        fn find-index (set c)
-            loop (k = 0)
-                let sc = (set @ (k as usize))
-                if (c == sc)
-                    break k
-                k + 1
+        fn find-index (set width c)
+            switch c
+            pass 48:i8 # 0
+            pass 49:i8 # 1
+            do
+                _ (width + c as i32 - 48) true
+            default
+                loop (k = 0)
+                    let sc = (set @ (k as usize))
+                    if (c == sc)
+                        break k false
+                    k + 1
         if (sz == 1)
-            let k = (find-index set (s @ 0))
-            return sz `k (literal? k)
+            let k literal? = (find-index set width (s @ 0))
+            return sz `k literal?
         # 2 - 4 arguments
         let entries = (alloca-array Value sz)
         local literals? = false
         for i in (range sz)
             let ui = (i as usize)
-            let k = (find-index set (s @ ui))
-            literals? |= (literal? k)
+            let k literal? = (find-index set width (s @ ui))
+            literals? |= literal?
             entries @ ui = `k
         let VT = (vector.type i32 sz)
         return sz (sc_const_aggregate_new VT sz entries) literals?
@@ -465,18 +467,21 @@ typedef+ vec-type
 
     spice __getattr (self name)
         let name = (name as Symbol as string)
-        let sz mask literals? = (build-access-mask name)
         let QT = ('qualified-typeof self)
         let T = ('typeof self)
+        let ETsz = ('element-count T)
+        let sz mask literals? = (build-access-mask name ETsz)
         if (sz == 1)
             if literals?
                 let mask = (mask as i32)
-                switch mask
-                case MASK_ZERO
+                let mask_zero = ETsz
+                let mask_one = (ETsz + 1)
+                if (mask == mask_zero)
                     '@ ('typeof self) 'Zero
-                case MASK_ONE
+                elseif (mask == mask_one)
                     '@ ('typeof self) 'One
-                default
+                else
+                    print mask mask_zero mask_one
                     error "illegal literal mask"
             else
                 `(extractelement self mask)

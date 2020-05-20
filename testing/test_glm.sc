@@ -16,6 +16,18 @@ do
     v.y = 2
     test (v == (vec2 4 2))
 
+# more constant swizzle tests
+do
+    let v = (vec3 9)
+    test (v.0 == 0.0)
+    test (v.1 == 1.0)
+    print vec3.LiteralShuffleMask
+    test (v.00 == (vec2 0 0))
+    test (v.01 == (vec2 0 1))
+    let v = (vec2 9)
+    test (v.00 == (vec2 0 0))
+    test (v.01 == (vec2 0 1))
+
 # default init
 test ((vec4) == (vec4 0 0 0 0))
 
@@ -46,7 +58,7 @@ test (v.st == (vec2 0 1))
 test (v @ 2 == 2.0)
 test (v.0 == 0.0)
 test (v.1 == 1.0)
-test ((ivec3 4 5 6) . 0y1z == (ivec4 1 5 0 6))
+test ((ivec3 4 5 6) . 0y1z == (ivec4 0 5 1 6))
 
 test ((ivec3 (vec3 5)) == (ivec3 5))
 
