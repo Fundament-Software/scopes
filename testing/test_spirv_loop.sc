@@ -6,6 +6,9 @@ fn function-with-exception ()
     10
 
 fn main ()
+    #if true 1
+    #elseif true 2
+    #else 3
     try
         let count = (function-with-exception)
         for i j in (zip (range count) (range 16))

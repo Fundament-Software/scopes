@@ -349,8 +349,9 @@ struct SPIRVGenerator {
 
     struct LabelInfo {
         LabelRef label;
-        spv::Block *bb_merge;
+        spv::Block *bb_merge = nullptr;
         Ids merge_values;
+        bool used = false; // used as a merge block already
 
         LabelInfo() :
             bb_merge(nullptr)
@@ -1837,10 +1838,8 @@ struct SPIRVGenerator {
         position_builder_at_end(bb);
         int count = (int)node->cases.size();
         assert(count);
-        spv::Block *merge_block = find_merge_block(node);
-        if (merge_block) {
-            builder.createSelectionMerge(merge_block, 0);
-        }
+        spv::Block *merge_block = ensure_merge_block(node);
+        builder.createSelectionMerge(merge_block, 0);
         auto _sw = new spv::Instruction(
             spv::NoResult, spv::NoType, spv::OpSwitch);
         bb->addInstruction(std::unique_ptr<spv::Instruction>(_sw));
@@ -1890,11 +1889,25 @@ struct SPIRVGenerator {
 
     spv::Block *find_merge_block(const TypedValueRef &node) {
         for (auto it = label_info_stack.rbegin(); it != label_info_stack.rend(); ++it) {
-            if (it->label->splitpoints.count(node.unref()) && it->bb_merge) {
+            if (it->label->splitpoints.count(node.unref())
+                && it->bb_merge) {
                 return it->bb_merge;
             }
         }
         return nullptr;
+    }
+
+    spv::Block *ensure_merge_block(const TypedValueRef &node) {
+        spv::Block *merge_block = find_merge_block(node);
+        if (!merge_block) {
+            auto old_bb = builder.getBuildPoint();
+            // make unreachable block, which is legal according to specs
+            merge_block = &builder.makeNewBlock();
+            position_builder_at_end(merge_block);
+            builder.makeUnreachable();
+            position_builder_at_end(old_bb);
+        }
+        return merge_block;
     }
 
     SCOPES_RESULT(void) translate_CondBr(const CondBrRef &node) {
@@ -1905,10 +1918,8 @@ struct SPIRVGenerator {
         auto bbthen = &builder.makeNewBlock();
         auto bbelse = &builder.makeNewBlock();
 
-        spv::Block *merge_block = find_merge_block(node);
-        if (merge_block) {
-            builder.createSelectionMerge(merge_block, 0);
-        }
+        spv::Block *merge_block = ensure_merge_block(node);
+        builder.createSelectionMerge(merge_block, 0);
         builder.createConditionalBranch(cond, bbthen, bbelse);
 
         // write then-block
@@ -2211,6 +2222,8 @@ struct SPIRVGenerator {
                     ok = builder.createCompositeExtract(ret,
                         builder.getContainedTypeId(builder.getTypeId(ret), 0), 0);
                 }
+                spv::Block *merge_block = ensure_merge_block(call);
+                builder.createSelectionMerge(merge_block, 0);
                 builder.createConditionalBranch(ok, bb, bb_except);
                 position_builder_at_end(bb);
                 if (has_return_value) {
