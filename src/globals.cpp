@@ -1448,17 +1448,9 @@ sc_valueref_t sc_global_string_new_from_cstr(const char *ptr) {
     return GlobalString::from(ptr, strlen(ptr));
 }
 
-sc_valueref_t sc_if_new() {
+sc_valueref_t sc_cond_new(sc_valueref_t cond, sc_valueref_t then_value, sc_valueref_t else_value) {
     using namespace scopes;
-    return If::from();
-}
-void sc_if_append_then_clause(sc_valueref_t value, sc_valueref_t cond, sc_valueref_t body) {
-    using namespace scopes;
-    value.cast<If>()->append_then(cond, body);
-}
-void sc_if_append_else_clause(sc_valueref_t value, sc_valueref_t body) {
-    using namespace scopes;
-    value.cast<If>()->append_else(body);
+    return CondTemplate::from(cond, then_value, else_value);
 }
 
 sc_valueref_t sc_switch_new(sc_valueref_t expr) {
@@ -2375,9 +2367,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_storage_class, TYPE_Symbol, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_global_string_new, TYPE_ValueRef, native_ro_pointer_type(TYPE_I8), TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_global_string_new_from_cstr, TYPE_ValueRef, native_ro_pointer_type(TYPE_I8));
-    DEFINE_EXTERN_C_FUNCTION(sc_if_new, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_if_append_then_clause, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_if_append_else_clause, _void, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_cond_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_new, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_case, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_pass, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);

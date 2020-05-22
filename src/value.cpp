@@ -948,32 +948,15 @@ CondBrRef CondBr::from(const TypedValueRef &cond) {
 
 //------------------------------------------------------------------------------
 
-bool If::Clause::is_then() const {
-    return cond.unref() != nullptr;
+CondTemplate::CondTemplate(
+    const ValueRef &_cond, const ValueRef &_then_value, const ValueRef &_else_value)
+    : UntypedValue(VK_CondTemplate),
+    cond(_cond), then_value(_then_value), else_value(_else_value) {
 }
 
-If::If(const Clauses &_clauses)
-    : UntypedValue(VK_If), clauses(_clauses) {
-}
-
-IfRef If::from(const Clauses &_clauses) {
-    return ref(unknown_anchor(), new If(_clauses));
-}
-
-void If::append_then(const ValueRef &cond, const ValueRef &value) {
-    assert(cond);
-    assert(value);
-    Clause clause;
-    clause.cond = cond;
-    clause.value = value;
-    clauses.push_back(clause);
-}
-
-void If::append_else(const ValueRef &value) {
-    assert(value);
-    Clause clause;
-    clause.value = value;
-    clauses.push_back(clause);
+CondTemplateRef CondTemplate::from(
+    const ValueRef &cond, const ValueRef &then_value, const ValueRef &else_value) {
+    return ref(unknown_anchor(), new CondTemplate(cond, then_value, else_value));
 }
 
 //------------------------------------------------------------------------------

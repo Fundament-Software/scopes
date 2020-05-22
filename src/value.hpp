@@ -330,28 +330,16 @@ struct CondBr : Instruction {
 
 //------------------------------------------------------------------------------
 
-struct If : UntypedValue {
-    struct Clause {
-        ValueRef cond;
-        ValueRef value;
-
-        Clause() {}
-
-        bool is_then() const;
-    };
-
-    typedef std::vector<Clause> Clauses;
-
+struct CondTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    If(const Clauses &clauses);
+    CondTemplate(const ValueRef &cond, const ValueRef &then_value, const ValueRef &else_value);
 
-    static IfRef from(const Clauses &clauses = {});
+    static CondTemplateRef from(const ValueRef &cond, const ValueRef &then_value, const ValueRef &else_value);
 
-    void append_then(const ValueRef &cond, const ValueRef &value);
-    void append_else(const ValueRef &value);
-
-    Clauses clauses;
+    ValueRef cond;
+    ValueRef then_value;
+    ValueRef else_value;
 };
 
 //------------------------------------------------------------------------------

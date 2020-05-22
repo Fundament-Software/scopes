@@ -19,7 +19,7 @@ namespace scopes {
     T(VK_Quote, "value-kind-quote", Quote) \
     T(VK_Unquote, "value-kind-unquote", Unquote) \
     T(VK_CompileStage, "value-kind-compile-stage", CompileStage) \
-    T(VK_If, "value-kind-if", If) \
+    T(VK_CondTemplate, "value-kind-cond-template", CondTemplate) \
     T(VK_SwitchTemplate, "value-kind-switch-template", SwitchTemplate) \
     T(VK_MergeTemplate, "value-kind-merge-template", MergeTemplate) \
     T(VK_CallTemplate, "value-kind-call-template", CallTemplate) \

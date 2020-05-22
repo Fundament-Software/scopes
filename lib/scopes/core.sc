@@ -2008,14 +2008,11 @@ fn dispatch-and-or (args flip)
         return call-elsef
     else
         return thenargs
-    let ifval = (sc_if_new)
-    if flip
-        sc_if_append_then_clause ifval condbool call-elsef
-        sc_if_append_else_clause ifval thenargs
-    else
-        sc_if_append_then_clause ifval condbool thenargs
-        sc_if_append_else_clause ifval call-elsef
-    ifval
+    sc_cond_new condbool
+        if flip
+            _ call-elsef thenargs
+        else
+            _ thenargs call-elsef
 
 let safe-shl =
     spice-macro
@@ -4610,13 +4607,14 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                 fn (args)
                     let self = ('getarg args 0)
                     let other = ('getarg args 1)
-                    let block = (sc_if_new)
-                    for i in (range ('element-count ('typeof self)))
-                        sc_if_append_then_clause block
-                            `((self @ i) != (other @ i))
-                            `false
-                    sc_if_append_else_clause block `true
-                    block
+                    loop (i result = ('element-count ('typeof self)) `true)
+                        if (i == 0)
+                            break result
+                        let i = (i - 1)
+                        _   i
+                            sc_cond_new `((self @ i) != (other @ i))
+                                `false
+                                result
     __unpack = __unpack-aggregate
     __countof = __countof-aggregate
     __@ =
@@ -7339,15 +7337,14 @@ fn constructor (cls args...)
 spice tuple== (self other)
     let cls = ('typeof self)
     let numfields = ('element-count cls)
-    let block = (sc_if_new)
     let quoted-false = `false
-    loop (i = 0)
-        if (i == numfields)
-            break;
-        sc_if_append_then_clause block `((@ self i) != (@ other i)) quoted-false
-        i + 1
-    sc_if_append_else_clause block `true
-    block
+    loop (i result = numfields `true)
+        if (i == 0)
+            break result
+        let i = (i - 1)
+        _   i
+            sc_cond_new `((self @ i) != (other @ i)) quoted-false result
+
 
 typedef+ tuple
     spice-quote

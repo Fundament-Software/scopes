@@ -230,23 +230,14 @@ struct Quoter {
         return canonicalize(expr);
     }
 
-    SCOPES_RESULT(ValueRef) quote_If(int level, const IfRef &node) {
+    SCOPES_RESULT(ValueRef) quote_CondTemplate(int level, const CondTemplateRef &node) {
         SCOPES_RESULT_TYPE(ValueRef);
         auto _anchor = node.anchor();
-        auto value = REF(CallTemplate::from(g_sc_if_new, {}));
-        auto expr = REF(Expression::unscoped_from());
-        for (auto &&clause : node->clauses) {
-            if (clause.is_then()) {
-                expr->append(REF(CallTemplate::from(g_sc_if_append_then_clause, { value,
-                    SCOPES_GET_RESULT(quote(level, clause.cond)),
-                    SCOPES_GET_RESULT(quote(level, clause.value)) })));
-            } else {
-                expr->append(REF(CallTemplate::from(g_sc_if_append_else_clause, { value,
-                    SCOPES_GET_RESULT(quote(level, clause.value)) })));
-            }
-        }
-        expr->append(value);
-        return canonicalize(expr);
+        return ValueRef(REF(CallTemplate::from(g_sc_cond_new, {
+            SCOPES_GET_RESULT(quote(level, node->cond)),
+            SCOPES_GET_RESULT(quote(level, node->then_value)),
+            SCOPES_GET_RESULT(quote(level, node->else_value))
+        })));
     }
 
     SCOPES_RESULT(ValueRef) quote_Template(int level, const TemplateRef &node) {

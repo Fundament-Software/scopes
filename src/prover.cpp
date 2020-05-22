@@ -3509,67 +3509,42 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     return finalize_merge_label(ctx, merge_label, "switch case");
 }
 
-static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef &_if) {
+static SCOPES_RESULT(TypedValueRef) prove_CondTemplate(const ASTContext &ctx, const CondTemplateRef &node) {
     SCOPES_RESULT_TYPE(TypedValueRef);
-    assert(!_if->clauses.empty());
-    int numclauses = _if->clauses.size();
-    assert(numclauses >= 1);
-    CondBrRef first_condbr;
-    CondBrRef last_condbr;
-    LabelRef merge_label = make_merge_label(ctx, _if.anchor());
+    LabelRef merge_label = make_merge_label(ctx, node.anchor());
     ASTContext subctx = ctx.with_block(merge_label->body);
-    for (int i = 0; i < numclauses; ++i) {
-        auto &&clause = _if->clauses[i];
-        //assert(clause.anchor);
-        //SCOPES_ANCHOR(clause.anchor);
-        if (clause.is_then()) {
-            TypedValueRef newcond = SCOPES_GET_RESULT(prove(subctx, clause.cond));
-            {
-                SCOPES_TRACE_PROVE_ARG(newcond);
-                newcond = ref(newcond.anchor(),
-                    ExtractArgument::from(newcond, 0));
-                SCOPES_CHECK_RESULT(build_tobool(subctx, clause.cond.anchor(), newcond));
-                SCOPES_CHECK_RESULT(build_deref_automove(subctx, newcond, newcond));
-                auto condT = strip_qualifiers(newcond->get_type());
-                if (condT != TYPE_Bool) {
-                    SCOPES_ERROR(ConditionNotBool, newcond->get_type());
-                }
-            }
-            CondBrRef condbr = ref(newcond.anchor(), CondBr::from(newcond));
-            if (!first_condbr) {
-                first_condbr = condbr;
-                merge_label->splitpoints.insert(condbr.unref());
-            }
-            condbr->then_body.set_parent(&merge_label->body);
-            condbr->else_body.set_parent(&merge_label->body);
-            auto thenctx = subctx.with_block(condbr->then_body);
-            auto thenresult = SCOPES_GET_RESULT(prove(thenctx, clause.value));
-            if (is_returning(thenresult->get_type())) {
-                SCOPES_CHECK_RESULT(make_merge(thenctx, thenresult.anchor(), merge_label, thenresult));
-            }
-            if (last_condbr) {
-                last_condbr->else_body.append(condbr);
 
-            } else {
-                merge_label->body.append(condbr);
-            }
-            last_condbr = condbr;
-            subctx = subctx.with_block(condbr->else_body);
-        } else {
-            assert(last_condbr);
-            auto elseresult = SCOPES_GET_RESULT(prove(subctx, clause.value));
-            if (is_returning(elseresult->get_type())) {
-                ASTContext elsectx = ctx.with_block(last_condbr->else_body);
-                SCOPES_CHECK_RESULT(make_merge(elsectx, _if.anchor(), merge_label, elseresult));
-            }
-            last_condbr = CondBrRef();
+    //assert(clause.anchor);
+    //SCOPES_ANCHOR(clause.anchor);
+    TypedValueRef newcond = SCOPES_GET_RESULT(prove(subctx, node->cond));
+    {
+        SCOPES_TRACE_PROVE_ARG(newcond);
+        newcond = ref(newcond.anchor(),
+            ExtractArgument::from(newcond, 0));
+        SCOPES_CHECK_RESULT(build_tobool(subctx, node->cond.anchor(), newcond));
+        SCOPES_CHECK_RESULT(build_deref_automove(subctx, newcond, newcond));
+        auto condT = strip_qualifiers(newcond->get_type());
+        if (condT != TYPE_Bool) {
+            SCOPES_ERROR(ConditionNotBool, newcond->get_type());
         }
     }
-    if (last_condbr) {
-        // last else value missing
-        ASTContext elsectx = ctx.with_block(last_condbr->else_body);
-        SCOPES_CHECK_RESULT(make_merge(elsectx, _if.anchor(), merge_label,
-            ref(_if.anchor(), ArgumentList::from({}))));
+    CondBrRef condbr = ref(newcond.anchor(), CondBr::from(newcond));
+    merge_label->splitpoints.insert(condbr.unref());
+    condbr->then_body.set_parent(&merge_label->body);
+    condbr->else_body.set_parent(&merge_label->body);
+    auto thenctx = subctx.with_block(condbr->then_body);
+    auto thenresult = SCOPES_GET_RESULT(prove(thenctx, node->then_value));
+    if (is_returning(thenresult->get_type())) {
+        SCOPES_CHECK_RESULT(make_merge(thenctx, thenresult.anchor(), merge_label, thenresult));
+    }
+    merge_label->body.append(condbr);
+
+    subctx = subctx.with_block(condbr->else_body);
+
+    auto elseresult = SCOPES_GET_RESULT(prove(subctx, node->else_value));
+    if (is_returning(elseresult->get_type())) {
+        ASTContext elsectx = ctx.with_block(condbr->else_body);
+        SCOPES_CHECK_RESULT(make_merge(elsectx, node.anchor(), merge_label, elseresult));
     }
 
     if (merge_label->merges.empty()) {
@@ -3577,7 +3552,7 @@ static SCOPES_RESULT(TypedValueRef) prove_If(const ASTContext &ctx, const IfRef 
         // conditions do not need a merge label
         assert(ctx.block);
         ctx.merge_block(merge_label->body);
-        return TypedValueRef(first_condbr);
+        return TypedValueRef(condbr);
     }
 
     return finalize_merge_label(ctx, merge_label, "branch");

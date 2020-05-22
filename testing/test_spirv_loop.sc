@@ -5,10 +5,13 @@ fn function-with-exception ()
             raise;
     10
 
+fn unconst (x) x
+
 fn main ()
-    #if true 1
-    #elseif true 2
-    #else 3
+    if true 1
+    elseif ((let k = (unconst 1)) == 1)
+        k
+    else 3
     try
         let count = (function-with-exception)
         for i j in (zip (range count) (range 16))

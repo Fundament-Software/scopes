@@ -411,18 +411,11 @@ HANDLER(Unquote) {
     );
 }
 
-HANDLER(If) {
+HANDLER(CondTemplate) {
     auto _anchor = node.anchor();
     const List *l = EOL;
-    int i = node->clauses.size();
-    while (i-- > 0) {
-        auto clause = node->clauses[i];
-        if (clause.cond) {
-            l = List::from(LIST(SYMBOL(KW_Case), clause.cond, clause.value), l);
-        } else {
-            l = List::from(LIST(SYMBOL(KW_Default), clause.value), l);
-        }
-    }
+    l = List::from(LIST(SYMBOL(KW_Case), node->cond, node->then_value), l);
+    l = List::from(LIST(SYMBOL(KW_Default), node->else_value), l);
     l = List::from(SYMBOL(KW_If), l);
     return ValueRef(_anchor, ConstPointer::list_from(l));
 }
@@ -508,7 +501,7 @@ ValueRef _convert(const ValueRef &node) {
     //CASE_HANDLER(Call)
     CASE_HANDLER(Template)
     CASE_HANDLER(Global)
-    CASE_HANDLER(If)
+    CASE_HANDLER(CondTemplate)
     CASE_HANDLER(ParameterTemplate)
     CASE_HANDLER(Expression)
     CASE_HANDLER(LabelTemplate)

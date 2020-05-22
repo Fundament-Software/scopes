@@ -837,10 +837,23 @@ struct Expander {
             branches.push_back(EOL);
         }
 
-        auto ifexpr = If::from();
+        ValueRef result;
 
-        int lastidx = (int)branches.size() - 1;
-        for (int idx = 0; idx < lastidx; ++idx) {
+        const int lastidx = (int)branches.size() - 1;
+        it = branches[lastidx];
+        if (it == EOL) {
+            result = ValueRef(ref(anchor, ArgumentList::from({})));
+        } else {
+            auto else_anchor = it->at.anchor();
+            it = it->next;
+            Expander subexp(Scope::from(nullptr, env), astscope);
+
+            result = SCOPES_GET_RESULT(
+                subexp.expand_expression(ref(else_anchor, it), false));
+        }
+
+        int idx = lastidx;
+        while (idx-- > 0) {
             it = branches[idx];
             //const Anchor *anchor = it->at->anchor();
             SCOPES_CHECK_RESULT(verify_list_parameter_count("branch", it, 1, -1));
@@ -873,24 +886,15 @@ struct Expander {
                 env = subexp.env;
 
                 subexp.env = Scope::from(nullptr, env);
-                ifexpr->append_then(cond,
-                    SCOPES_GET_RESULT(
-                        subexp.expand_expression(ref(branch_anchor, it), false)));
+                result =
+                    ref(branch_anchor, CondTemplate::from(cond,
+                        SCOPES_GET_RESULT(
+                            subexp.expand_expression(ref(branch_anchor, it), false)),
+                        result));
             }
         }
 
-        it = branches[lastidx];
-        if (it != EOL) {
-            auto else_anchor = it->at.anchor();
-            it = it->next;
-            Expander subexp(Scope::from(nullptr, env), astscope);
-
-            ifexpr->append_else(
-                SCOPES_GET_RESULT(
-                    subexp.expand_expression(ref(else_anchor, it), false)));
-        }
-
-        return ValueRef(ref(anchor, ifexpr));
+        return ValueRef(ref(anchor, result));
     }
 
     static SCOPES_RESULT(bool) get_kwargs(
