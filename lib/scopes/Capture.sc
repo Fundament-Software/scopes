@@ -117,7 +117,7 @@ sugar capture (head body...)
     capture-parser "capture" head body...
         inline (namestr args params body)
             qq [pack-capture] ([tupleof] (unquote-splice args))
-                [fn] [namestr] (self (unquote-splice params))
+                [inline] [namestr] (self (unquote-splice params))
                     [let] (unquote-splice args) =
                         [unpack-capture] self
                     unquote-splice body
