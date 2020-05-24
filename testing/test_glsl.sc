@@ -2,6 +2,7 @@
 using import glm
 using import glsl
 using import struct
+using import enum
 
 let screen-tri-vertices =
     arrayof vec2
@@ -9,10 +10,19 @@ let screen-tri-vertices =
 
 run-stage;
 
+enum Location : i32
+    UV
+    Transform
+    Phase
+    Sampler
+
+enum Binding : i32
+    M
+
 inout uv : vec2
-    location = 0
+    location = Location.UV
 in transform : mat4x3
-    location = 1
+    location = Location.Transform
 
 fn multiple-return-values ()
     if true
@@ -42,15 +52,15 @@ print
         #'no-opts
 
 uniform phase : f32
-    location = 1
+    location = Location.Phase
 uniform smp : sampler2D
-    location = 2
+    location = Location.Sampler
     set = 0
 
 buffer m :
     struct MutableData plain
         value : u32
-    binding = 5
+    binding = Binding.M
 
 out out_Color : vec4
 out out_UInt : u32

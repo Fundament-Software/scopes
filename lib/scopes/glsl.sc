@@ -279,6 +279,8 @@ inline wrap-xvar-global (f)
         `(ptrtoref [(f ...)])
 
 fn config-xvar (flags storage anchor name T layout)
+    fn imply-unbox-i32 (v)
+        (sc_prove `(imply v i32)) as i32
     local location = -1
     local binding = -1
     local set = -1
@@ -287,11 +289,11 @@ fn config-xvar (flags storage anchor name T layout)
         let k v = ('dekey arg)
         switch k
         case 'location
-            location = (v as i32)
+            location = (imply-unbox-i32 v)
         case 'binding
-            binding = (v as i32)
+            binding = (imply-unbox-i32 v)
         case 'set
-            set = (v as i32)
+            set = (imply-unbox-i32 v)
         case 'readonly
             if (flags & global-flag-non-readable)
                 error "value is already tagged writeonly"
