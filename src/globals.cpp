@@ -295,6 +295,11 @@ sc_string_raises_t sc_compile_glsl(int version, sc_symbol_t target, sc_valueref_
     return convert_result(compile_glsl(version, target, result, flags));
 }
 
+const sc_string_t *sc_spirv_to_glsl(const sc_string_t *binary) {
+    using namespace scopes;
+    return spirv_to_glsl(binary);
+}
+
 const sc_string_t *sc_default_target_triple() {
     using namespace scopes;
     return get_default_target_triple();
@@ -2303,6 +2308,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile, TYPE_ValueRef, TYPE_ValueRef, TYPE_U64);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_spirv, TYPE_String, TYPE_Symbol, TYPE_ValueRef, TYPE_U64);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_glsl, TYPE_String, TYPE_I32, TYPE_Symbol, TYPE_ValueRef, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_spirv_to_glsl, TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_default_target_triple, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_object, _void, TYPE_String, TYPE_I32, TYPE_String, TYPE_Scope, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_enter_solver_cli, _void);

@@ -162,11 +162,15 @@ do
                 sampler2D t_diffuse s_diffuse
                 v_tex_coords
 
-    print
+    let bin =
         compile-spirv 'fragment
             typify main
             'dump-disassembly
             #'no-opts
+
+    print bin
+    print
+        sc_spirv_to_glsl bin
 
 
 ;

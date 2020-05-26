@@ -250,6 +250,7 @@ struct SPIRVGenerator {
     FunctionRef active_function;
     int functions_generated;
     spv_target_env env;
+    bool use_combined_image_samplers = false;
 
     spv::Id get_op_ex(Symbol name) {
         auto it = intrinsic_ops.find(name);
@@ -629,6 +630,7 @@ struct SPIRVGenerator {
                 SCOPES_GET_RESULT(image_format_from_symbol(it->format)));
         } break;
         case TK_Sampler: {
+            use_combined_image_samplers = true;
             return builder.makeSamplerType();
         } break;
         default: break;
@@ -2438,6 +2440,27 @@ SCOPES_RESULT(const String *) compile_spirv(Symbol target, const FunctionRef &fn
     return String::from((char *)&result[0], bytesize);
 }
 
+const String *spirv_to_glsl(const String *binary) {
+    std::vector<unsigned int> bytes;
+    unsigned int sz = binary->count / sizeof(unsigned int);
+    bytes.resize(sz);
+    memcpy(&bytes[0], binary->data, binary->count);
+
+	spirv_cross::CompilerGLSL glsl(std::move(bytes));
+
+    // Set some options.
+    spirv_cross::CompilerGLSL::Options options;
+    options.version = 450;
+    options.vulkan_semantics = true;
+    glsl.build_combined_image_samplers();
+    glsl.set_common_options(options);
+
+    // Compile to GLSL, ready to give to GL driver.
+    std::string source = glsl.compile();
+
+    return String::from_stdstring(source);
+}
+
 SCOPES_RESULT(const String *) compile_glsl(int version, Symbol target, const FunctionRef &fn, uint64_t flags) {
     SCOPES_RESULT_TYPE(const String *);
     Timer sum_compile_time(TIMER_CompileSPIRV);
@@ -2497,8 +2520,6 @@ SCOPES_RESULT(const String *) compile_glsl(int version, Symbol target, const Fun
     spirv_cross::CompilerGLSL::Options options;
     options.version = (version <= 0)?450:version;
     glsl.set_common_options(options);
-
-    glsl.build_combined_image_samplers();
 
     // Compile to GLSL, ready to give to GL driver.
     std::string source = glsl.compile();

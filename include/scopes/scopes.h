@@ -169,6 +169,7 @@ SCOPES_LIBEXPORT sc_valueref_raises_t sc_typify_template(sc_valueref_t f, int nu
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_compile(sc_valueref_t srcl, uint64_t flags);
 SCOPES_LIBEXPORT sc_string_raises_t sc_compile_spirv(sc_symbol_t target, sc_valueref_t srcl, uint64_t flags);
 SCOPES_LIBEXPORT sc_string_raises_t sc_compile_glsl(int version, sc_symbol_t target, sc_valueref_t srcl, uint64_t flags);
+SCOPES_LIBEXPORT const sc_string_t *sc_spirv_to_glsl(const sc_string_t *binary);
 SCOPES_LIBEXPORT const sc_string_t *sc_default_target_triple();
 SCOPES_LIBEXPORT sc_void_raises_t sc_compile_object(const sc_string_t *target_triple, int file_kind, const sc_string_t *path, const sc_scope_t *table, uint64_t flags);
 SCOPES_LIBEXPORT void sc_enter_solver_cli ();
