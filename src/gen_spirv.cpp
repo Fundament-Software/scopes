@@ -583,8 +583,6 @@ struct SPIRVGenerator {
             return create_struct_type(type, flags);
         } break;
         case TK_Typename: {
-            if (type == TYPE_Sampler)
-                return builder.makeSamplerType();
             auto tn = cast<TypenameType>(type);
             if (!tn->is_opaque()) {
                 if (tn->storage()->kind() == TK_Tuple) {
@@ -629,6 +627,9 @@ struct SPIRVGenerator {
                 (it->multisampled == 1),
                 it->sampled,
                 SCOPES_GET_RESULT(image_format_from_symbol(it->format)));
+        } break;
+        case TK_Sampler: {
+            return builder.makeSamplerType();
         } break;
         default: break;
         };
@@ -2496,6 +2497,8 @@ SCOPES_RESULT(const String *) compile_glsl(int version, Symbol target, const Fun
     spirv_cross::CompilerGLSL::Options options;
     options.version = (version <= 0)?450:version;
     glsl.set_common_options(options);
+
+    glsl.build_combined_image_samplers();
 
     // Compile to GLSL, ready to give to GL driver.
     std::string source = glsl.compile();

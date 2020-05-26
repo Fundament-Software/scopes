@@ -45,6 +45,7 @@ struct TypedValue;
     T(TK_Tuple, "type-kind-tuple", TupleType) \
     T(TK_Function, "type-kind-function", FunctionType) \
     /* additional GPU machine types */ \
+    T(TK_Sampler, "type-kind-sampler", SamplerType) \
     T(TK_Image, "type-kind-image", ImageType) \
     T(TK_SampledImage, "type-kind-sampled-image", SampledImageType)
 

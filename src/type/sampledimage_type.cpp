@@ -54,5 +54,24 @@ const Type *sampled_image_type(const ImageType *_type) {
     return result;
 }
 
+//------------------------------------------------------------------------------
+// SAMPLER TYPE
+//------------------------------------------------------------------------------
+
+void SamplerType::stream_name(StyledStream &ss) const {
+    ss << "Sampler";
+}
+
+SamplerType::SamplerType() :
+    Type(TK_Sampler) {
+}
+
+static SamplerType *_sampler_type = nullptr;
+const Type *sampler_type() {
+    if (!_sampler_type) {
+        _sampler_type = new SamplerType();
+    }
+    return _sampler_type;
+}
 
 } // namespace scopes

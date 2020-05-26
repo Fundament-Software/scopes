@@ -855,6 +855,9 @@ struct LLVMIRGenerator {
         case TK_Image: {
             SCOPES_ERROR(CGenTypeUnsupportedInTarget, TYPE_Image);
         } break;
+        case TK_Sampler: {
+            SCOPES_ERROR(CGenTypeUnsupportedInTarget, TYPE_Sampler);
+        } break;
         default: break;
         };
 

@@ -209,6 +209,9 @@ typedef+ Rc
     inline __@ (self keys...)
         @ (view self) keys...
 
+    inline __call (self ...)
+        (view self) ...
+
     spice __methodcall (symbol self args...)
         'tag `(symbol (view self) args...) ('anchor args)
 

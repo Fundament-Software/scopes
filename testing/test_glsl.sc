@@ -18,6 +18,8 @@ enum Location : i32
 
 enum Binding : i32
     M
+    Sampler2
+    Texture2D
 
 inout uv : vec2
     location = Location.UV
@@ -57,6 +59,13 @@ uniform smp : sampler2D
     location = Location.Sampler
     set = 0
 
+uniform smp2 : Sampler
+    set = 0
+    binding = Binding.Sampler2
+uniform img-texture : texture2D
+    set = 0
+    binding = Binding.Texture2D
+
 buffer m :
     struct MutableData plain
         value : u32
@@ -76,9 +85,10 @@ fn fragment-shader ()
     if j
         true
     else;
+    let q = (texture (sampler2D img-texture smp2) uv)
     # use of intrinsic
     out_UInt = (packHalf2x16 uv)
-    out_Color = (color * (texture smp uv))
+    out_Color = (color * (texture smp uv) * q)
     return;
 
 #'dump

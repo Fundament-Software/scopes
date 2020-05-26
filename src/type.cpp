@@ -206,6 +206,7 @@ repeat:
     case TK_Real:
     case TK_Image:
     case TK_SampledImage:
+    case TK_Sampler:
     case TK_Function:
         return true;
     case TK_Array:
@@ -323,6 +324,7 @@ const Type *superof(const Type *T) {
     case TK_Function: return TYPE_Function;
     case TK_Image: return TYPE_Image;
     case TK_SampledImage: return TYPE_SampledImage;
+    case TK_Sampler: return TYPE_Immutable;
     }
     assert(false && "unhandled type kind; corrupt pointer?");
     return nullptr;
@@ -428,7 +430,7 @@ void init_types() {
     DEFINE_OPAQUE_TYPENAME("aggregate", TYPE_Aggregate, nullptr);
     DEFINE_OPAQUE_TYPENAME("opaquepointer", TYPE_OpaquePointer, nullptr);
 
-    DEFINE_OPAQUE_TYPENAME("Sampler", TYPE_Sampler, nullptr);
+    TYPE_Sampler = sampler_type();
 
     DEFINE_OPAQUE_TYPENAME("integer", TYPE_Integer, TYPE_Immutable);
     DEFINE_OPAQUE_TYPENAME("real", TYPE_Real, TYPE_Immutable);

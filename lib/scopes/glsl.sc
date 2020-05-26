@@ -181,14 +181,27 @@ inline make-gsampler (postfix dim arrayed ms coords)
                 Lod = lod
                 Offset = offset
 
+@@ memo
+inline sampled-image-constructor (result-type image-type sampler-type)
+    extern 'spirv.OpSampledImage (function result-type image-type sampler-type)
 
 inline make-sampler (prefix return-type postfix dim arrayed ms coords)
     let super =
         make-gsampler postfix dim arrayed ms coords
+    let image-type =
+        Image return-type dim 0 arrayed ms 1 'Unknown unnamed
     let storage =
-        SampledImage
-            Image return-type dim 0 arrayed ms 1 'Unknown unnamed
+        SampledImage image-type
     typedef (.. prefix "sampler" postfix) < super : storage
+        inline __typecall (cls _texture _sampler)
+            static-assert ((superof (typeof _texture)) == Image)
+            static-assert ((typeof _sampler) == Sampler)
+            let constrf =
+                sampled-image-constructor this-type
+                    typeof _texture
+                    typeof _sampler
+            constrf _texture _sampler
+
 
 local scope = (Scope)
 
@@ -237,6 +250,9 @@ build-rtypes
                     'bind scope (Symbol (.. prefix "image" postfix))
                         inline (format)
                             Image return-type dim 0 arrayed ms 2 format unnamed
+                scope =
+                    'bind scope (Symbol (.. prefix "texture" postfix))
+                        Image return-type dim 0 arrayed ms 1 'Unknown unnamed
                 let samplerT = (make-sampler prefix return-type postfix dim arrayed ms coords)
                 scope =
                     'bind scope (Symbol ('string samplerT)) samplerT
@@ -322,7 +338,8 @@ fn config-buffer (anchor name T layout)
 
 fn config-uniform (anchor name T layout)
     let storage =
-        if (('storageof T) < tuple) 'Uniform
+        if (T == Sampler) 'UniformConstant
+        elseif (('storageof T) < tuple) 'Uniform
         else 'UniformConstant
     config-xvar 0:u32 storage anchor name T layout
 

@@ -14,6 +14,19 @@ namespace scopes {
 struct ImageType;
 
 //------------------------------------------------------------------------------
+// SAMPLER TYPE
+//------------------------------------------------------------------------------
+
+struct SamplerType : Type {
+    static bool classof(const Type *T);
+
+    void stream_name(StyledStream &ss) const;
+    SamplerType();
+};
+
+const Type *sampler_type();
+
+//------------------------------------------------------------------------------
 // SAMPLED IMAGE TYPE
 //------------------------------------------------------------------------------
 
