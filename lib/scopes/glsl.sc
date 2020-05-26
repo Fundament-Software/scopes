@@ -338,7 +338,7 @@ fn config-buffer (anchor name T layout)
 
 fn config-uniform (anchor name T layout)
     let storage =
-        if (T == Sampler) 'UniformConstant
+        if (('storageof T) == Sampler) 'UniformConstant
         elseif (('storageof T) < tuple) 'Uniform
         else 'UniformConstant
     config-xvar 0:u32 storage anchor name T layout
@@ -491,6 +491,7 @@ sugar input_primitive (name)
 
 do
     let gsampler shared input_primitive output_primitive fragment_depth
+    let sampler = Sampler
     let
         in = (gen-xvar-sugar "in" (wrap-xvar-global (inline (...) (config-xvar 0:u32 'Input ...))))
         out = (gen-xvar-sugar "out" (wrap-xvar-global (inline (...) (config-xvar 0:u32 'Output ...))))

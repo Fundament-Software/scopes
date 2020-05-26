@@ -18,8 +18,6 @@ enum Location : i32
 
 enum Binding : i32
     M
-    Sampler2
-    Texture2D
 
 inout uv : vec2
     location = Location.UV
@@ -59,13 +57,6 @@ uniform smp : sampler2D
     location = Location.Sampler
     set = 0
 
-uniform smp2 : Sampler
-    set = 0
-    binding = Binding.Sampler2
-uniform img-texture : texture2D
-    set = 0
-    binding = Binding.Texture2D
-
 buffer m :
     struct MutableData plain
         value : u32
@@ -85,10 +76,9 @@ fn fragment-shader ()
     if j
         true
     else;
-    let q = (texture (sampler2D img-texture smp2) uv)
     # use of intrinsic
     out_UInt = (packHalf2x16 uv)
-    out_Color = (color * (texture smp uv) * q)
+    out_Color = (color * (texture smp uv))
     return;
 
 #'dump
@@ -150,4 +140,33 @@ do
             #'dump-disassembly
         #compile-spirv 'vertex (static-typify vert)
             'dump-disassembly
+
+
+# separate texture / sampler
+do
+    in v_tex_coords : vec2
+        location = 0
+    out f_color : vec4
+        location = 0
+
+    uniform t_diffuse : texture2D
+        set = 0
+        binding = 0
+    uniform s_diffuse : sampler
+        set = 0
+        binding = 1
+
+    fn main ()
+        f_color =
+            texture
+                sampler2D t_diffuse s_diffuse
+                v_tex_coords
+
+    print
+        compile-spirv 'fragment
+            typify main
+            'dump-disassembly
+            #'no-opts
+
+
 ;
