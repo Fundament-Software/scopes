@@ -129,6 +129,7 @@ typedef Set < Struct
             static-if (none? mask) self._mask
             else mask
         let capacity = (mask + 1:u64)
+        let result = (dupe (deref (self._keys @ pos)))
         label done
             loop (i = 1:u64)
                 if (i == capacity)
@@ -140,12 +141,11 @@ typedef Set < Struct
                 let pd = (keydistance ((hash atkey) as u64) index mask)
                 if ((pd == 0) or (not (valid-slot? self index)))
                     unset-slot self index_prev
-                    drop prev_key
                     merge done
-                assign atkey prev_key
+                swap atkey prev_key
                 i + 1:u64
         self._count = self._count - 1:u32
-        ;
+        result
 
     inline lookup (self key keyhash successf failf mask)
         """"finds the index and address of an entry associated with key or
@@ -311,6 +311,15 @@ typedef Set < Struct
             inline (i) (i <= self._mask)
             inline (i) (deref (self._keys @ i))
             next
+
+    fn pop (self)
+        """"discards an arbitrary key from the set and returns the discarded key
+        let init valid? at next = ((set-generator self))
+        let it = (init)
+        assert (valid? it)
+        let result = (erase_pos self it)
+        auto-rehash self
+        result
 
     inline __as (cls T)
         static-if (T == Generator)
