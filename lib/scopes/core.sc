@@ -2359,19 +2359,6 @@ let drop =
                 sc_expression_append block ('tag `(lose value) anchor)
                 block
 
-let forward-repr =
-    spice-macro
-        fn (args)
-            let argc = ('argcount args)
-            verify-count argc 1 1
-            let value = ('getarg args 0)
-            let T = ('typeof value)
-            try
-                let f = (sc_type_at T '__repr)
-                `(f value)
-            except (err)
-                `(sc_value_content_repr value)
-
 let repr =
     spice-macro
         fn (args)
@@ -2383,15 +2370,18 @@ let repr =
             verify-count argc 1 1
             let value = ('getarg args 0)
             let T = ('typeof value)
-            let s = `(forward-repr value)
-            if (type-is-default-suffix? T) s
+            try
+                let f = (sc_type_at T '__repr)
+                `(f value)
             else
-
-                let suffix =
-                    sc_string_join
-                        sc_default_styler style-operator ":"
-                        sc_default_styler style-type ('string T)
-                `(sc_string_join s suffix)
+                let s = `(sc_value_content_repr value)
+                if (type-is-default-suffix? T) s
+                else
+                    let suffix =
+                        sc_string_join
+                            sc_default_styler style-operator ":"
+                            sc_default_styler style-type ('string T)
+                    `(sc_string_join s suffix)
 
 let tostring =
     box-spice-macro
@@ -2399,13 +2389,19 @@ let tostring =
             let argc = ('argcount args)
             verify-count argc 1 -1
             let value = ('getarg args 0)
+            let T = ('typeof value)
             try
-                `([('@ ('typeof value) '__tostring)] value)
-            except (err)
-                if ('constant? value)
-                    `[(sc_value_tostring value)]
+                let f = ('@ T '__tostring)
+                `(f value)
+            else
+                try
+                    let f = (sc_type_at T '__repr)
+                    `(f value)
                 else
-                    `(sc_value_tostring value)
+                    if ('constant? value)
+                        `[(sc_value_tostring value)]
+                    else
+                        `(sc_value_tostring value)
 
 run-stage; # 4
 

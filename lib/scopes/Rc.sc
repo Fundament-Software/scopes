@@ -218,8 +218,8 @@ typedef+ Rc
     spice __getattr (self key)
         'tag `(getattr (view self) key) ('anchor args)
 
-    spice __repr (self)
-        'tag `(forward-repr (view self)) ('anchor args)
+    inline __repr (self)
+        .. "(Rc " (repr (view self)) ")"
 
     @@ memo
     inline __== (cls other-cls)

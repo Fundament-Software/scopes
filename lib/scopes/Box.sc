@@ -51,8 +51,8 @@ typedef Box
     spice __getattr (self key)
         'tag `(getattr (view self) key) ('anchor args)
 
-    spice __repr (self)
-        'tag `(forward-repr (view self)) ('anchor args)
+    inline __repr (self)
+        .. "(Box " (repr (view self)) ")"
 
     inline make-cast-op (f const?)
         spice "box-cast" (selfT otherT)
