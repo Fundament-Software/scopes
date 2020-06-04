@@ -6954,6 +6954,10 @@ sugar typedef (name body...)
         qq [let] [name] = [expr]
     else expr
 
+'set-symbols type
+    __macro = typedef
+let type+ = typedef+
+
 #-------------------------------------------------------------------------------
 # standard allocators
 #-------------------------------------------------------------------------------
