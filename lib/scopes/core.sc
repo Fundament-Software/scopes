@@ -47,7 +47,7 @@ inline swap (a b)
     let tmp = (deref (dupe b))
     assign (dupe a) b
     assign tmp a
-    return;
+    ;
 
 # pointer comparison as a template function, because we'll compare pointers of many types
 fn ptrcmp!= (t1 t2)
