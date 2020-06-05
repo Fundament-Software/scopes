@@ -2268,6 +2268,7 @@ let
     countof = (unary-op-dispatch '__countof "count")
     unpack = (unary-op-dispatch '__unpack "unpack")
     hash1 = (unary-op-dispatch '__hash "hash")
+    copy = (unary-op-dispatch '__copy "copy")
     ~ = (unary-op-dispatch '__~ "bitwise-negate")
     == = (balanced-binary-op-dispatch '__== '__r== "compare")
     != = (balanced-binary-op-dispatch '__!= '__r!= "compare")
@@ -2447,6 +2448,31 @@ let opaque =
             let TT = (sc_typename_type name supertype)
             sc_typename_type_set_opaque TT
             'tag `TT ('anchor args)
+
+do
+    # default copy operator
+    let default-copy =
+        box-pointer
+            spice-macro
+                fn (args)
+                    let argc = ('argcount args)
+                    verify-count argc 1 1
+                    let self = ('getarg args 0)
+                    let T = ('storageof ('typeof self))
+                    if (not ('plain? T))
+                        hide-traceback;
+                        error "cannot copy value of non-plain storage type"
+                    let anchor = ('anchor args)
+                    'tag `(dupe self) anchor
+
+    'set-symbols immutable
+        __copy = default-copy
+    'set-symbols pointer
+        __copy = default-copy
+    'set-symbols aggregate
+        __copy = default-copy
+    'set-symbols CStruct
+        __copy = default-copy
 
 'set-symbols typename
     # inverted compare attempts regular compare

@@ -21,6 +21,7 @@ test-modules
     .test_closure
     .test_conversion
     .test_convert
+    .test_copy
     .test_currying
     .test_decorator
     .test_defer

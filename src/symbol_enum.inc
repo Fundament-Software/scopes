@@ -240,7 +240,7 @@ namespace scopes {
     T(FN_AllocaArray, "alloca-array") \
     T(FN_MallocArray, "malloc-array") \
     T(FN_Dupe, "dupe") \
-    T(FN_Copy, "copy") \
+    /*T(FN_Copy, "copy")*/ \
     T(FN_Move, "move") \
     T(FN_View, "view") \
     T(FN_Viewing, "viewing") \

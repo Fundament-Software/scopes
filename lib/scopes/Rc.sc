@@ -126,7 +126,7 @@ typedef+ Weak
             fn (self other)
                 == (extractvalue self METADATA_INDEX) (extractvalue other METADATA_INDEX)
 
-    fn... clone (self : Weak,)
+    fn... __copy (self : Weak,)
         viewing self
         let md = (extractvalue self METADATA_INDEX)
         if (ptrtoint md usize)
@@ -173,8 +173,7 @@ typedef+ Rc
     inline new (T args...)
         (gen-type T) args...
 
-    fn... clone
-    case (value : Rc,)
+    fn... __copy (value : Rc,)
         viewing value
         let refcount =
             getelementptr
@@ -185,9 +184,6 @@ typedef+ Rc
         let rc = (add rc 1)
         store rc refcount
         deref (dupe value)
-    case (value : Weak,)
-        viewing value
-        'clone value
 
     inline wrap (value)
         ((gen-type (typeof value)) . wrap) value

@@ -23,7 +23,7 @@ do
 
     do
         test ((Rc.strong-count k) == 1)
-        let k2 = (Rc.clone k)
+        let k2 = (copy k)
         test ((Rc.strong-count k) == 2)
     test ((Rc.strong-count k) == 1)
 
@@ -49,7 +49,7 @@ do
     test ((Rc.weak-count nullweak) == 1)
     test ((Rc.weak-count nullweak2) == 1)
     test-error ('upgrade nullweak2)
-    let nullweak3 = ('clone nullweak)
+    let nullweak3 = (copy nullweak)
     test (nullweak == nullweak2)
     test (nullweak == nullweak3)
 
@@ -70,7 +70,7 @@ do
     test ((Rc.strong-count p) == 2)
     test ((Rc.weak-count p) == 1)
 
-    let w2 = (Rc.clone w)
+    let w2 = (copy w)
     test ((Rc.strong-count p) == 2)
     test ((Rc.weak-count p) == 2)
     test (w == w2)
@@ -117,7 +117,7 @@ do
             let self =
                 RcType
                     _name = name
-            'append parent.children (Rc.clone self)
+            'append parent.children (copy self)
             self
 
         inline __== (self other)
@@ -191,7 +191,7 @@ do
                 RcType
                     parent = parent
                     _name = name
-            'append parent.children (Rc.clone self)
+            'append parent.children (copy self)
             self
 
         inline __== (self other)
@@ -219,7 +219,7 @@ do
             let oldparent =
                 try ('upgrade self.parent)
                 else
-                    return (Rc.clone self)
+                    return (copy self)
             let i = ('child-index oldparent self)
             self.parent = (WeakType)
             'remove oldparent.children i
@@ -277,7 +277,7 @@ do
             data = (T 17)
         'force-unwrap data
 
-    local example : T = (Rc.clone (singleton))
+    local example : T = (copy (singleton))
     test (example == (singleton))
     ;
 test ((One.refcount) == 1)
@@ -304,7 +304,7 @@ do
             data = (RcT (a = (Inner 17)))
         'force-unwrap data
 
-    let k = (Rc.clone (singleton))
+    let k = (copy (singleton))
     local example : RcT = k
     # error: value of type %1000:<Rc T> must be unique
 
@@ -316,7 +316,7 @@ do
 
     RcT := (Rc T)
 
-    let k = (Rc.clone (RcT 17))
+    let k = (copy (RcT 17))
 
     local container : RcT
     dump (typeof container) (typeof k)
