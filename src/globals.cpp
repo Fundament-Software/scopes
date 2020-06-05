@@ -1909,6 +1909,11 @@ bool sc_type_is_refer(const sc_type_t *T) {
     return has_qualifier<ReferQualifier>(T);
 }
 
+bool sc_type_is_view(const sc_type_t *T) {
+    using namespace scopes;
+    return has_qualifier<ViewQualifier>(T);
+}
+
 // Pointer Type
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2498,6 +2503,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_type_next, arguments_type({TYPE_Symbol, TYPE_ValueRef}), TYPE_Type, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_type_set_symbol, _void, TYPE_Type, TYPE_Symbol, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_refer, TYPE_Bool, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_is_view, TYPE_Bool, TYPE_Type);
 
     DEFINE_EXTERN_C_FUNCTION(sc_type_key, arguments_type({TYPE_Symbol, TYPE_Type}), TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_key_type, TYPE_Type, TYPE_Symbol, TYPE_Type);

@@ -40,3 +40,24 @@ do
     test (a == b)
     test (b != c)
 
+do
+    let q =
+        tupleof
+            One 1
+            One 2
+            One 3
+    let w = (move q)
+    ;
+One.test-refcount-balanced;
+
+do
+    let a b c =
+        One 1
+        One 2
+        view (One 3)
+    let q =
+        tupleof a b c
+    ;
+One.test-refcount-balanced;
+
+;

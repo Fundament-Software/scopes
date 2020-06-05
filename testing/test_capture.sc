@@ -50,7 +50,7 @@ test ((cf2 1 2) == (- (+ 10 20 1 2)))
 # callback arrays
 using import Array
 
-local callbacks : (GrowingArray (Capture (function void voidstar)))
+local callbacks : (GrowingArray (Capture (Capture.function void)))
 
 fn make-callback (x)
     capture () {x}
@@ -64,5 +64,38 @@ let b = "2!"
 
 for cb in callbacks
     cb;
+
+do
+    # unique borrowed arguments
+    let a = (One 1)
+    let b = (One 2)
+
+    let va vb = a b
+    capture testcap () {va vb}
+        ('value va) + ('value vb)
+
+    test ((testcap) == 3)
+    test ((testcap) == 3)
+
+    test ((One.refcount) == 2)
+    drop testcap
+    test ((One.refcount) == 0)
+
+    ;
+One.test-refcount-balanced;
+
+do
+    # unique borrowed arguments
+    let a = (One 1)
+    let b = (One 2)
+
+    let va vb = (view a) (view b)
+    capture testcap () {va vb}
+        ('value va) + ('value vb)
+
+    test ((testcap) == 3)
+    test ((testcap) == 3)
+    ;
+One.test-refcount-balanced;
 
 ;

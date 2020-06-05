@@ -485,6 +485,7 @@ SCOPES_LIBEXPORT const sc_type_t *sc_arguments_type_getarg(sc_type_t *T, int ind
 SCOPES_LIBEXPORT const sc_type_t *sc_key_type(sc_symbol_t name, const sc_type_t *T);
 SCOPES_LIBEXPORT sc_symbol_type_tuple_t sc_type_key(const sc_type_t *T);
 SCOPES_LIBEXPORT bool sc_type_is_refer(const sc_type_t *T);
+SCOPES_LIBEXPORT bool sc_type_is_view(const sc_type_t *T);
 SCOPES_LIBEXPORT const sc_type_t *sc_view_type(const sc_type_t *type, int id);
 SCOPES_LIBEXPORT const sc_type_t *sc_unique_type(const sc_type_t *type, int id);
 SCOPES_LIBEXPORT const sc_type_t *sc_mutate_type(const sc_type_t *type);

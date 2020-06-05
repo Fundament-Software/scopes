@@ -2766,10 +2766,15 @@ repeat:
             READ_AUTOMOVE_TYPEOF(AT);
             READ_AUTOMOVE_STORAGETYPEOF(ET);
             READ_INT_CONST(idx);
-            bool movable = is_template_like_constant(_AT)
-                || is_movable(AT);
-            if (movable != is_movable(typeof_ET)) {
-                SCOPES_ERROR(MovableTypeMismatch, AT, typeof_ET);
+            bool movable = false;
+            if (is_template_like_constant(_AT)) {
+                movable = is_movable(typeof_ET);
+            } else {
+                movable = is_movable(AT);
+                if (movable != is_movable(typeof_ET)) {
+                    // borrow both arguments if one isn't movable
+                    SCOPES_ERROR(MovableTypeMismatch, AT, typeof_ET);
+                }
             }
             auto T = SCOPES_GET_RESULT(storage_type(AT));
             switch(T->kind()) {

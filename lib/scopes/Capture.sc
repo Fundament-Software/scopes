@@ -13,21 +13,35 @@
 # runtime closures
 #-------------------------------------------------------------------------------
 
+let DropFuncType =
+    pointer (function void voidstar)
+
+@@ memo
+inline dropper (T)
+    static-typify
+        fn (env)
+            let tmp = (@ (bitcast env (mutable pointer T)))
+            __drop (view tmp)
+            lose tmp
+            ;
+        voidstar
+
 typedef Capture
     inline __call (self args...)
-        let f env = (unpack (storagecast self))
+        let f env = (unpack (storagecast (view self)))
         f env args...
 
     @@ memo
-    inline make-type (ftype)
+    inline make-type (ftype fdrop)
         static-assert (ftype < function) "function type expected"
-        let ST = (tuple (pointer ftype) voidstar)
+        let ST = (tuple (pointer ftype) voidstar DropFuncType)
         typedef (.. "Capture<" (tostring ftype) ">") < this-type :: ST
             let FunctionType = ftype
 
     inline __drop (self)
-        let f env = (unpack (storagecast self))
-        free (bitcast (dupe env) (mutable pointer i8))
+        let f env dropf = (unpack (storagecast (view self)))
+        dropf env
+        free (bitcast env (mutable pointer i8))
 
     inline __typecall (cls args...)
         static-if (cls == this-type)
@@ -35,12 +49,19 @@ typedef Capture
             make-type ftype
         else
             let f envtuple = args...
-            let env = (malloc (typeof envtuple))
+            let envT = (typeof envtuple)
+            let env = (malloc envT)
             store envtuple env
-            let closure = (tupleof f (env as voidstar))
+            let closure = (tupleof f (env as voidstar) (dropper envT))
             bitcast closure cls
 
+    inline function (return-type param-types...)
+        function return-type (viewof voidstar 1) param-types...
+
 typedef CaptureTemplate
+    inline __drop (self)
+        __drop (storagecast self)
+
     @@ spice-cast-macro
     fn __imply (selfT otherT)
         if (otherT < Capture)
@@ -64,7 +85,7 @@ typedef CaptureTemplate
                 innerf
                     ptrtoref (bitcast env T*)
                     args...
-            \ voidstar types...
+            \ (viewof voidstar 1) types...
 
     inline build-instance (self f)
         (Capture (elementof (typeof f))) f self
@@ -100,7 +121,7 @@ inline capture-parser (macroname head body genf)
 
 spice unpack-capture (capture)
     let T = ('storageof ('typeof capture))
-    `(unpack (bitcast capture T))
+    `(unpack (bitcast (view capture) T))
 
 spice pack-capture (argtuple func)
     let T = ('typeof argtuple)

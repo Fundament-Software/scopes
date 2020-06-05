@@ -983,7 +983,8 @@ run-stage; # 3
         inline (self)
             sc_write (sc_value_ast_repr self)
     typeof = sc_value_type
-    qualified-typeof = sc_value_qualified_type
+    qualified-typeof = sc_value_qualified_type # deprecated
+    qualifiersof = sc_value_qualified_type
     anchor = sc_value_anchor
     argcount = sc_argcount
     getarg = sc_getarg
@@ -1071,6 +1072,7 @@ run-stage; # 3
                 inline ()
                     sc_view_type self id
     refer? = sc_type_is_refer
+    view? = sc_type_is_view
     variadic? = sc_function_type_is_variadic
     pointer? =
         fn (cls)
@@ -4565,17 +4567,19 @@ inline gen-tupleof (type-func)
 
             # build tuple type and values
             # also check if all arguments are constant
+            # and build a tuple view if one argument is a view
             let values = (alloca-array Value argc)
             let field-types = (alloca-array type argc)
-            let const? =
-                loop (i const? = 0 true)
+            let const? view? =
+                loop (i const? view? = 0 true false)
                     if (i == argc)
-                        break const?
+                        break const? view?
                     let k arg = ('dekey ('getarg args i))
                     store arg (getelementptr values i)
+                    let view? = (view? | ('view? ('qualifiersof arg)))
                     let T = ('key-type ('typeof arg) k)
                     store T (getelementptr field-types i)
-                    _ (i + 1) (const? & ('constant? arg))
+                    _ (i + 1) (const? & ('constant? arg)) view?
 
             let TT = (type-func argc field-types)
             if const?
@@ -4586,6 +4590,10 @@ inline gen-tupleof (type-func)
                     if (i == argc)
                         break result
                     let arg = (load (getelementptr values i))
+                    let arg =
+                        if view?
+                            `(view arg)
+                        else arg
                     _ (i + 1)
                         `(insertvalue result arg i)
 
