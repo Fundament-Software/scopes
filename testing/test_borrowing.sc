@@ -479,13 +479,11 @@ fn f ()
     ;
 test-refcount (inline () (f))
 
-# TODO: what happens when we pass view handles to tupleof?
-
+# make viewed tuple when some arguments are views
 fn f ()
-    tupleof (view (One 100))
+    tupleof (One 200) (view (One 100))
     ;
-# error: arguments of type 1001:{One} and %1000:One must both be movable
-test-compiler-error (static-typify f)
+test-refcount (inline () (f))
 
 # globals
 
