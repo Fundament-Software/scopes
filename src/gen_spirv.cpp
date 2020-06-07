@@ -1688,27 +1688,12 @@ struct SPIRVGenerator {
             auto val = builder.createUnaryOp(spv::OpBitReverse, rtype, x);
             map_phi({ val }, node); return {};
         } break;
-        case UnOpCTPop: {
+        case UnOpBitCount: {
             auto val = builder.createUnaryOp(spv::OpBitCount, rtype, x);
             map_phi({ val }, node); return {};
         } break;
-        case UnOpCTLZ: {
-            // emulate behavior of ctlz
-            auto val = builder.createBuiltinCall(rtype, glsl_ext_inst, GLSLstd450FindUMsb, { x });
-            spv::Id constant;
-            if (builder.isVectorType(rtype)) {
-                auto c = builder.makeIntConstant(builder.getContainedTypeId(rtype), 31, false);
-                int count = builder.getNumTypeComponents(rtype);
-                std::vector<spv::Id> comps;
-                comps.resize(count, c);
-                constant = builder.makeCompositeConstant(rtype, comps);
-            } else {
-                constant = builder.makeIntConstant(rtype, 31, false);
-            }
-            val = builder.createBinOp(spv::OpISub, rtype, constant, val);
-            map_phi({ val }, node); return {};
-        } break;
-        case UnOpCTTZ: _builtin = GLSLstd450FindILsb; break;
+        case UnOpFindMSB: _builtin = GLSLstd450FindUMsb; break;
+        case UnOpFindLSB: _builtin = GLSLstd450FindILsb; break;
         case UnOpLength:
             rtype = builder.getContainedTypeId(rtype);
             _builtin = GLSLstd450Length; break;

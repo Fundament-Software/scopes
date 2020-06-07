@@ -652,9 +652,9 @@ struct FCmp : Instruction {
 
 #define SCOPES_UNOP_KIND() \
     T(UnOpBitReverse, "unop-kind-bitreverse") \
-    T(UnOpCTPop, "unop-kind-ctpop") \
-    T(UnOpCTLZ, "unop-kind-ctlz") \
-    T(UnOpCTTZ, "unop-kind-cttz") \
+    T(UnOpBitCount, "unop-kind-bitcount") \
+    T(UnOpFindMSB, "unop-kind-findmsb") \
+    T(UnOpFindLSB, "unop-kind-findlsb") \
     T(UnOpSin, "unop-kind-sin") \
     T(UnOpCos, "unop-kind-cos") \
     T(UnOpTan, "unop-kind-tan") \

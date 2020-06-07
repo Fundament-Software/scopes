@@ -1726,7 +1726,8 @@ struct LLVMIRGenerator {
     }
 
     LLVMValueRef translate_pm_unop(const UnOpRef &node, LLVMValueRef x, PMIntrinsic op) {
-        LLVMValueRef func = get_intrinsic(op, LLVMTypeOf(x));
+        auto T = LLVMTypeOf(x);
+        LLVMValueRef func = get_intrinsic(op, T);
         assert(func);
         LLVMValueRef values[] = { x, trueV };
         int valcount = 1;
@@ -1737,7 +1738,27 @@ struct LLVMIRGenerator {
         } break;
         default: break;
         }
-        return LLVMBuildCall(builder, func, values, valcount, "");
+        LLVMValueRef result = LLVMBuildCall(builder, func, values, valcount, "");
+        if (op == llvm_ctlz) {
+            // emulate FindUMsb
+            LLVMValueRef constant;
+            if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                auto count = LLVMGetVectorSize(T);
+                auto ET = LLVMGetElementType(T);
+                assert(LLVMGetTypeKind(ET) == LLVMIntegerTypeKind);
+                int width = LLVMGetIntTypeWidth(ET);
+                constant = LLVMConstInt(ET, width - 1, false);
+                std::vector<LLVMValueRef> comps;
+                comps.resize(count, constant);
+                constant = LLVMConstVector(&comps[0], count);
+            } else {
+                assert(LLVMGetTypeKind(T) == LLVMIntegerTypeKind);
+                int width = LLVMGetIntTypeWidth(T);
+                constant = LLVMConstInt(T, width - 1, false);
+            }
+            result = LLVMBuildSub(builder, constant, result, "");
+        }
+        return result;
     }
 
     SCOPES_RESULT(void) translate_UnOp(const UnOpRef &node) {
@@ -1780,9 +1801,9 @@ struct LLVMIRGenerator {
 #define UNOP(SRC, FUNC) \
         case SRC: { val = translate_pm_unop(node, x, FUNC); } break;
         UNOP(UnOpBitReverse, llvm_bitreverse)
-        UNOP(UnOpCTPop, llvm_ctpop)
-        UNOP(UnOpCTLZ, llvm_ctlz)
-        UNOP(UnOpCTTZ, llvm_cttz)
+        UNOP(UnOpBitCount, llvm_ctpop)
+        UNOP(UnOpFindMSB, llvm_ctlz)
+        UNOP(UnOpFindLSB, llvm_cttz)
 #undef UNOP
         default: {
             auto T = LLVMTypeOf(x);

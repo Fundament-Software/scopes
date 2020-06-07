@@ -67,7 +67,7 @@ namespace scopes {
     FARITH_OP(FDiv) \
     FARITH_OP(FRem) \
     \
-    IUN_OP(BitReverse) IUN_OP(CTPop) IUN_OP(CTLZ) IUN_OP(CTTZ) \
+    IUN_OP(BitReverse) IUN_OP(BitCount) IUN_OP(FindMSB) IUN_OP(FindLSB) \
     \
     FUN_OP(FAbs) \
     \

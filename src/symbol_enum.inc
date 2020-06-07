@@ -342,9 +342,9 @@ namespace scopes {
     T(OP_BOr, "bor") \
     T(OP_BXor, "bxor") \
     T(OP_BitReverse, "bitreverse") \
-    T(OP_CTPop, "ctpop") \
-    T(OP_CTLZ, "ctlz") \
-    T(OP_CTTZ, "cttz") \
+    T(OP_BitCount, "bitcount") \
+    T(OP_FindMSB, "findmsb") \
+    T(OP_FindLSB, "findlsb") \
     T(OP_FAdd, "fadd") \
     T(OP_FSub, "fsub") \
     T(OP_FMul, "fmul") \

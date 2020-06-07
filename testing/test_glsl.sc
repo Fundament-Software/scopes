@@ -187,11 +187,11 @@ do
         f =
             typeinit
                 bitreverse v.x
-                ctpop v.y
-                ctlz v.z
-                cttz v.w
+                bitcount v.y
+                findmsb v.z
+                findlsb v.w
         f2 =
-            ctlz v2
+            findmsb v2
 
     print
         compile-glsl 440 'fragment
