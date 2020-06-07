@@ -133,6 +133,13 @@ struct PointerNamespaces {
 };
 
 struct LLVMIRGenerator {
+    enum PMIntrinsic {
+        llvm_bitreverse,
+        llvm_ctpop,
+        llvm_ctlz,
+        llvm_cttz,
+    };
+
     enum Intrinsic {
         llvm_sin_f32,
         llvm_sin_f64,
@@ -289,6 +296,18 @@ struct LLVMIRGenerator {
     static LLVMAttributeRef attr_sret;
     static LLVMAttributeRef attr_nonnull;
     LLVMValueRef intrinsics[NumIntrinsics];
+
+    // polymorphic intrinsics
+    typedef std::pair<PMIntrinsic, LLVMTypeRef> PMIntrinsicKey;
+    struct HashPMIntrinsicKey {
+        size_t operator ()(const PMIntrinsicKey &value) const {
+            return
+                hash2(std::hash<PMIntrinsic>()(value.first),
+                    std::hash<LLVMTypeRef>()(value.second));
+        }
+    };
+
+    std::unordered_map< PMIntrinsicKey, LLVMValueRef, HashPMIntrinsicKey > pm_intrinsics;
 
     bool use_debug_info = true;
     bool generate_object = false;
@@ -464,6 +483,42 @@ struct LLVMIRGenerator {
         fprintf(stderr, "LLVM %s: %s\n", severity, str);
         LLVMDisposeMessage(str);
         //LLVMDiagnosticSeverity LLVMGetDiagInfoSeverity(LLVMDiagnosticInfoRef DI);
+    }
+
+    LLVMValueRef get_intrinsic(PMIntrinsic op, LLVMTypeRef T) {
+        auto key = PMIntrinsicKey(op, T);
+        auto it = pm_intrinsics.find(key);
+        if (it != pm_intrinsics.end())
+            return it->second;
+        const char *prefix = nullptr;
+        int argcount = 0;
+        switch(op) {
+#define LLVM_PM_INTRINSIC(NAME, ARGC) \
+    case llvm_ ## NAME: prefix = #NAME; argcount = ARGC; break;
+        LLVM_PM_INTRINSIC(bitreverse, 1)
+        LLVM_PM_INTRINSIC(ctpop, 1)
+        LLVM_PM_INTRINSIC(ctlz, 2)
+        LLVM_PM_INTRINSIC(cttz, 2)
+#undef LLVM_PM_INTRINSIC
+        default: assert(false); break;
+        }
+        char strname[256];
+        if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+            int count = LLVMGetVectorSize(T);
+            auto ET = LLVMGetElementType(T);
+            assert(LLVMGetTypeKind(ET) == LLVMIntegerTypeKind);
+            int width = LLVMGetIntTypeWidth(ET);
+            snprintf(strname, 255, "llvm.%s.v%ii%i", prefix, count, width);
+        } else {
+            assert(LLVMGetTypeKind(T) == LLVMIntegerTypeKind);
+            int width = LLVMGetIntTypeWidth(T);
+            snprintf(strname, 255, "llvm.%s.i%i", prefix, width);
+        }
+        LLVMTypeRef argtypes[] = { T, i1T };
+        LLVMValueRef result = LLVMAddFunction(module, strname,
+            LLVMFunctionType(T, argtypes, argcount, false));
+        pm_intrinsics.insert({key, result});
+        return result;
     }
 
     LLVMValueRef get_intrinsic(Intrinsic op) {
@@ -1670,6 +1725,21 @@ struct LLVMIRGenerator {
         return {};
     }
 
+    LLVMValueRef translate_pm_unop(const UnOpRef &node, LLVMValueRef x, PMIntrinsic op) {
+        LLVMValueRef func = get_intrinsic(op, LLVMTypeOf(x));
+        assert(func);
+        LLVMValueRef values[] = { x, trueV };
+        int valcount = 1;
+        switch (op) {
+        case llvm_ctlz:
+        case llvm_cttz: {
+            valcount++;
+        } break;
+        default: break;
+        }
+        return LLVMBuildCall(builder, func, values, valcount, "");
+    }
+
     SCOPES_RESULT(void) translate_UnOp(const UnOpRef &node) {
         SCOPES_RESULT_TYPE(void);
         auto x = SCOPES_GET_RESULT(ref_to_value(node->value));
@@ -1707,6 +1777,13 @@ struct LLVMIRGenerator {
                 val = LLVMConstReal(T, 1.0);
             }
         } break;
+#define UNOP(SRC, FUNC) \
+        case SRC: { val = translate_pm_unop(node, x, FUNC); } break;
+        UNOP(UnOpBitReverse, llvm_bitreverse)
+        UNOP(UnOpCTPop, llvm_ctpop)
+        UNOP(UnOpCTLZ, llvm_ctlz)
+        UNOP(UnOpCTTZ, llvm_cttz)
+#undef UNOP
         default: {
             auto T = LLVMTypeOf(x);
             auto ET = T;

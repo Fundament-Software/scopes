@@ -172,5 +172,38 @@ do
     print
         sc_spirv_to_glsl bin
 
+# new instructions
+do
+    in v : ivec4
+        location = 0
+    out f : ivec4
+        location = 0
+    in v2 : ivec3
+        location = 1
+    out f2 : ivec3
+        location = 1
+
+    fn main ()
+        f =
+            typeinit
+                bitreverse v.x
+                ctpop v.y
+                ctlz v.z
+                cttz v.w
+        f2 =
+            ctlz v2
+
+    print
+        compile-glsl 440 'fragment
+            typify main
+            #'dump-disassembly
+            #'no-opts
+
+    #test ((ctpop 5:i16) == 2:i16)
+    #test ((ctlz 6) == 29)
+    #test ((cttz 6) == 1)
+    #test ((bitreverse 0b10010110:i8) == 0b01101001:i8)
+
+
 
 ;

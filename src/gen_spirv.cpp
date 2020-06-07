@@ -1684,6 +1684,31 @@ struct SPIRVGenerator {
         GLSLstd450 _builtin = GLSLstd450Bad;
         auto rtype = builder.getTypeId(x);
         switch (node->op) {
+        case UnOpBitReverse: {
+            auto val = builder.createUnaryOp(spv::OpBitReverse, rtype, x);
+            map_phi({ val }, node); return {};
+        } break;
+        case UnOpCTPop: {
+            auto val = builder.createUnaryOp(spv::OpBitCount, rtype, x);
+            map_phi({ val }, node); return {};
+        } break;
+        case UnOpCTLZ: {
+            // emulate behavior of ctlz
+            auto val = builder.createBuiltinCall(rtype, glsl_ext_inst, GLSLstd450FindUMsb, { x });
+            spv::Id constant;
+            if (builder.isVectorType(rtype)) {
+                auto c = builder.makeIntConstant(builder.getContainedTypeId(rtype), 31, false);
+                int count = builder.getNumTypeComponents(rtype);
+                std::vector<spv::Id> comps;
+                comps.resize(count, c);
+                constant = builder.makeCompositeConstant(rtype, comps);
+            } else {
+                constant = builder.makeIntConstant(rtype, 31, false);
+            }
+            val = builder.createBinOp(spv::OpISub, rtype, constant, val);
+            map_phi({ val }, node); return {};
+        } break;
+        case UnOpCTTZ: _builtin = GLSLstd450FindILsb; break;
         case UnOpLength:
             rtype = builder.getContainedTypeId(rtype);
             _builtin = GLSLstd450Length; break;
@@ -2100,9 +2125,9 @@ struct SPIRVGenerator {
             int64_t value = node->msw();
             switch(it->width) {
             case 8: return builder.makeIntConstant(
-                builder.makeIntegerType(8, true), value);
+                builder.makeIntegerType(8, true), value, false);
             case 16: return builder.makeIntConstant(
-                builder.makeIntegerType(16, true), value);
+                builder.makeIntegerType(16, true), value, false);
             case 32: return builder.makeIntConstant(value);
             case 64: return builder.makeInt64Constant(value);
             default: break;
@@ -2112,9 +2137,9 @@ struct SPIRVGenerator {
             switch(it->width) {
             case 1: return builder.makeBoolConstant(value);
             case 8: return builder.makeIntConstant(
-                builder.makeIntegerType(8, false), value);
+                builder.makeIntegerType(8, false), value, false);
             case 16: return builder.makeIntConstant(
-                builder.makeIntegerType(16, false), value);
+                builder.makeIntegerType(16, false), value, false);
             case 32: return builder.makeUintConstant(value);
             case 64: return builder.makeUint64Constant(value);
             default: break;

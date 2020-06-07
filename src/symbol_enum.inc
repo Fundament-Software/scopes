@@ -341,6 +341,10 @@ namespace scopes {
     T(OP_BAnd, "band") \
     T(OP_BOr, "bor") \
     T(OP_BXor, "bxor") \
+    T(OP_BitReverse, "bitreverse") \
+    T(OP_CTPop, "ctpop") \
+    T(OP_CTLZ, "ctlz") \
+    T(OP_CTTZ, "cttz") \
     T(OP_FAdd, "fadd") \
     T(OP_FSub, "fsub") \
     T(OP_FMul, "fmul") \

@@ -48,24 +48,26 @@ namespace scopes {
     IARITH_NUW_NSW_OPS(Sub) \
     IARITH_NUW_NSW_OPS(Mul) \
     \
-    IARITH_OP(SDiv, i) \
-    IARITH_OP(UDiv, u) \
-    IARITH_OP(SRem, i) \
-    IARITH_OP(URem, u) \
+    IARITH_OP(SDiv) \
+    IARITH_OP(UDiv) \
+    IARITH_OP(SRem) \
+    IARITH_OP(URem) \
     \
-    IARITH_OP(BAnd, u) \
-    IARITH_OP(BOr, u) \
-    IARITH_OP(BXor, u) \
+    IARITH_OP(BAnd) \
+    IARITH_OP(BOr) \
+    IARITH_OP(BXor) \
     \
-    IARITH_OP(Shl, u) \
-    IARITH_OP(LShr, u) \
-    IARITH_OP(AShr, i) \
+    IARITH_OP(Shl) \
+    IARITH_OP(LShr) \
+    IARITH_OP(AShr) \
     \
     FARITH_OP(FAdd) \
     FARITH_OP(FSub) \
     FARITH_OP(FMul) \
     FARITH_OP(FDiv) \
     FARITH_OP(FRem) \
+    \
+    IUN_OP(BitReverse) IUN_OP(CTPop) IUN_OP(CTLZ) IUN_OP(CTTZ) \
     \
     FUN_OP(FAbs) \
     \
@@ -3177,7 +3179,7 @@ repeat:
             op->hack_change_value(VIEWTYPE1(op->get_type(), _A, _B)); \
             return TypedValueRef(call.anchor(), op); \
         } break;
-#define IARITH_OP(NAME, PFX) \
+#define IARITH_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(2, 2); \
             READ_TYPEOF(A); READ_TYPEOF(B); \
@@ -3204,7 +3206,7 @@ repeat:
             op->hack_change_value(VIEWTYPE1(op->get_type(), _A, _B, _C)); \
             return TypedValueRef(call.anchor(), op); \
         } break;
-#define IUN_OP(NAME, PFX) \
+#define IUN_OP(NAME) \
         case OP_ ## NAME: { \
             CHECKARGS(1, 1); \
             READ_TYPEOF(A); \
