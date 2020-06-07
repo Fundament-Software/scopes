@@ -1729,17 +1729,21 @@ struct LLVMIRGenerator {
         auto T = LLVMTypeOf(x);
         LLVMValueRef func = get_intrinsic(op, T);
         assert(func);
-        LLVMValueRef values[] = { x, trueV };
+        LLVMValueRef values[] = { x, falseV };
         int valcount = 1;
         switch (op) {
-        case llvm_ctlz:
+        case llvm_ctlz: {
+            valcount++;
+        } break;
         case llvm_cttz: {
             valcount++;
+            values[1] = trueV; // we don't need the undefined result
         } break;
         default: break;
         }
         LLVMValueRef result = LLVMBuildCall(builder, func, values, valcount, "");
-        if (op == llvm_ctlz) {
+        switch (op) {
+        case llvm_ctlz: {
             // emulate FindUMsb
             LLVMValueRef constant;
             if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
@@ -1757,6 +1761,26 @@ struct LLVMIRGenerator {
                 constant = LLVMConstInt(T, width - 1, false);
             }
             result = LLVMBuildSub(builder, constant, result, "");
+        } break;
+        case llvm_cttz: {
+            // emulate FindILsb
+            LLVMValueRef constant;
+            if (LLVMGetTypeKind(T) == LLVMVectorTypeKind) {
+                auto count = LLVMGetVectorSize(T);
+                auto ET = LLVMGetElementType(T);
+                assert(LLVMGetTypeKind(ET) == LLVMIntegerTypeKind);
+                constant = LLVMConstInt(ET, -1ull, true);
+                std::vector<LLVMValueRef> comps;
+                comps.resize(count, constant);
+                constant = LLVMConstVector(&comps[0], count);
+            } else {
+                assert(LLVMGetTypeKind(T) == LLVMIntegerTypeKind);
+                constant = LLVMConstInt(T, -1ull, true);
+            }
+            auto cmpinstr = LLVMBuildICmp(builder, LLVMIntEQ, x, LLVMConstNull(T), "");
+            result = LLVMBuildSelect(builder, cmpinstr, constant, result, "");
+        } break;
+        default: break;
         }
         return result;
     }
