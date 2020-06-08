@@ -13,6 +13,7 @@
 
 #include <stdint.h>
 #include <unordered_map>
+#include <string>
 
 #include "result.hpp"
 
