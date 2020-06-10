@@ -264,6 +264,13 @@ typedef Set < Struct
             inline "ok" (idx) true
             inline "fail" () false
 
+    @@ memo
+    inline __rin (elemT cls)
+        let KeyType = cls.KeyType
+        static-if (imply? elemT KeyType)
+            inline (key self)
+                in? self (imply key KeyType)
+
     fn getdefault (self key value)
         """"returns the value associated with key or raises an error
         let hash = ((typeof self) . HashFunction)

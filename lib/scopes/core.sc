@@ -2276,6 +2276,7 @@ let
     <= = (balanced-binary-op-dispatch '__<= '__r<= "compare")
     > = (balanced-binary-op-dispatch '__> '__r> "compare")
     >= = (balanced-binary-op-dispatch '__>= '__r>= "compare")
+    in = (balanced-binary-op-dispatch '__in '__rin "find element with")
     + = (balanced-binary-op-dispatch '__+ '__r+ "add")
     - = (unary-or-balanced-binary-op-dispatch '__neg "negate" '__- '__r- "subtract")
     * = (balanced-binary-op-dispatch '__* '__r* "multiply")
@@ -3504,6 +3505,7 @@ define-infix> 300 <=
 define-infix> 300 >=
 define-infix> 300 !=
 define-infix> 300 ==
+define-infix> 300 in
 
 define-infix> 340 |
 define-infix> 350 ^
@@ -6441,7 +6443,7 @@ define-sugar-macro decorate-vvv
         if (empty? in)
             break out
         let decorator in = (decons in)
-        repeat in
+        repeat (_ in)
             `[(cons decorator (list out))]
 
 define-sugar-macro decorate-fn
@@ -6463,7 +6465,7 @@ define-sugar-macro decorate-fn
             if (empty? in)
                 break out
             let decorator in = (decons in)
-            repeat in
+            repeat (_ in)
                 `[(cons decorator (list out))]
     if name-is-symbol?
         `[(list let name '= result)]
@@ -6495,10 +6497,10 @@ define-sugar-macro decorate-let
                         if (empty? in)
                             break out
                         let decorator in = (decons in)
-                        repeat in
+                        repeat (_ in)
                             list
                                 'tag `[(cons decorator out)] entry-anchor
-                repeat in
+                repeat (_ in)
                     cons
                         'tag `[(cons k eq result)] anchor
                         out
@@ -6518,7 +6520,7 @@ define-sugar-macro decorate-let
                 if (empty? in)
                     break out
                 let decorator in = (decons in)
-                repeat in
+                repeat (_ in)
                     cons decorator (list out)
         loop (in out = params (list '= ('tag `result anchor)))
             if (empty? in)
@@ -7108,6 +7110,48 @@ spice MethodsAccessor-typeattr (cls name)
         Symbol
             .. (tostring ContextType) "." (name as Symbol as string)
     'tag boundmethod anchor
+
+#-------------------------------------------------------------------------------
+# spice for tuple search in next stage
+#-------------------------------------------------------------------------------
+
+spice in-tuple? (element collection)
+    let T = ('typeof collection)
+    let vQT = ('qualified-typeof element)
+    let VT-static? = ('constant? element)
+    if (VT-static? & ('constant? collection))
+        # compile time search
+        for i in (range ('element-count T))
+            let ET = ('element@ T i)
+            let f = (imply-converter vQT ET true)
+            inline ret-true () true
+            inline ret-false () false
+            if (operator-valid? f)
+                let elem = (sc_const_extract_at collection i)
+                let result =
+                    sc_prove
+                        spice-quote
+                            static-branch
+                                ((f element) == elem)
+                                ret-true
+                                ret-false
+                if (result as bool)
+                    return `true
+        `false
+    else
+        let quoted-true = `true
+        let expr = (ptrtoref (alloca Value))
+        expr = `false
+        for i in (range ('element-count T))
+            let ET = ('element@ T i)
+            let f = (imply-converter vQT ET VT-static?)
+            if (operator-valid? f)
+                expr =
+                    sc_cond_new
+                        `((f element) == collection @ i)
+                        quoted-true
+                        expr
+        deref expr
 
 run-stage; # 11
 
@@ -7821,6 +7865,15 @@ fn mod (a b)
 #inline... mod
 #case (a : integer, b : integer) (mod (deref a) (deref b))
 #case (a : real, b : real) (mod (deref a) (deref b))
+
+#-------------------------------------------------------------------------------
+# element searching
+#-------------------------------------------------------------------------------
+
+typedef+ tuple
+    inline __rin (T selfT) in-tuple?
+
+unlet in-tuple?
 
 #-------------------------------------------------------------------------------
 # constants

@@ -1,5 +1,6 @@
 
 using import Map
+using import testing
 
 local map : (Map Symbol i32)
 inline iter-pairs1 (f)
@@ -29,6 +30,8 @@ iter-pairs
     inline (key value)
         'set map key value
 'dump map
+
+test ('D in map)
 
 for k v in map
     print k v
@@ -70,6 +73,10 @@ iter-pairs
     inline (key value)
         'insert set value
 'dump set
+
+test (909 in set)
+test (909:i16 in set)
+
 for val in set
     print val
 iter-pairs

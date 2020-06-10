@@ -40,6 +40,25 @@ do
     test (a == b)
     test (b != c)
 
+    inline test_values (a)
+        test (1 in a)
+        test (606 in a)
+        test (true in a)
+        test (not (false in a))
+
+    fn test_values_unconst (a)
+        test_values a
+
+    test (constant? (true in a))
+    test_values a
+    test_values_unconst a
+
+do
+    r? := i32 in (tupleof i8 i16 i32 i64)
+
+    test r?
+    test (constant? r?)
+
 do
     let q =
         tupleof
