@@ -31,3 +31,7 @@ test-compiler-error
     do
         let x = (+ 1)
 
+test ((floor 3) == 3)
+test ((floor 3.5) == 3.0)
+test (all? ((floor (vectorof i32 1 2)) == (vectorof i32 1 2)))
+test (all? ((floor (vectorof f32 1.5 2.5)) == (vectorof f32 1 2)))

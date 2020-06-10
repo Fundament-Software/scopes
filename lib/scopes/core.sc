@@ -7765,15 +7765,48 @@ fn hex (value)
     integer->string value (16 as (typeof value))
 
 #-------------------------------------------------------------------------------
+# typematching
+#-------------------------------------------------------------------------------
+
+@@ memo
+inline typematcher (cmpf)
+    typedef "typematcher"
+        @@ memo
+        inline __typematch (cls other-cls)
+            cmpf other-cls
+        @@ memo
+        inline __rimply (cls T)
+            inline (self) self
+
+sugar typematch (...)
+    qq
+        [typematcher]
+            [inline] (T)
+                unquote
+                    if ((countof ...) == 1)
+                        let head = (decons ...)
+                        head
+                    else `...
+
+#-------------------------------------------------------------------------------
 # extensions to intrinsics
 #-------------------------------------------------------------------------------
 
 inline distance (a b)
     length (a - b)
 
-inline... floor
-case (x : integer,) x
-case (x : real,) (floor x)
+inline floorf (T)
+    let ST = (storageof T)
+    inline identity (x) x
+    dump ST
+    static-if (ST < integer) identity
+    elseif (ST < vector)
+        static-if ((storageof (elementof ST)) < integer) identity
+        else floor
+    else floor
+
+inline floor (x)
+    (floorf (typeof x)) x
 
 # computes the remainder of floor division
 fn mod (a b)
@@ -7785,9 +7818,9 @@ fn mod (a b)
             rem
         ? (b < 0) b (0 as (typeof b))
 
-inline... mod
-case (a : integer, b : integer) (mod (deref a) (deref b))
-case (a : real, b : real) (mod (deref a) (deref b))
+#inline... mod
+#case (a : integer, b : integer) (mod (deref a) (deref b))
+#case (a : real, b : real) (mod (deref a) (deref b))
 
 #-------------------------------------------------------------------------------
 # constants
@@ -7830,7 +7863,7 @@ sc_set_typecast_handler
 
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
-    \ tuple== gen-arrayof MethodsAccessor-typeattr
+    \ tuple== gen-arrayof MethodsAccessor-typeattr floorf
 
 run-stage; # 12
 

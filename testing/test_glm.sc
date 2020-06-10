@@ -210,6 +210,9 @@ do
     test ((m * (vec4 2 3 4 5)) == (vec3 21 30 52))
     test (((vec3 2 3 4) * m) == (vec4 27 22 20 28))
 
+test ((floor (ivec2 1 2)) == (ivec2 1 2))
+test ((floor (vec2 1.5 2.5)) == (vec2 1 2))
+
 #let m = (mat3 m)
 #print m
 

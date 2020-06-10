@@ -110,3 +110,20 @@ case (x,) 2
 
 test ((test6 1 2 3) == 1)
 test ((test6 1) == 2)
+
+do
+    typedef K : f32
+    typedef M : i32
+    typedef L : i32
+
+    # typematcher
+    fn... test7
+    case (a : (typematch T < integer),) 1
+    case (a : (typematch T < real),) 2
+    case (a : (typematch (storageof T) < real),) 3
+    #case (a : (typematch T in (tupleof M L)),) 3
+
+    test ((test7 1) == 1)
+    test ((test7 1.0) == 2)
+    test ((test7 (nullof K)) == 3)
+
