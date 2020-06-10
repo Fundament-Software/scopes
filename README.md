@@ -1,4 +1,4 @@
-![scopes_logo_210px.png](https://hg.sr.ht/~duangle/scopes/raw/default/extras/images/scopes_logo_210px.png)
+![scopes_logo_210px.png](https://hg.sr.ht/~duangle/scopes/raw/extras/images/scopes_logo_210px.png)
 
 Welcome to Scopes
 -----------------
