@@ -3417,7 +3417,8 @@ let sign = (select-op-macro ssign ssign fsign 1)
 let hash = (sc_typename_type "hash" typename)
 'set-plain-storage hash u64
 
-# final `not` - this one folds the constant
+# semi-final `not` - this one folds the constant
+    further down you'll find the sugar for not
 let not =
     spice-macro
         fn (args)
@@ -7093,6 +7094,20 @@ let global =
                     spice-quote
                         store init val
                         qval
+
+#-------------------------------------------------------------------------------
+# sugared not: single line sugar; this is the last definition of `not`
+#-------------------------------------------------------------------------------
+
+let _not = not # spice still directly available
+sugar not (expr...)
+    let anchor = ('anchor expr-head)
+    let _not = ('tag `_not anchor)
+    if ((countof expr...) <= 1)
+        cons _not expr...
+    else
+        let head rest = (decons expr...)
+        list _not ('tag `expr... ('anchor head))
 
 #-------------------------------------------------------------------------------
 # spice for MethodsAccessor in next stage
