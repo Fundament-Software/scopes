@@ -35,3 +35,32 @@ test ((floor 3) == 3)
 test ((floor 3.5) == 3.0)
 test (all? ((floor (vectorof i32 1 2)) == (vectorof i32 1 2)))
 test (all? ((floor (vectorof f32 1.5 2.5)) == (vectorof f32 1 2)))
+
+
+do
+    let x y = 2 3
+
+    test (not (x == y))
+    test
+        not x == y
+    # don't wrap single multiline expressions
+    test
+        not
+            if true false
+            else true
+    # but wrap multiple multiline expressions
+    test
+        not
+            &
+            if true false
+            else true
+            if true false
+            else true
+    test
+        not (x == y) | (not constant? y)
+    test
+        not not not not true
+
+
+
+;

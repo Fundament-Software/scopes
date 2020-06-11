@@ -7103,11 +7103,27 @@ let _not = not # spice still directly available
 sugar not (expr...)
     let anchor = ('anchor expr-head)
     let _not = ('tag `_not anchor)
+    #SCOPES_LIBEXPORT sc_valueref_list_scope_raises_t sc_expand(sc_valueref_t expr, const sc_list_t *next, const sc_scope_t *scope);
     if ((countof expr...) <= 1)
-        cons _not expr...
+        _
+            cons _not expr...
+            next-expr
+            sugar-scope
     else
+        # count multi-line expressions as a single one
         let head rest = (decons expr...)
-        list _not ('tag `expr... ('anchor head))
+        let head rest sugar-scope = (sc_expand head rest sugar-scope)
+        if (empty? rest)
+            _
+                cons _not head rest
+                next-expr
+                sugar-scope
+        else
+            let expr = (cons head rest)
+            _
+                list _not ('tag `expr ('anchor head))
+                next-expr
+                sugar-scope
 
 #-------------------------------------------------------------------------------
 # spice for MethodsAccessor in next stage
