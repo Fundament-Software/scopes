@@ -5645,8 +5645,20 @@ define va@
         fn "va@" (args)
             let argc = ('argcount args)
             verify-count argc 1 -1
-            let at = (('getarg args 0) as i32)
-            'getarg args (at + 1)
+            let at = ('getarg args 0)
+            if (('typeof at) == Symbol)
+                let at = (at as Symbol)
+                loop (i = 1)
+                    if (i >= argc)
+                        break `()
+                    let val = ('getarg args i)
+                    let k val = ('dekey val)
+                    if (k == at)
+                        break val
+                    repeat (i + 1)
+            else
+                let at = (at as i32)
+                'getarg args (at + 1)
 
 """".. spice:: (va-map f ...)
 
