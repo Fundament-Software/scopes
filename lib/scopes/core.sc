@@ -7103,7 +7103,6 @@ let _not = not # spice still directly available
 sugar not (expr...)
     let anchor = ('anchor expr-head)
     let _not = ('tag `_not anchor)
-    #SCOPES_LIBEXPORT sc_valueref_list_scope_raises_t sc_expand(sc_valueref_t expr, const sc_list_t *next, const sc_scope_t *scope);
     if ((countof expr...) <= 1)
         _
             cons _not expr...

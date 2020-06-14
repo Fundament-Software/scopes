@@ -8,6 +8,11 @@ This is an early release. Right now, only basic syntax highlighting is available
 
 ## Release Notes
 
+### 0.46.0
+
+* Updated extension for Scopes 0.16
+* Removed defunct icon theme
+
 ### 0.44.0
 
 * Added more keywords relevant to Scopes 0.15
