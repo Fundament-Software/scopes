@@ -7472,6 +7472,15 @@ typedef+ tuple
             static-if (cls == T)
                 tuple==
 
+    # automatic hashing of arguments
+    spice __hash (self)
+        let cls = ('typeof self)
+        let numfields = ('element-count cls)
+        if (numfields == 0)
+            `(nullof hash)
+        else
+            `(hash (unpack self))
+
     # extend type constructor with value constructor
     spice __typecall (cls args...)
         let cls = (cls as type)
