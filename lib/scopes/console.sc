@@ -181,9 +181,9 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                         extern-new unnamed ('typeof x)
                             storage-class = 'Private
                     let block = (sc_expression_new)
-                    sc_expression_append block `(store x globalx)
+                    sc_expression_append block `(store (deref x) globalx)
                     sc_expression_append block `(ptrtoref globalx)
-                    return block
+                    return (sc_prove block)
             x
 
         spice append-to-scope (scope key docstr vals...)
@@ -230,8 +230,8 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
             spice-quote
                 print key [(default-styler style-operator "=")] outargs
 
-        spice handle-retargs (inserts counter eval-scope vals...)
-            let inserts = (inserts as i32)
+        spice print-retargs (_inserts counter vals...)
+            let inserts = (_inserts as i32)
             let counter = (counter as i32)
             let count = ('argcount vals...)
             if inserts
@@ -244,10 +244,8 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                     return
                         spice-quote
                             print outargs
-                            _ counter eval-scope
+                            _inserts
             elseif (count != 0)
-                local eval-scope = eval-scope
-                let block = (sc_expression_new)
                 let outargs =
                     sc_argument_list_map_new (count * 2 + 1)
                         inline (i)
@@ -260,22 +258,39 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                             let arg = ('getarg vals... i)
                             let idstr = (make-idstr (counter + i))
                             let idsym = (Symbol idstr)
-                            eval-scope =
-                                do
-                                    let eval-scope = (deref eval-scope)
-                                    if (('typeof arg) == Value)
-                                        `('bind eval-scope idsym ``arg)
-                                    else
-                                        let arg = (unlocal arg)
-                                        `('bind eval-scope idsym `arg)
-                            sc_expression_append block eval-scope
                             `idstr
+                return
+                    spice-quote
+                        print outargs
+                        _inserts
+            _inserts
+
+        spice handle-retargs (inserts counter eval-scope vals...)
+            let inserts = (inserts as i32)
+            let counter = (counter as i32)
+            let count = ('argcount vals...)
+            if inserts
+            elseif (count != 0)
+                local eval-scope = eval-scope
+                let block = (sc_expression_new)
+                for i in (range count)
+                    let arg = ('getarg vals... i)
+                    let idstr = (make-idstr (counter + i))
+                    let idsym = (Symbol idstr)
+                    eval-scope =
+                        do
+                            let eval-scope = (deref eval-scope)
+                            if (('typeof arg) == Value)
+                                `('bind eval-scope idsym ``arg)
+                            else
+                                let arg = (unlocal arg)
+                                `('bind eval-scope idsym `arg)
+                    sc_expression_append block eval-scope
                 let counter = (counter + count)
                 let eval-scope = (deref eval-scope)
                 return
                     spice-quote
                         block
-                        print outargs
                         _ counter eval-scope
             spice-quote
                 _ counter eval-scope
@@ -315,7 +330,10 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                                 [embed]
                                     unquote-splice user-expr
                             [let]
-                                inserted = ([fold-locals] 0 [count-folds])
+                                inserted =
+                                    [print-retargs]
+                                        [fold-locals] 0 [count-folds]
+                                        \ [counter] [tmp]
                                 eval-scope = ([fold-imports] [eval-scope])
                             [handle-retargs] inserted
                                 \ [counter] eval-scope [tmp]
