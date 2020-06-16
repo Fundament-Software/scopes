@@ -172,6 +172,20 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                 return x
             x + 1
 
+        fn unlocal (x)
+            let T = ('qualifiersof x)
+            if ('refer? T)
+                if ((sc_refer_storage_class T) == 'Function)
+                    # convert local to global
+                    let globalx =
+                        extern-new unnamed ('typeof x)
+                            storage-class = 'Private
+                    let block = (sc_expression_new)
+                    sc_expression_append block `(store x globalx)
+                    sc_expression_append block `(ptrtoref globalx)
+                    return block
+            x
+
         spice append-to-scope (scope key docstr vals...)
             let tmp = (Symbol "#result...")
             if ((key != tmp) and (key != unnamed))
@@ -185,6 +199,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                             if (('typeof arg) == Value)
                                 `(store ``arg (getelementptr outargs i))
                             else
+                                let arg = (unlocal arg)
                                 `(store `arg (getelementptr outargs i))
                     sc_expression_append block
                         `('bind-with-docstring scope key (sc_argument_list_new acount outargs) docstr)
@@ -192,7 +207,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                 else
                     return
                         spice-quote
-                            'bind-with-docstring scope key vals... docstr
+                            'bind-with-docstring scope key [(unlocal vals...)] docstr
             scope
 
         sugar fold-imports ((eval-scope as Scope))
@@ -251,6 +266,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                                     if (('typeof arg) == Value)
                                         `('bind eval-scope idsym ``arg)
                                     else
+                                        let arg = (unlocal arg)
                                         `('bind eval-scope idsym `arg)
                             sc_expression_append block eval-scope
                             `idstr
