@@ -1437,7 +1437,7 @@ static SCOPES_RESULT(TypedValueRef) prove_KeyedTemplate(const ASTContext &ctx,
     const KeyedTemplateRef &keyed) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     auto value = SCOPES_GET_RESULT(prove(ctx, keyed->value));
-    assert(!value.isa<ArgumentList>());
+    //assert(!value.isa<ArgumentList>());
     return ref(keyed.anchor(), Keyed::from(keyed->key, value));
 }
 
