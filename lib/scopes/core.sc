@@ -2464,7 +2464,7 @@ do
                         hide-traceback;
                         error "cannot copy value of non-plain storage type"
                     let anchor = ('anchor args)
-                    'tag `(dupe self) anchor
+                    'tag `(dupe (deref self)) anchor
 
     'set-symbols immutable
         __copy = default-copy
