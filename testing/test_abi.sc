@@ -122,3 +122,41 @@ do
     test (s.vertexCount == s2.vertexCount)
     test (s.triangleCount == s2.triangleCount)
     test (s.vertices == s2.vertices)
+
+do
+    let AB =
+        do
+            using import struct
+
+            struct AB plain
+                a : i32
+                b : i32
+                c : i32
+
+    fn mrv1 ()
+        let sptr = (malloc AB)
+        sptr.a = 1
+        sptr.b = 2
+        sptr.c = 3
+        # wrong ABI when references are being returned, produces crash
+        _ sptr.a sptr.b sptr.c
+
+    fn mrv2 ()
+        let sptr = (malloc-array i32 3)
+        sptr @ 0 = 1
+        sptr @ 1 = 2
+        sptr @ 2 = 3
+        # wrong ABI when references are being returned, produces crash
+        _ (sptr @ 0) (sptr @ 1) (sptr @ 2)
+
+    #compile
+        static-typify mrv1
+        'dump-function
+
+    let a b c = (mrv1)
+    print a b c
+
+    let a b c = (mrv2)
+    print a b c
+
+

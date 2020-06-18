@@ -66,7 +66,11 @@ void ArgumentsType::stream_name(StyledStream &ss) const {
 
 const TupleType *ArgumentsType::to_tuple_type() const {
     assert(!values.empty());
-    return cast<TupleType>(tuple_type(values).assert_ok());
+    Types storage_types;
+    for (auto &&value : values) {
+        storage_types.push_back(qualified_storage_type(value).assert_ok());
+    }
+    return cast<TupleType>(tuple_type(storage_types).assert_ok());
 }
 
 ArgumentsType::ArgumentsType(const Types &_values) :

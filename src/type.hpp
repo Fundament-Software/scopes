@@ -195,6 +195,11 @@ bool all_plain(const Types &types);
 bool is_plain(const Type *T);
 
 //------------------------------------------------------------------------------
+
+SCOPES_RESULT(const Type *) storage_type(const Type *T);
+SCOPES_RESULT(const Type *) qualified_storage_type(const Type *T);
+
+//------------------------------------------------------------------------------
 // TYPE CHECK PREDICATES
 //------------------------------------------------------------------------------
 

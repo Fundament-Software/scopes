@@ -6,6 +6,7 @@
 
 #include "platform_abi.hpp"
 #include "types.hpp"
+#include "type.hpp"
 #include "utils.hpp"
 #include "dyn_cast.inc"
 
@@ -116,7 +117,7 @@ static size_t classify_tuple_like(size_t size,
     }
     ABIClass subclasses[MAX_ABI_CLASSES];
     for (size_t i = 0; i < count; ++i) {
-        auto ET = strip_qualifiers(fields[i]);
+        auto ET = qualified_storage_type(fields[i]).assert_ok();
         if (!packed)
             offset = align(offset, align_of(ET).assert_ok());
         size_t num = classify (ET, subclasses, offset % 8);
@@ -172,7 +173,7 @@ static size_t classify_array_like(size_t size,
         classes[0] = ABI_CLASS_NO_CLASS;
         return 1;
     }
-    auto ET = element_type;
+    auto ET = qualified_storage_type(element_type).assert_ok();
     ABIClass subclasses[MAX_ABI_CLASSES];
     size_t alignment = align_of(ET).assert_ok();
     size_t esize = size_of(ET).assert_ok();
@@ -296,7 +297,7 @@ static size_t classify(const Type *T, ABIClass *classes, size_t offset) {
 #endif // SCOPES_WIN32
 
 size_t abi_classify(const Type *T, ABIClass *classes) {
-    T = strip_qualifiers(T);
+    //const Type *ST = strip_qualifiers(T);
     if (T->kind() == TK_Arguments) {
         if (T == empty_arguments_type()) {
             classes[0] = ABI_CLASS_NO_CLASS;
@@ -304,6 +305,7 @@ size_t abi_classify(const Type *T, ABIClass *classes) {
         }
         T = cast<ArgumentsType>(T)->to_tuple_type();
     }
+    T = qualified_storage_type(T).assert_ok();
 #ifdef SCOPES_WIN32
     classes[0] = ABI_CLASS_NO_CLASS;
     if (is_opaque(T))

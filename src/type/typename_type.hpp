@@ -57,8 +57,6 @@ const TypenameType *opaque_typename_type(const String *name, const Type *superty
 SCOPES_RESULT(const TypenameType *) plain_typename_type(const String *name, const Type *supertype, const Type *storage_type);
 SCOPES_RESULT(const TypenameType *) unique_typename_type(const String *name, const Type *supertype, const Type *storage_type);
 
-SCOPES_RESULT(const Type *) storage_type(const Type *T);
-
 } // namespace scopes
 
 #endif // SCOPES_TYPENAME_HPP

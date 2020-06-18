@@ -10,6 +10,8 @@
 #include "pointer_type.hpp"
 #include "arguments_type.hpp"
 #include "qualify_type.hpp"
+#include "../qualifiers.hpp"
+#include "../qualifier.inc"
 #include "../dyn_cast.inc"
 
 namespace scopes {
@@ -109,24 +111,6 @@ SCOPES_RESULT(const TypenameType *) unique_typename_type(const String *name, con
     auto TT = incomplete_typename_type(name, supertype);
     SCOPES_CHECK_RESULT(TT->complete(storage_type, 0));
     return TT;
-}
-
-SCOPES_RESULT(const Type *) storage_type(const Type *T) {
-    SCOPES_RESULT_TYPE(const Type *);
-    T = strip_qualifiers(T);
-    switch(T->kind()) {
-    case TK_Typename: {
-        const TypenameType *tt = cast<TypenameType>(T);
-        if (!tt->is_complete()) {
-            SCOPES_ERROR(TypenameIncomplete, T);
-        }
-        if (tt->is_opaque()) {
-            SCOPES_ERROR(OpaqueType, T);
-        }
-        return tt->storage();
-    } break;
-    default: return T;
-    }
 }
 
 

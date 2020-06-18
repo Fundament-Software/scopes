@@ -367,6 +367,38 @@ bool types_compatible(const Type *paramT, const Type *argT) {
 }
 
 //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+SCOPES_RESULT(const Type *) storage_type(const Type *T) {
+    SCOPES_RESULT_TYPE(const Type *);
+    T = strip_qualifiers(T);
+    switch(T->kind()) {
+    case TK_Typename: {
+        const TypenameType *tt = cast<TypenameType>(T);
+        if (!tt->is_complete()) {
+            SCOPES_ERROR(TypenameIncomplete, T);
+        }
+        if (tt->is_opaque()) {
+            SCOPES_ERROR(OpaqueType, T);
+        }
+        return tt->storage();
+    } break;
+    default: return T;
+    }
+}
+
+SCOPES_RESULT(const Type *) qualified_storage_type(const Type *T) {
+    //SCOPES_RESULT_TYPE(const Type *);
+    auto rq = try_qualifier<ReferQualifier>(T);
+    if (rq) {
+        T = strip_qualifiers(T);
+        return pointer_type(T, rq->flags, rq->storage_class);
+    } else {
+        return storage_type(T);
+    }
+}
+
+//------------------------------------------------------------------------------
 // TYPE CHECK PREDICATES
 //------------------------------------------------------------------------------
 
