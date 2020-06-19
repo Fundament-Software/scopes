@@ -184,7 +184,9 @@ B_TYPES()
 bool is_opaque(const Type *T);
 TypeKind storage_kind(const Type *T);
 SCOPES_RESULT(size_t) size_of(const Type *T);
+SCOPES_RESULT(size_t) qualified_size_of(const Type *T);
 SCOPES_RESULT(size_t) align_of(const Type *T);
+SCOPES_RESULT(size_t) qualified_align_of(const Type *T);
 const Type *superof(const Type *T);
 void stream_type_name(StyledStream &ss, const Type *T);
 bool is_returning(const Type *T);

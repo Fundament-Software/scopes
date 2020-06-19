@@ -277,6 +277,11 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
     SCOPES_ERROR(OpaqueType, T);
 }
 
+SCOPES_RESULT(size_t) qualified_size_of(const Type *T) {
+    SCOPES_RESULT_TYPE(size_t);
+    return size_of(SCOPES_GET_RESULT(qualified_storage_type(T)));
+}
+
 SCOPES_RESULT(size_t) align_of(const Type *T) {
     SCOPES_RESULT_TYPE(size_t);
     switch(T->kind()) {
@@ -307,6 +312,11 @@ SCOPES_RESULT(size_t) align_of(const Type *T) {
     }
 
     SCOPES_ERROR(OpaqueType, T);
+}
+
+SCOPES_RESULT(size_t) qualified_align_of(const Type *T) {
+    SCOPES_RESULT_TYPE(size_t);
+    return align_of(SCOPES_GET_RESULT(qualified_storage_type(T)));
 }
 
 const Type *superof(const Type *T) {

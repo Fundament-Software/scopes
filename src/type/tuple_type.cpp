@@ -83,7 +83,7 @@ TupleType::TupleType(const Types &_values, bool _packed, size_t _alignment)
         for (size_t i = 0; i < values.size(); ++i) {
             const Type *ET = values[i];
             offsets[i] = sz;
-            sz += size_of(ET).assert_ok();
+            sz += qualified_size_of(ET).assert_ok();
         }
         size = sz;
         align = 1;
@@ -91,11 +91,11 @@ TupleType::TupleType(const Types &_values, bool _packed, size_t _alignment)
         size_t al = 1;
         for (size_t i = 0; i < values.size(); ++i) {
             const Type *ET = values[i];
-            size_t etal = align_of(ET).assert_ok();
+            size_t etal = qualified_align_of(ET).assert_ok();
             sz = scopes::align(sz, etal);
             offsets[i] = sz;
             al = std::max(al, etal);
-            sz += size_of(ET).assert_ok();
+            sz += qualified_size_of(ET).assert_ok();
         }
         size = scopes::align(sz, al);
         align = al;
