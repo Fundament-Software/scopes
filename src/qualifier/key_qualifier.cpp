@@ -42,10 +42,13 @@ KeyQualifier::KeyQualifier(Symbol _key)
     : Qualifier((QualifierKind)Kind), key(_key) {}
 
 void KeyQualifier::stream_prefix(StyledStream &ss) const {
-    ss << key.name()->data << "=";
+    ss << "(";
+    ss << key.name()->data;
+    ss << " = ";
 }
 
 void KeyQualifier::stream_postfix(StyledStream &ss) const {
+    ss << ")";
 }
 
 //------------------------------------------------------------------------------

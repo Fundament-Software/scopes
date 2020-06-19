@@ -37,14 +37,13 @@ static std::unordered_set<const ArrayType *, ArraySet::Hash, ArraySet::KeyEqual>
 //------------------------------------------------------------------------------
 
 void ArrayType::stream_name(StyledStream &ss) const {
-    ss << "[";
+    ss << "(array ";
     stream_type_name(ss, element_type);
-    ss << " x ";
-    if (is_unsized())
-        ss << "?";
-    else
+    if (!is_unsized()) {
+        ss << " ";
         ss << _count;
-    ss << "]";
+    }
+    ss << ")";
 }
 
 ArrayType::ArrayType(const Type *_element_type, size_t _count)

@@ -14,16 +14,34 @@ namespace scopes {
 // INTEGER TYPE
 //------------------------------------------------------------------------------
 
+static bool is_standard_integer_size(int width) {
+    switch (width) {
+    case 8:
+    case 16:
+    case 32:
+    case 64:
+        return true;
+    default: return false;
+    }
+}
+
 void IntegerType::stream_name(StyledStream &ss) const {
     if ((width == 1) && !issigned) {
         ss << "bool";
-    } else {
+    } else if (is_standard_integer_size(width)) {
         if (issigned) {
             ss << "i";
         } else {
             ss << "u";
         }
         ss << width;
+    } else {
+        ss << "(";
+        if (issigned) {
+            ss << "signed ";
+        }
+        ss << "integer " << width;
+        ss << ")";
     }
 }
 

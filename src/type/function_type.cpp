@@ -25,23 +25,27 @@ namespace scopes {
 //------------------------------------------------------------------------------
 
 void FunctionType::stream_name(StyledStream &ss) const {
-    stream_type_name(ss, return_type);
-    ss << "<-";
-    if (has_exception()) {
-        ss << ">";
-        stream_type_name(ss, except_type);
+    bool exc = has_exception();
+    if (exc) {
+        ss << "(";
     }
     ss << "(";
+    if (vararg()) {
+        ss << "variadic function ";
+    } else {
+        ss << "function ";
+    }
+    stream_type_name(ss, return_type);
     for (size_t i = 0; i < argument_types.size(); ++i) {
-        if (i > 0) {
-            ss << " ";
-        }
+        ss << " ";
         stream_type_name(ss, argument_types[i]);
     }
-    if (vararg()) {
-        ss << " ...";
-    }
     ss << ")";
+    if (exc) {
+        ss << " raises ";
+        stream_type_name(ss, except_type);
+        ss << ")";
+    }
 }
 
 FunctionType::FunctionType(const Type *_except_type,

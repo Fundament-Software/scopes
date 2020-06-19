@@ -39,14 +39,13 @@ static std::unordered_set<const VectorType *, VectorSet::Hash, VectorSet::KeyEqu
 //------------------------------------------------------------------------------
 
 void VectorType::stream_name(StyledStream &ss) const {
-    ss << "<";
+    ss << "(vector ";
     stream_type_name(ss, element_type);
-    ss << " x ";
-    if (is_unsized())
-        ss << "?";
-    else
+    if (!is_unsized()) {
+        ss << " ";
         ss << _count;
-    ss << ">";
+    }
+    ss << ")";
 }
 
 VectorType::VectorType(const Type *_element_type, size_t _count)

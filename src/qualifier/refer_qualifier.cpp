@@ -40,21 +40,23 @@ static std::unordered_set<const ReferQualifier *, ReferSet::Hash, ReferSet::KeyE
 //------------------------------------------------------------------------------
 
 void ReferQualifier::stream_prefix(StyledStream &ss) const {
+    ss << "(";
+    if (pointer_flags_is_readable(flags) && pointer_flags_is_writable(flags)) {
+        ss << "mutable& ";
+    } else if (pointer_flags_is_readable(flags)) {
+        ss << "& ";
+    } else if (pointer_flags_is_writable(flags)) {
+        ss << "writeonly& ";
+    } else {
+        ss << "opaque& ";
+    }
+    if (storage_class != SYM_Unnamed) {
+        ss << "(storage = " << storage_class << ") ";
+    }
 }
 
 void ReferQualifier::stream_postfix(StyledStream &ss) const {
-    if (pointer_flags_is_readable(flags) && pointer_flags_is_writable(flags)) {
-        ss << "&";
-    } else if (pointer_flags_is_readable(flags)) {
-        ss << "(&)";
-    } else if (pointer_flags_is_writable(flags)) {
-        ss << "!&!";
-    } else {
-        ss << "<&>";
-    }
-    if (storage_class != SYM_Unnamed) {
-        ss << "[" << storage_class.name()->data << "]";
-    }
+    ss << ")";
 }
 
 const Type *ReferQualifier::get_pointer_type(const Type *ET) const {

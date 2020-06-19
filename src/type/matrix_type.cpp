@@ -41,11 +41,13 @@ static std::unordered_set<const MatrixType *, MatrixSet::Hash, MatrixSet::KeyEqu
 //------------------------------------------------------------------------------
 
 void MatrixType::stream_name(StyledStream &ss) const {
-    ss << "<";
-    stream_type_name(ss, element_type);
-    ss << " * ";
-    ss << _count;
-    ss << ">";
+    ss << "(matrix ";
+    stream_type_name(ss, column_element_type);
+    ss << " ";
+    ss << count();
+    ss << " ";
+    ss << row_count;
+    ss << ")";
 }
 
 const VectorType *MatrixType::column_type() const {

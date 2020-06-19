@@ -42,19 +42,21 @@ static std::unordered_set<const PointerType *, PointerSet::Hash, PointerSet::Key
 //------------------------------------------------------------------------------
 
 void PointerType::stream_name(StyledStream &ss) const {
-    stream_type_name(ss, element_type);
+    ss << "(";
     if (is_writable() && is_readable()) {
-        ss << "*";
+        ss << "mutable@ ";
     } else if (is_readable()) {
-        ss << "(*)";
+        ss << "@ ";
     } else if (is_writable()) {
-        ss << "!*!";
+        ss << "writeonly@ ";
     } else {
-        ss << "<*>";
+        ss << "opaque@ ";
     }
     if (storage_class != SYM_Unnamed) {
-        ss << "[" << storage_class.name()->data << "]";
+        ss << "(storage = " << storage_class << ") ";
     }
+    stream_type_name(ss, element_type);
+    ss << ")";
 }
 
 PointerType::PointerType(const Type *_element_type,

@@ -56,23 +56,21 @@ static std::unordered_set<const TupleType *, TupleSet::Hash, TupleSet::KeyEqual>
 //------------------------------------------------------------------------------
 
 void TupleType::stream_name(StyledStream &ss) const {
-    if (explicit_alignment) {
-        ss << "[align:" << align << "]";
-    }
     if (packed) {
-        ss << "<";
+        ss << "(packed ";
+    } else {
+        ss << "(tuple ";
     }
-    ss << "{";
+    if (explicit_alignment) {
+        ss << "(__align = " << align << ") ";
+    }
     for (size_t i = 0; i < values.size(); ++i) {
         if (i > 0) {
             ss << " ";
         }
         stream_type_name(ss, values[i]);
     }
-    ss << "}";
-    if (packed) {
-        ss << ">";
-    }
+    ss << ")";
 }
 
 TupleType::TupleType(const Types &_values, bool _packed, size_t _alignment)

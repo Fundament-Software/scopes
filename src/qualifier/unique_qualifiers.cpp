@@ -153,29 +153,29 @@ ViewQualifier::ViewQualifier(const IDSet &_ids)
 }
 
 void ViewQualifier::stream_prefix(StyledStream &ss) const {
-    ss << "%";
-    if (sorted_ids.empty()) {
-        ss << "?";
-    } else {
-        for (int i = 0; i < sorted_ids.size(); ++i) {
-            if (i > 0) ss << "|";
-            stream_id(ss, sorted_ids[i]);
-        }
-    }
-    ss << ":";
+    ss << "(viewof ";
 }
 
 void ViewQualifier::stream_postfix(StyledStream &ss) const {
+    if (!sorted_ids.empty()) {
+        for (int i = 0; i < sorted_ids.size(); ++i) {
+            ss << " ";
+            stream_id(ss, sorted_ids[i]);
+        }
+    }
+    ss << ")";
 }
 
 //------------------------------------------------------------------------------
 
 void UniqueQualifier::stream_prefix(StyledStream &ss) const {
-    stream_id(ss, id);
-    ss << ":";
+    ss << "(uniqueof ";
 }
 
 void UniqueQualifier::stream_postfix(StyledStream &ss) const {
+    ss << " ";
+    stream_id(ss, id);
+    ss << ")";
 }
 
 UniqueQualifier::UniqueQualifier(int _id)

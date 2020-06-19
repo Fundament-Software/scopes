@@ -53,11 +53,9 @@ void ArgumentsType::stream_name(StyledStream &ss) const {
     if (values.size() == 0) {
         ss << "void";
     } else {
-        ss << "λ(";
+        ss << "(_:";
         for (size_t i = 0; i < values.size(); ++i) {
-            if (i > 0) {
-                ss << " ";
-            }
+            ss << " ";
             stream_type_name(ss, values[i]);
         }
         ss << ")";

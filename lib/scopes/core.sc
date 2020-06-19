@@ -700,6 +700,9 @@ sc_type_set_symbol Arguments '__typecall
                 add i 1
             box-pointer (sc_arguments_type pcount types)
 
+# shorter type constructor
+let _: = Arguments
+
 # static function type constructor
 sc_type_set_symbol function '__typecall
     box-spice-macro
@@ -1149,7 +1152,33 @@ let mutable =
                 let T = (unbox-pointer self type)
                 let T = (sc_pointer_type T pointer-flag-non-writable unnamed)
                 return `[('mutable T)]
-            error "syntax: (mutable pointer-type) or (mutable pointer type)"
+            error "syntax: (mutable <pointer-type>) or (mutable pointer <type>)"
+
+let mutable@ =
+    spice-macro
+        fn (args)
+            let argc = (sc_argcount args)
+            verify-count argc 1 1
+            let self = (sc_getarg args 0)
+            let T = (unbox-pointer self type)
+            let T = (sc_pointer_type T pointer-flag-non-writable unnamed)
+            return `[('mutable T)]
+
+let signed =
+    spice-macro
+        fn (args)
+            let argc = (sc_argcount args)
+            verify-count argc 1 2
+            if (icmp== argc 1)
+                let self = (sc_getarg args 0)
+                let T = (unbox-pointer self type)
+                if (icmp== ('kind T) type-kind-integer)
+                    return `[(sc_integer_type ('bitcount T) true)]
+            elseif (ptrcmp== (unbox-pointer (sc_getarg args 0) type) integer)
+                let self = (sc_getarg args 1)
+                let width = (unbox-integer self i32)
+                return `[(sc_integer_type width true)]
+            error "syntax: (signed <integer-type>) or (signed integer <size>)"
 
 let protect =
     spice-macro
@@ -3524,6 +3553,7 @@ define-infix> 600 //
 define-infix> 600 *
 define-infix< 700 ** pow
 define-infix> 750 as
+define-infix> 750 raises
 define-infix> 780 :
 define-infix> 800 .
 define-infix> 800 @
