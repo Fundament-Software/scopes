@@ -3512,6 +3512,17 @@ let
                 raising Error
                 let f args = (decons expr 2)
                 qq ([f] [args])
+    <-: =
+        sugar-macro
+            fn expand-apply (expr)
+                raising Error
+                let ret args = (decons expr 2)
+                if (== ('typeof args) Nothing)
+                    let ret = (as ret list)
+                    qq ([function] [void] (unquote-splice ret))
+                else
+                    let args = (as args list)
+                    qq ([function] [ret] (unquote-splice args))
 
 #define-infix< 40 , _
 
@@ -3553,11 +3564,12 @@ define-infix> 600 //
 define-infix> 600 *
 define-infix< 700 ** pow
 define-infix> 750 as
-define-infix> 750 raises
 define-infix> 780 :
 define-infix> 800 .
 define-infix> 800 @
 define-infix> 800 <-
+define-infix> 800 <-:
+define-infix> 800 raises
 
 # (va-option key args... else-body)
 let va-option =
