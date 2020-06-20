@@ -2503,6 +2503,8 @@ do
         __copy = default-copy
     'set-symbols CStruct
         __copy = default-copy
+    'set-symbols Error
+        __copy = default-copy
 
 'set-symbols typename
     # inverted compare attempts regular compare
