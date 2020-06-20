@@ -75,3 +75,22 @@ do
     test-try-else 2
     test-try-else 3
     One.test-refcount-balanced;
+
+
+do
+    # re-raising uniques
+    try
+        try
+            if true
+                let one =
+                    try (One 100)
+                    else
+                        assert false "error creating One"
+                        unreachable;
+                raise one
+        except (err)
+            raise err
+    except (err)
+        ;
+
+    One.test-refcount-balanced;
