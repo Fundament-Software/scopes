@@ -20,9 +20,10 @@ Scopes only supports the `mingw64` toolchain for the foreseeable future.
 
 * Install `MSYS2 <http://msys2.github.io>`_ and
   `install <https://github.com/valtron/llvm-stuff/wiki/Build-LLVM-with-MSYS2>`_
-  clang, LLVM 10.0.x, cmake and make for ``x86_64``. The packages are named
-  ``mingw64/mingw-w64-x86_64-llvm``, ``mingw64/mingw-w64-x86_64-clang``,
-  ``mingw64/mingw-w64-x86_64-cmake``  and ``make``.
+  clang, LLVM 10.0.x, polly, cmake and make for ``x86_64``. The packages are
+  named ``mingw64/mingw-w64-x86_64-llvm``, ``mingw64/mingw-w64-x86_64-clang``,
+  ``mingw64/mingw-w64-x86_64-cmake``, ``mingw64/mingw-w64-x86_64-polly``
+  and ``make``.
 * Nice to have: ``mingw-w64-x86_64-gdb``
 * at least ``usr/bin`` from your MSYS2 installation must be added to the
   ``PATH`` variable so that the buildscript can find MSYS2.
