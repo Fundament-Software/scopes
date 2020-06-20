@@ -831,8 +831,8 @@ std::unique_ptr<clang::ASTConsumer> EmitLLVMOnlyAction::CreateASTConsumer(clang:
 
     std::vector< std::unique_ptr<clang::ASTConsumer> > consumers;
     consumers.push_back(clang::EmitLLVMOnlyAction::CreateASTConsumer(CI, InFile));
-    consumers.push_back(llvm::make_unique<CodeGenProxy>(*this));
-    return llvm::make_unique<clang::MultiplexConsumer>(std::move(consumers));
+    consumers.push_back(std::make_unique<CodeGenProxy>(*this));
+    return std::make_unique<clang::MultiplexConsumer>(std::move(consumers));
 }
 
 static std::vector<LLVMModuleRef> llvm_c_modules;

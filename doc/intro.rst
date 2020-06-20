@@ -20,7 +20,7 @@ Scopes only supports the `mingw64` toolchain for the foreseeable future.
 
 * Install `MSYS2 <http://msys2.github.io>`_ and
   `install <https://github.com/valtron/llvm-stuff/wiki/Build-LLVM-with-MSYS2>`_
-  clang, LLVM 9.0.x, cmake and make for ``x86_64``. The packages are named
+  clang, LLVM 10.0.x, cmake and make for ``x86_64``. The packages are named
   ``mingw64/mingw-w64-x86_64-llvm``, ``mingw64/mingw-w64-x86_64-clang``,
   ``mingw64/mingw-w64-x86_64-cmake``  and ``make``.
 * Nice to have: ``mingw-w64-x86_64-gdb``
@@ -46,14 +46,14 @@ Scopes only supports the `mingw64` toolchain for the foreseeable future.
   hardware threads to use.
 * There should now be a ``scopes.exe`` executable in the `bin` folder.
 * For the clang bridge to work properly, copy
-  `clang/lib/clang/9.0.x/include` to `scopes-repo/lib/clang/include`.
+  `clang/lib/clang/10.0.x/include` to `scopes-repo/lib/clang/include`.
 * For a fresh rebuild, just remove the ``build`` directory before running
   ``make`` again.
 
 Building Scopes on Linux
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-* You need build-essentials, clang, libclang and LLVM 9.0.x installed -
+* You need build-essentials, clang, libclang and LLVM 10.0.x installed -
   preferably locally:
 * Put ``llvm-config`` in your ``$PATH``.
 * Alternatively, provide your own clang distribution and symlink it to
@@ -86,7 +86,7 @@ Building Scopes on Linux
 Building Scopes on macOS
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
-* Scopes builds on macOS Mojave (10.14) using LLVM 9.0.
+* Scopes builds on macOS Mojave (10.14) using LLVM 10.0.
 * You'll need the following packages from `brew <https://brew.sh/>`_: `llvm`
   and `cmake`. Scopes' build system respects ``brew``'s standard installation
   paths.

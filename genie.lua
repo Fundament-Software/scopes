@@ -86,8 +86,25 @@ local LLVM_LDFLAGS = pkg_config(LLVM_CONFIG .. " --ldflags")
 local LLVM_CXXFLAGS = pkg_config(LLVM_CONFIG .. " --cxxflags")
 local LLVM_LIBS = pkg_config(LLVM_CONFIG .. " --link-static --libs orcjit"
     .. " engine passes option objcarcopts coverage support lto coroutines"
-    .. " webassembly")
+    .. " webassembly frontendopenmp")
 local LLVM_INCLUDEDIR = pkg_config(LLVM_CONFIG .. " --includedir")
+
+local CLANG_DEPS = {
+    "-lclangCodeGen",
+    "-lclangFrontend",
+    "-lclangDriver",
+    "-lclangSerialization",
+    "-lclangParse",
+    "-lclangSema",
+    "-lclangAnalysis",
+    "-lclangEdit",
+    "-lclangASTMatchers",
+    "-lclangAST",
+    "-lclangLex",
+    "-lclangBasic",
+    "-lPolly",
+    "-lPollyISL",
+}
 
 if not os.is("windows") then
     premake.gcc.cxx = CLANG_CXX
@@ -229,7 +246,7 @@ project "scopesrt"
         }
 
         buildoptions_cpp {
-            "-std=c++11",
+            "-std=c++14",
             "-fno-rtti",
             "-fno-exceptions",
             "-ferror-limit=1",
@@ -282,20 +299,7 @@ project "scopesrt"
             THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a"
         }
         linkoptions(LLVM_LDFLAGS)
-        linkoptions {
-            "-lclangCodeGen",
-            "-lclangFrontend",
-            "-lclangDriver",
-            "-lclangSerialization",
-            "-lclangParse",
-            "-lclangSema",
-            "-lclangAnalysis",
-            "-lclangEdit",
-            "-lclangASTMatchers",
-            "-lclangAST",
-            "-lclangLex",
-            "-lclangBasic"
-        }
+        linkoptions(CLANG_DEPS)
         --linkoptions { "-Wl,--whole-archive" }
         linkoptions(LLVM_LIBS)
         --linkoptions { "-Wl,--no-whole-archive" }
@@ -374,20 +378,7 @@ project "scopesrt"
             THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a"
         }
         linkoptions(LLVM_LDFLAGS)
-        linkoptions {
-            "-lclangCodeGen",
-            "-lclangFrontend",
-            "-lclangDriver",
-            "-lclangSerialization",
-            "-lclangParse",
-            "-lclangSema",
-            "-lclangAnalysis",
-            "-lclangEdit",
-            "-lclangASTMatchers",
-            "-lclangAST",
-            "-lclangLex",
-            "-lclangBasic"
-        }
+        linkoptions(CLANG_DEPS)
         linkoptions(LLVM_LIBS)
 
         if os.is("windows") then
@@ -413,7 +404,7 @@ project "scopesrt"
         }
 
         buildoptions_cpp {
-            "-std=c++11",
+            "-std=c++14",
             "-fno-rtti",
             "-fno-exceptions",
             "-ferror-limit=1",
@@ -446,22 +437,7 @@ project "scopesrt"
         }
 
         linkoptions(LLVM_LDFLAGS)
-
-        linkoptions {
-            "-lclangFrontend",
-            "-lclangDriver",
-            "-lclangSerialization",
-            "-lclangCodeGen",
-            "-lclangParse",
-            "-lclangSema",
-            "-lclangAnalysis",
-            "-lclangEdit",
-            "-lclangASTMatchers",
-            "-lclangAST",
-            "-lclangLex",
-            "-lclangBasic"
-        }
-
+        linkoptions(CLANG_DEPS)
         linkoptions(LLVM_LIBS)
 
         postbuildcommands {
@@ -501,7 +477,7 @@ project "scopes"
         }
 
         buildoptions_cpp {
-            "-std=c++11",
+            "-std=c++14",
             "-fno-rtti",
             "-fno-exceptions",
             "-ferror-limit=1",
@@ -601,7 +577,7 @@ project "scopes"
         defines { "SCOPES_MACOS" }
 
         buildoptions_cpp {
-            "-std=c++11",
+            "-std=c++14",
             "-fno-rtti",
             "-fno-exceptions",
             "-ferror-limit=1",
