@@ -5,10 +5,10 @@ Installation
 ------------
 
 You can either download a binary distribution of Scopes from the
-`website <https://bitbucket.org/duangle/scopes>`_ or build Scopes from source.
+`website <http://scopes.rocks>`_ or build Scopes from source.
 
 The main repository for scopes is on
-`bitbucket <https://bitbucket.org/duangle/scopes>`_.
+`sourcehut <https://hg.sr.ht/~duangle/scopes>`_.
 
 Note: any reference to `scopes-repo` in the instructions refers to wherever
 you have checked out the Scopes source tree.
