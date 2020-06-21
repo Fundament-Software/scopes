@@ -102,6 +102,8 @@ local CLANG_DEPS = {
     "-lclangAST",
     "-lclangLex",
     "-lclangBasic",
+}
+local POLLY_DEPS = {
     "-lPolly",
     "-lPollyISL",
 }
@@ -300,6 +302,7 @@ project "scopesrt"
         }
         linkoptions(LLVM_LDFLAGS)
         linkoptions(CLANG_DEPS)
+        linkoptions(POLLY_DEPS)
         --linkoptions { "-Wl,--whole-archive" }
         linkoptions(LLVM_LIBS)
         --linkoptions { "-Wl,--no-whole-archive" }
@@ -312,7 +315,7 @@ project "scopesrt"
         buildoptions_cpp {
             "-D_GNU_SOURCE",
             "-Wa,-mbig-obj",
-            "-std=gnu++11",
+            "-std=gnu++14",
             "-fno-exceptions",
             "-fno-rtti",
             "-fno-strict-aliasing",
@@ -438,6 +441,7 @@ project "scopesrt"
 
         linkoptions(LLVM_LDFLAGS)
         linkoptions(CLANG_DEPS)
+        linkoptions(POLLY_DEPS)
         linkoptions(LLVM_LIBS)
 
         postbuildcommands {
@@ -511,7 +515,7 @@ project "scopes"
         buildoptions_cpp {
             "-D_GNU_SOURCE",
             "-Wa,-mbig-obj",
-            "-std=gnu++11",
+            "-std=gnu++14",
             "-fno-exceptions",
             "-fno-rtti",
             "-fno-strict-aliasing",
