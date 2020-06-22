@@ -244,7 +244,7 @@ project "scopesrt"
         defines { "SCOPES_LINUX" }
 
         includedirs {
-            "clang/include"
+			LLVM_INCLUDEDIR
         }
 
         buildoptions_cpp {
@@ -352,6 +352,10 @@ project "scopesrt"
 
         includedirs {
             "src/win32"
+        }
+
+        includedirs {
+			LLVM_INCLUDEDIR
         }
 
         files {
