@@ -531,4 +531,32 @@ fn test-drop ()
 test-drop;
 print "done"
 
+do
+    # test viewing on plain arguments
+
+    using import struct
+
+    fn make (json-string)
+
+    fn parse (json-string)
+        viewing json-string
+        make json-string
+
+    fn make2 (json-string)
+        viewing json-string
+
+    fn parse2 (json-string)
+        make2 json-string
+
+    # unique
+    struct M
+        s : string
+    parse (nullof M)
+    parse2 (nullof M)
+    unlet M
+    struct M plain
+        s : string
+    parse (nullof M)
+    parse2 (nullof M)
+
 ;

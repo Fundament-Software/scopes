@@ -2242,7 +2242,10 @@ repeat:
                 if (!param) {
                     SCOPES_ERROR(ValueKindMismatch, VK_Parameter, value->kind());
                 }
-                param->retype(view_type(param->get_type(), {}));
+                auto T = param->get_type();
+                if (!is_plain(T)) {
+                    param->retype(view_type(param->get_type(), {}));
+                }
             }
             return ref(call.anchor(), ArgumentList::from({}));
         } break;
