@@ -349,39 +349,43 @@ sc_bool_string_tuple_t sc_prompt(const sc_string_t *s, const sc_string_t *pre) {
     return { true, String::from_cstr(r) };
 }
 
-void sc_save_history(const sc_string_t *path) {
+void sc_prompt_save_history(const sc_string_t *path) {
     using namespace scopes;
     linenoiseHistorySave(path->data);
 }
 
-void sc_load_history(const sc_string_t *path) {
+void sc_prompt_load_history(const sc_string_t *path) {
     using namespace scopes;
     linenoiseHistoryLoad(path->data);
 }
 
 namespace scopes {
 
-static const Scope *autocomplete_scope = nullptr;
+static sc_autocomplete_func_t autocomplete_handler = nullptr;
 
 static void prompt_completion_cb(const char *buf, linenoiseCompletions *lc) {
-    // Tab on an empty string gives an indentation
-    if (*buf == 0) {
-        linenoiseAddCompletion(lc, "    ");
-        return;
-    }
-
-    const String* name = String::from_cstr(buf);
-    Symbol sym(name);
-    const Scope *scope = autocomplete_scope ? autocomplete_scope : globals;
-    for (const auto& m : scope->find_elongations(sym))
-        linenoiseAddCompletion(lc, m.name()->data);
+    if (autocomplete_handler)
+        autocomplete_handler(buf, lc);
 }
 
 }
 
-void sc_set_autocomplete_scope(const sc_scope_t* scope) {
+void sc_prompt_set_autocomplete_handler(sc_autocomplete_func_t func) {
     using namespace scopes;
-    autocomplete_scope = scope;
+    autocomplete_handler = func;
+}
+
+void sc_prompt_add_completion(void *ctx, const char *text) {
+    linenoiseAddCompletion((linenoiseCompletions *)ctx, text);
+}
+
+void sc_prompt_add_completion_from_scope(void *ctx, const char *searchtext, const sc_scope_t* scope) {
+    using namespace scopes;
+    const String* name = String::from_cstr(searchtext);
+    Symbol sym(name);
+    scope = scope ? scope : globals;
+    for (const auto& m : scope->find_elongations(sym))
+        linenoiseAddCompletion((linenoiseCompletions *)ctx, m.name()->data);
 }
 
 const sc_string_t *sc_format_message(const sc_anchor_t *anchor, const sc_string_t *message) {
@@ -2301,6 +2305,9 @@ void init_globals(int argc, char *argv[]) {
     const Type *TYPE_typecast_func = native_ro_pointer_type(
         raising_function_type(TYPE_ValueRef, { TYPE_ValueRef, TYPE_Type }));
 
+    const Type *TYPE_autocomplete_func = native_ro_pointer_type(
+        function_type(_void, { rawstring, voidstar }));
+
     DEFINE_EXTERN_C_FUNCTION(sc_compiler_version, arguments_type({TYPE_I32, TYPE_I32, TYPE_I32}));
     DEFINE_EXTERN_C_FUNCTION(sc_cache_misses, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_expand, arguments_type({TYPE_ValueRef, TYPE_List, TYPE_Scope}), TYPE_ValueRef, TYPE_List, TYPE_Scope);
@@ -2319,11 +2326,14 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_enter_solver_cli, _void);
     DEFINE_EXTERN_C_FUNCTION(sc_launch_args, arguments_type({TYPE_I32,native_ro_pointer_type(rawstring)}));
     DEFINE_EXTERN_C_FUNCTION(sc_set_typecast_handler, _void, TYPE_typecast_func);
+    DEFINE_EXTERN_C_FUNCTION(sc_prompt_set_autocomplete_handler, _void, TYPE_autocomplete_func);
 
     DEFINE_EXTERN_C_FUNCTION(sc_prompt, arguments_type({TYPE_Bool, TYPE_String}), TYPE_String, TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_save_history, _void, TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_load_history, _void, TYPE_String);
-    DEFINE_EXTERN_C_FUNCTION(sc_set_autocomplete_scope, _void, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_prompt_save_history, _void, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_prompt_load_history, _void, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_prompt_add_completion, _void, voidstar, rawstring);
+    DEFINE_EXTERN_C_FUNCTION(sc_prompt_add_completion_from_scope, _void, voidstar, rawstring, TYPE_Scope);
+
     DEFINE_EXTERN_C_FUNCTION(sc_default_styler, TYPE_String, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_format_message, TYPE_String, TYPE_Anchor, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_write, _void, TYPE_String);

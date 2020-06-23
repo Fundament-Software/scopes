@@ -50,7 +50,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
     let eval-scope = (Scope global-scope)
 
     if (not (empty? history-path))
-        sc_load_history history-path
+        sc_prompt_load_history history-path
 
     sugar help ((value as Symbol))
         let val =
@@ -118,8 +118,21 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                 typedef (do "Enter 'exit;' or Ctrl+D to exit")
                     inline __typecall () (if true (exit 0))
 
+    global autocomplete-scope : Scope
+    fn autocomplete (text ctx)
+        # Tab on an empty string gives an indentation
+            TODO: is this really necessary anymore?
+        if ((@ text) == 0)
+            sc_prompt_add_completion ctx "    "
+            return;
+        if ((deref autocomplete-scope) != null)
+            sc_prompt_add_completion_from_scope ctx text autocomplete-scope
+        ;
+
     loop (preload cmdlist counter eval-scope = "" "" 0 eval-scope)
-        set-autocomplete-scope! eval-scope
+        autocomplete-scope = eval-scope
+
+        sc_prompt_set_autocomplete_handler autocomplete
 
         fn make-idstr (counter)
             .. "$" (tostring counter)
@@ -130,7 +143,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                 default-styler style-comment "►"
         let promptlen = ((countof idstr) + 2:usize)
         let success cmd =
-            __prompt
+            sc_prompt
                 ..
                     if (empty? cmdlist) promptstr
                     else
@@ -138,7 +151,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                     " "
                 preload
         if (not (empty? history-path))
-            sc_save_history history-path
+            sc_prompt_save_history history-path
         if (not success)
             return;
         fn endswith-blank (s)

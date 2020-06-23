@@ -6601,8 +6601,6 @@ let
     realpath = sc_realpath
     globals = sc_get_globals
     set-globals! = sc_set_globals
-    __prompt = sc_prompt
-    set-autocomplete-scope! = sc_set_autocomplete_scope
     exit = sc_exit
     launch-args = sc_launch_args
     set-signal-abort! = sc_set_signal_abort

@@ -146,6 +146,7 @@ SCOPES_TYPEDEF_RESULT_RAISES(sc_bool_i32_i32_raises, sc_bool_i32_i32_tuple_t);
 typedef sc_valueref_raises_t (*sc_ast_macro_func_t)(sc_valueref_t);
 typedef sc_valueref_raises_t (*sc_typecast_func_t)(sc_valueref_t, const sc_type_t *);
 typedef sc_list_scope_raises_t (*sc_syntax_wildcard_func_t)(const sc_list_t *, const sc_scope_t *);
+typedef void (*sc_autocomplete_func_t)(const char *, void *);
 
 // booting
 
@@ -287,9 +288,12 @@ SCOPES_LIBEXPORT sc_valueref_raises_t sc_parse_from_string(const sc_string_t *st
 
 SCOPES_LIBEXPORT const sc_string_t *sc_default_styler(sc_symbol_t style, const sc_string_t *str);
 SCOPES_LIBEXPORT sc_bool_string_tuple_t sc_prompt(const sc_string_t *s, const sc_string_t *pre);
-SCOPES_LIBEXPORT void sc_save_history(const sc_string_t *path);
-SCOPES_LIBEXPORT void sc_load_history(const sc_string_t *path);
-SCOPES_LIBEXPORT void sc_set_autocomplete_scope(const sc_scope_t* scope);
+SCOPES_LIBEXPORT void sc_prompt_save_history(const sc_string_t *path);
+SCOPES_LIBEXPORT void sc_prompt_load_history(const sc_string_t *path);
+SCOPES_LIBEXPORT void sc_prompt_set_autocomplete_handler(sc_autocomplete_func_t func);
+SCOPES_LIBEXPORT void sc_prompt_add_completion(void *ctx, const char *text);
+SCOPES_LIBEXPORT void sc_prompt_add_completion_from_scope(void *ctx, const char *searchtext, const sc_scope_t* scope);
+
 SCOPES_LIBEXPORT const sc_string_t *sc_format_message(const sc_anchor_t *anchor, const sc_string_t *message);
 SCOPES_LIBEXPORT void sc_write(const sc_string_t *value);
 
