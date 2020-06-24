@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <unordered_set>
+#include <cstring>
 
 namespace scopes {
 
@@ -241,8 +242,16 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
         }
         self = self->next;
     } while (self);
-    std::sort(found.begin(), found.end(), [](Symbol a, Symbol b){
-                return a.name()->count < b.name()->count; });
+    std::sort(found.begin(), found.end(),
+        [](Symbol a, Symbol b){
+            auto a_count = a.name()->count;
+            auto b_count = b.name()->count;
+            if (a_count == b_count) {
+                return std::strcmp(a.name()->data, b.name()->data) < 0;
+            } else {
+                return a_count < b_count;
+            }
+        });
     return found;
 }
 
