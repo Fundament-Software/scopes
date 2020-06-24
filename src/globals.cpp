@@ -379,13 +379,17 @@ void sc_prompt_add_completion(void *ctx, const char *text) {
     linenoiseAddCompletion((linenoiseCompletions *)ctx, text);
 }
 
-void sc_prompt_add_completion_from_scope(void *ctx, const char *searchtext, const sc_scope_t* scope) {
+void sc_prompt_add_completion_from_scope(void *ctx, const char *searchtext, int offset, const sc_scope_t* scope) {
     using namespace scopes;
-    const String* name = String::from_cstr(searchtext);
+    const String* name = String::from_cstr(searchtext + offset);
     Symbol sym(name);
     scope = scope ? scope : globals;
-    for (const auto& m : scope->find_elongations(sym))
-        linenoiseAddCompletion((linenoiseCompletions *)ctx, m.name()->data);
+
+    for (const auto& m : scope->find_elongations(sym)) {
+        auto result =
+            std::string(searchtext, offset) + std::string(m.name()->data);
+        linenoiseAddCompletion((linenoiseCompletions *)ctx, result.c_str());
+    }
 }
 
 const sc_string_t *sc_format_message(const sc_anchor_t *anchor, const sc_string_t *message) {
@@ -2332,7 +2336,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_prompt_save_history, _void, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_prompt_load_history, _void, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_prompt_add_completion, _void, voidstar, rawstring);
-    DEFINE_EXTERN_C_FUNCTION(sc_prompt_add_completion_from_scope, _void, voidstar, rawstring, TYPE_Scope);
+    DEFINE_EXTERN_C_FUNCTION(sc_prompt_add_completion_from_scope, _void, voidstar, rawstring, TYPE_I32, TYPE_Scope);
 
     DEFINE_EXTERN_C_FUNCTION(sc_default_styler, TYPE_String, TYPE_Symbol, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_format_message, TYPE_String, TYPE_Anchor, TYPE_String);

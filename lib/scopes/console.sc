@@ -118,15 +118,40 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                 typedef (do "Enter 'exit;' or Ctrl+D to exit")
                     inline __typecall () (if true (exit 0))
 
+    fn autocomplete-symbol (text ctx scope)
+        loop (i0 i scope = 0 0 scope)
+            let c = (text @ i)
+            if (c == 0:i8)
+            elseif ((c == 46:i8) & (i != i0))
+                let key =
+                    Symbol (string (& (text @ i0)) (i - i0))
+                let subkey = ('@ scope key)
+                let i = (i + 1)
+                if ('constant? subkey)
+                    let T = ('typeof subkey)
+                    if (T == Scope)
+                        repeat i i (subkey as Scope)
+                    elseif (T == type)
+                        repeat i i
+                            fold (scope = (Scope)) for k v in ('symbols (subkey as type))
+                                'bind scope k v
+
+            else
+                repeat i0 (i + 1) scope
+            sc_prompt_add_completion_from_scope ctx text i0 scope
+            return;
+
     global autocomplete-scope : Scope
     fn autocomplete (text ctx)
         # Tab on an empty string gives an indentation
-            TODO: is this really necessary anymore?
         if ((@ text) == 0)
             sc_prompt_add_completion ctx "    "
             return;
-        if ((deref autocomplete-scope) != null)
-            sc_prompt_add_completion_from_scope ctx text autocomplete-scope
+        let scope = (deref autocomplete-scope)
+        if (scope != null)
+            try
+                autocomplete-symbol text ctx scope
+            else;
         ;
 
     loop (preload cmdlist counter eval-scope = "" "" 0 eval-scope)
