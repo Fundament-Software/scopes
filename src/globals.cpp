@@ -1210,7 +1210,10 @@ sc_valueref_t sc_value_wrap(const sc_type_t *type, sc_valueref_t value) {
 
 sc_valueref_t sc_value_unwrap(const sc_type_t *type, sc_valueref_t value) {
     using namespace scopes;
-    auto result = unwrap_value(type, value);
+    ValueRef result;
+    if (!is_opaque(type)) {
+        result = unwrap_value(type, value);
+    }
     if (!result) {
         result = ref(value.anchor(), ArgumentList::from({}));
     }
