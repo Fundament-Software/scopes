@@ -1260,12 +1260,10 @@ static SCOPES_RESULT(TypedValueRef) prove_Loop(const ASTContext &ctx, const Loop
     SCOPES_TRACE_PROVE_EXPR(loop);
 
     const Type *rtype = newloop->args->get_type();
-    const Anchor *last_anchor = result.anchor();
     for (auto repeat : newloop->repeats) {
         SCOPES_CHECK_RESULT(merge_value_type("loop repeat", rtype,
             arguments_type_from_typed_values(repeat->values),
-            last_anchor, repeat.anchor()));
-        last_anchor = repeat.anchor();
+            newloop.anchor(), repeat.anchor()));
     }
 
     return TypedValueRef(newloop);
