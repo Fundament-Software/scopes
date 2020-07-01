@@ -6,19 +6,19 @@ even before the first function is even written: *Scopes List Notation*,
 abbreviated **SLN**.
 
 Closely related to `S-Expressions <https://en.wikipedia.org/wiki/S-expression>`_,
-SLN can be seen as a human-readable serialization format comparable to
+SLN can be regarded as a human-readable serialization format comparable to
 YAML, XML or JSON. It has been optimized for simplicity and terseness.
 
-SLN files do not have to contain code on their own. They're more likely to
-store configuration or metadata. Therefore, the examples in this document are
-schema free and do only contain arbitrary data. They're not necessarily valid
-Scopes source code.
+SLN files do not have to contain valid Scopes source code on their own--they
+are more likely to store configuration or metadata. As a result, the examples
+in this document should be regarded as schema-free and containing arbitrary
+data.
 
 At a Glance
 -----------
 
-In case you don't have time to read the full documentation, here's an
-example that gives you an overview of all notation aspects::
+As a summary, here is an example that provides an overview of all
+the notation aspects::
 
     # below is some random data without any schema
 
@@ -37,7 +37,7 @@ example that gives you an overview of all notation aspects::
     # a single top-level element, a single-line string
     "I am Locutus of Borg."
 
-    # a raw block string
+    # a raw block string; four double quotes mark the start
     """"
         Ma'am is acceptable in a crunch, but I prefer Captain.
                                         -- Kathryn Janeway
@@ -132,15 +132,16 @@ SLN recognizes only five kinds of elements:
 * **Strings**
 * **Symbols**
 * **Lists**
+* **Comments**
 
-In addition, users can specify comments which are not part of the data structure.
+.. note:: Comments are not part of the data structure.
 
 Comments
 ^^^^^^^^
 
 Both line and block comments are initiated with a single token, ``#``. A comment
-lasts from its beginning token to the first non-whitespace character with equal
-or lower indentation. Some examples for valid comments::
+lasts from its beginning token to the first non-whitespace character with an equal
+or lower indentation level. Some examples of valid comments::
 
     # a line comment
     not a comment
@@ -162,7 +163,7 @@ characters can be encoded via ``\\xNN``, where ``NN`` is the character's
 hexadecimal code. Strings are parsed as-is, so UTF-8 encoded strings will be
 copied over verbatim.
 
-Here are some examples for valid strings::
+Here are some examples of valid strings::
 
     "a single-line string in double quotations"
     "return: \n, tab: \t, backslash: \\, double quote: \", nbsp: \xFF."
@@ -175,7 +176,7 @@ that should not be escaped. A raw block string begins with ``""""`` (four
 double quotes). A raw block string ends at the first newline before a printable
 character that has a lower indentation.
 
-Here are some examples for valid raw block strings::
+Here are some examples of valid raw block strings::
 
     """"a single-line string as a block string
     # commented line inbetween
@@ -197,7 +198,7 @@ sharing the same sequence of characters always map to the same value.
 
 As a special case, ``,`` is always parsed as a single character.
 
-Here are some examples for valid symbols::
+Here are some examples of valid symbols::
 
     # classic underscore notation
     some_identifier _some_identifier
@@ -214,16 +215,16 @@ Numbers
 ^^^^^^^
 
 Numbers come in two forms: integers and reals. The parser understands integers
-in the range -(2^63) to 2^64-1 and records them as signed 32-bit values unless
-the value is too big, in which case it will be extended to 64-bit signed, then
-64-bit unsigned. Reals are floating point numbers parsed and stored as
-IEEE 754 binary32 values.
+in the range ``-(2^63)`` to ``2^64-1`` and records them as signed 32-bit values
+unless the value is too big, in which case it will be extended to 64-bit
+signed, then 64-bit unsigned. Reals are floating point numbers parsed and
+stored as `IEEE-754 <https://wikipedia.org/wiki/IEEE_754>`_ binary32 values.
 
 Numbers can be explicitly specified to be of a certain type by appending a ``:``
-to the number as well as a numerical typename that is either ``i8``, ``i16``,
-``i32``, ``i64``, ``u8``, ``u16``, ``u32``, ``u64``, ``f32`` and ``f64``.
+to the number as well as a numerical typename that is one of: ``i8``, ``i16``,
+``i32``, ``i64``, ``u8``, ``u16``, ``u32``, ``u64``, ``f32`` or ``f64``.
 
-Here are some examples for valid numbers::
+Here are some examples of valid numbers::
 
     # positive and negative integers in decimal and hexadecimal notation
     0 +23 42 -303 12 -1 -0x20 0xAFFE
@@ -247,7 +248,7 @@ indentation. For braces, ``()``, ``[]`` and ``{}`` are accepted.
 Lists can be empty or contain a virtually unlimited number of elements,
 only separated by whitespace. They typically describe expressions in Scopes.
 
-Here are some examples for valid lists::
+Here are some examples of valid lists::
 
     # a list of numbers in naked format
     1 2 3 4 5
@@ -265,7 +266,7 @@ Every Scopes source file is parsed as a tree of expresion lists.
 
 The classic notation (what we will call *braced notation*) uses a syntax close
 to what `Lisp <http://en.wikipedia.org/wiki/Lisp_(programming_language)>`_ and
-`Scheme <http://en.wikipedia.org/wiki/Scheme_(programming_language)>`_ users
+`Scheme <http://en.wikipedia.org/wiki/Scheme_(programming_language)>`_ authors
 know as *restricted* `S-expressions <https://en.wikipedia.org/wiki/S-expression>`_::
 
     (print
@@ -320,21 +321,19 @@ contain naked lists::
         (+ 1 2
             \ 3 * 4) # parsed as (+ 1 2 (3 * 4))
 
-Because it is more convenient for users without specialized editors to write
-in naked notation, and balancing parentheses can be challenging for beginners,
-the author suggests to use braced notation sparingly and in good taste.
-Purists and Scheme enthusiasts may however prefer to work with braced lists
-almost exclusively.
-
-Therefore Scopes' reference documentation describes all available symbols in
-braced notation, while code examples make ample use of naked notation.
+Naked notation is strongly encouraged as it is more convenient for authors
+without specialized editors to write and balancing parentheses can be
+challenging for beginners. However, purists and Scheme enthusiasts may prefer
+to work with braced notation almost exclusively. As a result, Scopes'
+reference documentation describes all available symbols in braced notation,
+while code examples make ample use of naked notation.
 
 Brace Styles
 ------------
 
-In addition to regular curvy braces ``()``, SLN parses curly ``{}`` and
+In addition to regular parentheses ``()``, SLN parses curly ``{}`` and
 square ``[]`` brace styles. They are merely meant for providing variety for
-writing SLN based formats, and are expanded to simple lists during parsing.
+writing SLN-based formats, and are expanded to simple lists during parsing.
 Some examples::
 
     [a b c d]
@@ -349,12 +348,12 @@ List Separators
 ---------------
 
 Both naked and braced lists support a special control character, the list
-separator `;` (semicolon). Known as statement separator in other languages,
-it groups atoms into separate lists, and permits to reduce the amount of
-required parentheses or lines in complex trees.
+separator ``;`` (semicolon). Known as a statement separator in other languages,
+it groups atoms into separate lists and allows the omission of required
+parentheses or lines in complex trees.
 
 In addition, it is possible to list-wrap the first element of a list in naked
-mode by starting the head of the block with `;`.
+mode by starting the head of the block with ``;``.
 
 Here are some examples::
 
@@ -371,26 +370,28 @@ Here are some examples::
     # parses as
     ((print a) (print b) ((print c) (print d)))
 
-There's a caveat with semicolons in braced mode tho though: if trailing elements
-aren't terminated with `;`, they're not going to be wrapped::
+.. warning::
 
-    # in braced notation
-    (print a; print (a;b;); print c)
-    # parses as
-    ((print a) (print ((a) (b))) print c)
+    If semicolons are used with braced notation then any trailing elements that
+    are not terminated with ``;`` will not be wrapped::
+
+        # in braced notation
+        (print a; print (a;b;); print c)
+        # parses as
+        ((print a) (print ((a) (b))) print c)
 
 Pitfalls of Naked Notation
 --------------------------
 
-As naked notation giveth the user the freedom to care less about parentheses,
-it also taketh away. In the following section we will discuss the few
-small difficulties that can arise and how to solve them efficiently.
+As naked notation gives the author the freedom to care less about parentheses,
+it also takes away. The following section discusses small challenges that
+might be encountered when using naked notation and how to resolve them.
 
 Single Elements
 ^^^^^^^^^^^^^^^
 
-Special care must be taken when single elements are defined which the user
-wishes to wrap in a list.
+Special care must be taken when single elements are defined when the author
+wants to wrap them in a list.
 
 Here is a braced list describing an expression printing the number 42::
 
@@ -416,8 +417,8 @@ character, which ends the current list::
 
     print;          # (print)
 
-Wrap-Around Lines
-^^^^^^^^^^^^^^^^^
+Continuation Lines
+^^^^^^^^^^^^^^^^^^
 
 There are often situations when a high number of elements in a list
 interferes with best practices of formatting source code and exceeds the line
@@ -448,17 +449,17 @@ The naked approach interprets each new line as a nested list::
 
 This can be fixed by using the ``splice-line`` control character, ``\``::
 
-    # correct solution using splice-line, postfix style
+    # correct solution using splice-line, postfix-style
     import-from "OpenGL" \
         glBindBuffer GL_UNIFORM_BUFFER glClear GL_COLOR_BUFFER_BIT \
         GL_STENCIL_BUFFER_BIT GL_DEPTH_BUFFER_BIT glViewport glUseProgram \
         glDrawArrays glEnable glDisable GL_TRIANGLE_STRIP
 
 Unlike in other languages, and as previously demonstrated, ``\`` splices at the
-token level rather than the character level, and can therefore also be placed
-at the beginning of nested lines, where the parent is still the active list::
+token level rather than the character level, and can also be placed at the
+beginning of nested lines, where the parent is still the active list::
 
-    # correct solution using splice-line, prefix style
+    # correct solution using the splice-line control character '\', prefix-style
     import-from "OpenGL"
         \ glBindBuffer GL_UNIFORM_BUFFER glClear GL_COLOR_BUFFER_BIT
         \ GL_STENCIL_BUFFER_BIT GL_DEPTH_BUFFER_BIT glViewport glUseProgram
@@ -467,8 +468,7 @@ at the beginning of nested lines, where the parent is still the active list::
 Tail Splicing
 ^^^^^^^^^^^^^
 
-While naked notation is ideal for writing nested lists that accumulate
-at the tail::
+Naked notation is ideal for writing nested lists that accumulate at the tail::
 
     # braced
     (a b c
@@ -482,15 +482,16 @@ at the tail::
             g h i
         j k l
 
-...there are complications when additional elements need to be spliced back into
-the parent list::
+However, there are complications when additional elements need to be spliced
+back into the parent list::
 
     (a b c
         (d e f
             (g h i))
         j k l)
 
-Once again, we can reuse the splice-line control character to get what we want::
+Once again, we can reuse the splice-line control character ``\`` to get what we
+want::
 
     a b c
         d e f
@@ -500,7 +501,7 @@ Once again, we can reuse the splice-line control character to get what we want::
 Left-Hand Nesting
 ^^^^^^^^^^^^^^^^^
 
-When using infix notation, conditional blocks or functions producing functions,
+When using infix notation, conditional blocks, or functions producing functions,
 lists occur that nest at the head level rather than the tail::
 
     ((((a b)
@@ -521,7 +522,8 @@ splice-line characters to describe the same tree::
         \ g h
 
 A more complex tree which also requires splicing elements back into the parent
-list can be realized with the same combo of list separator and splice-line::
+list can be implemented with the same combination of list separator and
+splice-line characters::
 
     # braced
     (a
@@ -539,8 +541,8 @@ list can be realized with the same combo of list separator and splice-line::
         \ f g
         h i
 
-While this example demonstrates the versatile usefulness of splice-line and
-list separator, expressing similar trees in partially braced notation might
-often be easier on the eyes.
+While this example demonstrates the versatility of the splice-line and list
+separator characters, use of partially braced notation may be easier to
+read.
 
-As so often, the best format is the one that fits the context.
+As usual, the best format is the one that fits the context.
