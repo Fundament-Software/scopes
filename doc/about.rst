@@ -14,7 +14,7 @@ as well as a SPIR-V backend (targeting both CPU and GPU with a single codebase),
 and exports a minimal runtime environment. The remaining features are
 bootstrapped from within the language.
 
-The language is expression based, but primarily imperative. The syntactical
+The language is expression-based, but primarily imperative. The syntactical
 style marries concepts from Scheme and Python, describing source code with
 S-expressions but delimiting blocks by indentation rather than braces. Closures
 are supported as a zero-cost abstraction. The type system is strongly statically
@@ -34,8 +34,8 @@ languages to describe configuration files, user interfaces, state machines or
 processing graphs.
 
 Scopes embeds the clang compiler infrastructure and is therefore fully C
-compatible. C libraries can be imported and executed at compile- and runtime
-without overhead and without requiring special bindings.
+compatible. C libraries can be imported and executed at compile time and
+runtime without overhead and without requiring special bindings.
 
 The Scopes Compiler Intermediate Language is suitable for painless translation
 to SSA forms such as LLVM IR and SPIR-V, of which both are supported.

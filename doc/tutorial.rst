@@ -11,7 +11,7 @@ Using the Scopes Live Compiler
 
 After downloading and unpacking the latest release of Scopes, the easiest way
 to start it is to simply launch the executable shipped with the archive. It
-is usually located in the root directory, and on Unix compatible systems
+is usually located in the root directory, and on Unix-compatible systems
 it can simply be started from the terminal with:
 
 ..  code-block:: none
@@ -39,6 +39,15 @@ read-eval-print loop (REPL), also called a console. Here's an example:
      ///\\\
     ///  \\\  Scopes 0.14 (Apr 17 2019, 19:43:48)
     $0 ▶
+
+.. note::
+
+    At the time of writing, some console emulators such as Mintty (used by
+    default by the MSYS2 shell applications) may not display the Interactive
+    Console's output properly. Windows users are advised to use the -defterm
+    option when running the MSYS2 shell applications, or install
+    `ConEmu <https://conemu.github.io/>`_ and change them to use the -conemu
+    option instead.
 
 Simple expressions can be written on a single line, followed by hitting the
 return key::
@@ -112,6 +121,23 @@ nicely as a comfy calculator::
 
 Integer numbers like ``6`` or ``65`` have type `i32`, real numbers with a
 fractional part like ``13.0`` or ``1.6`` have type `f32`.
+
+.. note::
+
+    You will likely notice that if the whitespace characters between the
+    operators and numbers are omitted that the Interactive Console will
+    display an error when evaluating the expression. For example::
+
+        $0 ▶ 1+2+3
+        <string>:1:1: while expanding
+            1+2+3
+        error: syntax: identifier '1+2+3' is not declared in scope. Did you mean 'u32', 'f128', 'f32',
+        'i32', '+' or '+='?
+
+    This is because symbol identifiers in Scopes may contain any character
+    from the UTF-8 character set except whitespace characters and characters
+    from the set ``()[]{}"';#,``, where ``,`` is in itself a context-free
+    symbol.  See :doc:`dataformat` for details.
 
 Division always returns a real number. On the off-chance that you want an
 integer result without the fractional part, use the floor division operator
@@ -264,32 +290,53 @@ for such a task, computing the first few numbers of the fibonacci sequence::
     8
     $0 = 13
 
-This example introduces several new features.
+In Scopes, indentation is how the grouping of statements is determined which
+is why the conditional block is indented. A tab or four spaces must start each
+indented line within the block. Additionally, each line within a block must be
+indented by the same amount.
+
+.. note::
+
+    When entering a block of statements in the Interactive Console, a space
+    must be used at the end of the line that starts the block.
+
+This example introduces several new features:
 
 * The first line declares the entry point of a loop so we can jump back
-  (see the fourth line), bind new values to ``a`` and ``b``, and perform the same
-  operations again.
-* The first line also performs multiple assignments at the same time. ``a`` is
-  initially bound to ``0``, while ``b`` is initialized to ``1``. When we jump
-  to this assignment again in line four, ``a`` will be bound to ``b``, while
-  ``b`` will be bound to the result of calculating ``(a + b)``.
-* In the second line, we perform a *conditional operation*. That is, the
+  (see the fourth line), bind new values to ``a`` and ``b``, and perform the
+  same operations again. The first line also performs multiple assignments at
+  the same time. ``a`` is initially bound to ``0``, while ``b`` is initialized
+  to ``1``::
+
+    $0 ▶ loop (a b = 0 1)
+
+* On the second line, we perform a *conditional operation*. That is, the
   indented block formed by lines three and four is only executed if the
   expression ``(b < 10)`` evaluates to `true`. In other words: we are going
-  to be performing the loop as long as ``b`` is smaller than ``10``.
-* In line 5, we introduce the alternative block to be executed when ``b``
-  is greater or equal to ``10``.
-* In line 6, we break from the loop, returning the final value of ``b``.
-* Scopes offers a set of comparison operators for all basic types. You can
-  compare any two numbers using `<` (less than), `>` (greater than),
-  `==` (equal to), `<=` (less than or equal to), `>=` (greater than or equal to)
-  and `\!=` (not equal to).
-* The body of the conditional block is indented: indentation is Scopes' way of
-  grouping statements. At the console, you have to type a tab or four spaces for
-  each indented line. In practice you will prepare more complicated input for
-  Scopes with a text editor; all decent text editors have an auto-indent
-  facility. Note that each line within a basic block must be indented by the
-  same amount.
+  to be performing the loop as long as ``b`` is smaller than ``10``::
+
+    ....     if (b < 10)
+
+  .. note::
+
+      Scopes offers a set of comparison operators for all basic types. You can
+      compare any two numbers using `<` (less than), `>` (greater than),
+      `==` (equal to), `<=` (less than or equal to), `>=` (greater than or equal to)
+      and `\!=` (not equal to).
+
+* On line 4, the loop will be repeated with ``a`` bound to the value of ``b``,
+  while ``b`` will be bound to the result of calculating ``(a + b)``::
+
+    ....         repeat b (a + b)
+
+* On line 5, we introduce the alternative block to be executed when ``b``
+  is greater or equal to ``10``::
+
+    ....     else
+
+* On line 6, we break from the loop, returning the final value of ``b``::
+
+    ....         break b
 
 Controlling Flow
 ----------------
@@ -303,7 +350,7 @@ You have seen a small bit of `if` in that fibonacci example. `if` is your
 go-to solution for any task that requires the program to make decisions.
 Another example::
 
-    $0 ▶ __prompt "please enter a word: " ""
+    $0 ▶ sc_prompt "please enter a word: " ""
     please enter a word: bang
     $0 $1 = true "bang"
     $2 ▶ if ($1 < "n")
@@ -319,10 +366,12 @@ Another example::
 
 You can also use `if` to decide on an expression::
 
+    $0 ▶ let chosen = true
+    true
     $0 ▶ print "you chose"
-    ....     if true
+    ....     if x
     ....         "poorly"
-    ....     else
+    ....     elseif
     ....         "wisely"
     ....
     you chose poorly
