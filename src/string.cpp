@@ -44,7 +44,7 @@ int unescape_string(char *buf) {
             src++;
             if (*src == 0) {
                 break;
-            } if (*src == 'n') {
+            } else if (*src == 'n') {
                 *dst = '\n';
             } else if (*src == 't') {
                 *dst = '\t';
@@ -60,6 +60,31 @@ int unescape_string(char *buf) {
                     src--;
                     *dst = *src;
                 }
+            } else {
+                *dst = *src;
+            }
+        } else {
+            *dst = *src;
+        }
+        src++;
+        dst++;
+    }
+    // terminate
+    *dst = 0;
+    return dst - buf;
+}
+
+int unescape_string_light(char *buf) {
+    char *dst = buf;
+    char *src = buf;
+    while (*src) {
+        if (*src == '\\') {
+            auto c = *(src + 1);
+            if (c == 0) {
+                *dst++ = *src;
+                break;
+            } else if (c == '"') {
+                *dst = *(++src);
             } else {
                 *dst = *src;
             }

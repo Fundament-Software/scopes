@@ -84,6 +84,7 @@ const String *format( const char *fmt, ...);
 size_t distance(const String *_s, const String *_t);
 
 int unescape_string(char *buf);
+int unescape_string_light(char *buf);
 int escape_string(char *buf, const char *str, int strcount, const char *quote_chars);
 
 } // namespace scopes

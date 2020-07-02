@@ -133,6 +133,7 @@ struct LexerParser {
 
     Symbol get_symbol();
     const String *get_string();
+    const String *get_unescaped_string();
     const String *get_block_string();
     ValueRef get_number();
     //Const *get();
@@ -143,7 +144,7 @@ struct LexerParser {
     // parses the next sequence and returns it wrapped in a cell that points
     // to prev
     SCOPES_RESULT(ValueRef) parse_any();
-    SCOPES_RESULT(ValueRef) parse_string();
+    SCOPES_RESULT(ValueRef) parse_prefixed_string();
 
     SCOPES_RESULT(ValueRef) parse_naked(int column, Token end_token);
 

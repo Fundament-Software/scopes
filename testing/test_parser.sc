@@ -24,4 +24,11 @@ do
               line3
 
     test (S == "<line1\nline2\nline3\n>")
+
+    # string literal prefix does not escape
+    inline prefix:r (s) s
+
+    test (r"\\test\n\"test\"" == "\\\\test\\n\"test\"")
+
+
 ;

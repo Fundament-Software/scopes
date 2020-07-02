@@ -684,6 +684,14 @@ const String *LexerParser::get_string() {
     auto size = unescape_string(dest);
     return String::from(dest, size);
 }
+const String *LexerParser::get_unescaped_string() {
+    auto len = string_len - 2;
+    char dest[len + 1];
+    memcpy(dest, string + 1, len);
+    dest[len] = 0;
+    auto size = unescape_string_light(dest);
+    return String::from(dest, size);
+}
 const String *LexerParser::get_block_string() {
     int strip_col = column() + 4;
     auto len = string_len - 4;
@@ -800,13 +808,13 @@ SCOPES_RESULT(const List *) LexerParser::parse_list(Token end_token) {
     return builder.get_result();
 }
 
-SCOPES_RESULT(ValueRef) LexerParser::parse_string() {
+SCOPES_RESULT(ValueRef) LexerParser::parse_prefixed_string() {
     SCOPES_RESULT_TYPE(ValueRef);
     assert(this->token != tok_eof);
     const Anchor *anchor = this->anchor();
     switch (this->token) {
     case tok_string: {
-        return ValueRef(anchor, ConstPointer::string_from(get_string()));
+        return ValueRef(anchor, ConstPointer::string_from(get_unescaped_string()));
     } break;
     case tok_block_string: {
         return ValueRef(anchor, ConstPointer::string_from(get_block_string()));
@@ -847,9 +855,11 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_any() {
         SCOPES_TRACE_PARSER(this->anchor());
         SCOPES_ERROR(ParserStrayClosingBracket);
     } break;
-    case tok_string:
+    case tok_string: {
+        return ValueRef(anchor, ConstPointer::string_from(get_string()));
+    } break;
     case tok_block_string: {
-        return parse_string();
+        return ValueRef(anchor, ConstPointer::string_from(get_block_string()));
     } break;
     case tok_symbol: {
         return ValueRef(anchor, ConstInt::symbol_from(get_symbol()));
@@ -868,7 +878,7 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_any() {
             wrapped = wrappedsym;
         }
         SCOPES_CHECK_RESULT(this->read_token());
-        ValueRef str = SCOPES_GET_RESULT(parse_string());
+        ValueRef str = SCOPES_GET_RESULT(parse_prefixed_string());
         return ValueRef(anchor, ConstPointer::list_from(
             List::from(ref(anchor, wrapped), str)));
     } break;
