@@ -419,6 +419,34 @@ SCOPES_RESULT(void) LexerParser::read_symbol() {
     return {};
 }
 
+SCOPES_RESULT(void) LexerParser::read_symbol_or_prefix() {
+    SCOPES_RESULT_TYPE(void);
+    token = tok_symbol;
+    bool escape = false;
+    while (true) {
+        if (is_eof()) {
+            break;
+        }
+        char c = SCOPES_GET_RESULT(next());
+        if (escape) {
+            if (c == '\n') {
+                newline();
+            }
+            escape = false;
+        } else if (c == '\\') {
+            escape = true;
+        } else if (isspace(c) || strchr(TOKEN_TERMINATORS, c)) {
+            if (c == '"') {
+                token = tok_string_prefix;
+            }
+            next_cursor = next_cursor - 1;
+            break;
+        }
+    }
+    select_string();
+    return {};
+}
+
 SCOPES_RESULT(void) LexerParser::read_string(char terminator) {
     SCOPES_RESULT_TYPE(void);
     bool escape = false;
@@ -636,7 +664,7 @@ skip:
     else if (c == '`') { token = tok_ast_quote; }
     else if (c == ',') { token = tok_symbol; read_single_symbol(); }
     else if (SCOPES_GET_RESULT(read_number())) { token = tok_number; }
-    else { token = tok_symbol; SCOPES_CHECK_RESULT(read_symbol()); }
+    else { SCOPES_CHECK_RESULT(read_symbol_or_prefix()); }
 done:
     return token;
 }
@@ -772,39 +800,82 @@ SCOPES_RESULT(const List *) LexerParser::parse_list(Token end_token) {
     return builder.get_result();
 }
 
+SCOPES_RESULT(ValueRef) LexerParser::parse_string() {
+    SCOPES_RESULT_TYPE(ValueRef);
+    assert(this->token != tok_eof);
+    const Anchor *anchor = this->anchor();
+    switch (this->token) {
+    case tok_string: {
+        return ValueRef(anchor, ConstPointer::string_from(get_string()));
+    } break;
+    case tok_block_string: {
+        return ValueRef(anchor, ConstPointer::string_from(get_block_string()));
+    } break;
+    default: break;
+    }
+    SCOPES_TRACE_PARSER(this->anchor());
+    SCOPES_ERROR(ParserUnexpectedToken,
+        this->cursor[0], (int)this->cursor[0]);
+}
+
 // parses the next sequence and returns it wrapped in a cell that points
 // to prev
 SCOPES_RESULT(ValueRef) LexerParser::parse_any() {
     SCOPES_RESULT_TYPE(ValueRef);
     assert(this->token != tok_eof);
     const Anchor *anchor = this->anchor();
-    if (this->token == tok_open) {
+    switch (this->token) {
+    case tok_open: {
         return ValueRef(anchor, ConstPointer::list_from(
             SCOPES_GET_RESULT(parse_list(tok_close))));
-    } else if (this->token == tok_square_open) {
+    } break;
+    case tok_square_open: {
         return ValueRef(anchor, ConstPointer::list_from(
             List::from(
                 ref(anchor, ConstInt::symbol_from(Symbol(SYM_SquareList))),
                 SCOPES_GET_RESULT(parse_list(tok_square_close)))));
-    } else if (this->token == tok_curly_open) {
+    } break;
+    case tok_curly_open: {
         return ValueRef(anchor, ConstPointer::list_from(
             List::from(
                 ref(anchor, ConstInt::symbol_from(Symbol(SYM_CurlyList))),
                 SCOPES_GET_RESULT(parse_list(tok_curly_close)))));
-    } else if ((this->token == tok_close)
-        || (this->token == tok_square_close)
-        || (this->token == tok_curly_close)) {
+    } break;
+    case tok_close:
+    case tok_square_close:
+    case tok_curly_close: {
         SCOPES_TRACE_PARSER(this->anchor());
         SCOPES_ERROR(ParserStrayClosingBracket);
-    } else if (this->token == tok_string) {
-        return ValueRef(anchor, ConstPointer::string_from(get_string()));
-    } else if (this->token == tok_block_string) {
-        return ValueRef(anchor, ConstPointer::string_from(get_block_string()));
-    } else if (this->token == tok_symbol) {
+    } break;
+    case tok_string:
+    case tok_block_string: {
+        return parse_string();
+    } break;
+    case tok_symbol: {
         return ValueRef(anchor, ConstInt::symbol_from(get_symbol()));
-    } else if (this->token == tok_number) {
+    } break;
+    case tok_string_prefix: {
+        auto sym = get_symbol();
+        // cache existing symbols
+        auto it = prefix_symbol_map.find(sym);
+        ValueRef wrapped;
+        if (it != prefix_symbol_map.end()) {
+            wrapped = it->second;
+        } else {
+            auto wrappedsym = ConstInt::symbol_from(
+                Symbol(String::join(String::from("str:"), sym.name())));
+            prefix_symbol_map.insert({sym, wrappedsym});
+            wrapped = wrappedsym;
+        }
+        SCOPES_CHECK_RESULT(this->read_token());
+        ValueRef str = SCOPES_GET_RESULT(parse_string());
+        return ValueRef(anchor, ConstPointer::list_from(
+            List::from(ref(anchor, wrapped), str)));
+    } break;
+    case tok_number: {
         return get_number();
-    } else if (this->token == tok_syntax_quote) {
+    } break;
+    case tok_syntax_quote: {
         SCOPES_CHECK_RESULT(this->read_token());
         if (this->token == tok_eof) {
             SCOPES_TRACE_PARSER(this->anchor());
@@ -815,7 +886,8 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_any() {
                 ref(anchor, ConstInt::symbol_from(Symbol(KW_SyntaxQuote))),
                 SCOPES_GET_RESULT(parse_any())
                 )));
-    } else if (this->token == tok_ast_quote) {
+    } break;
+    case tok_ast_quote: {
         SCOPES_CHECK_RESULT(this->read_token());
         if (this->token == tok_eof) {
             SCOPES_TRACE_PARSER(this->anchor());
@@ -826,12 +898,12 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_any() {
                 ref(anchor, ConstInt::symbol_from(Symbol(KW_ASTQuote))),
                 SCOPES_GET_RESULT(parse_any())
                 )));
-    } else {
-        SCOPES_TRACE_PARSER(this->anchor());
-        SCOPES_ERROR(ParserUnexpectedToken,
-            this->cursor[0], (int)this->cursor[0]);
+    } break;
+    default: break;
     }
-    return ValueRef(anchor, ConstAggregate::none_from());
+    SCOPES_TRACE_PARSER(this->anchor());
+    SCOPES_ERROR(ParserUnexpectedToken,
+        this->cursor[0], (int)this->cursor[0]);
 }
 
 SCOPES_RESULT(ValueRef) LexerParser::parse_naked(int column, Token end_token) {

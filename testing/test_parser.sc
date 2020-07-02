@@ -9,3 +9,13 @@ test (-0b1111 == -15)
 
 test ((typeof 0x111:u16) == u16)
 
+do
+    # string literal prefix
+
+    inline str:<> (s)
+        .. "<" s ">"
+
+    test (<>"test" == "<test>")
+    test (<>"test" == "<test>")
+
+;

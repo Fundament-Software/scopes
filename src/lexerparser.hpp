@@ -9,8 +9,10 @@
 
 #include "result.hpp"
 #include "valueref.inc"
+#include "symbol.hpp"
 
 #include <stddef.h>
+#include <unordered_map>
 
 namespace scopes {
 
@@ -43,6 +45,7 @@ struct Type;
     T(syntax_quote, '\'') \
     T(ast_quote, '`') \
     T(symbol, 'S') \
+    T(string_prefix, 'p') \
     T(escape, '\\') \
     T(statement, ';') \
     T(number, 'N')
@@ -106,6 +109,7 @@ struct LexerParser {
     void read_single_symbol();
 
     SCOPES_RESULT(void) read_symbol();
+    SCOPES_RESULT(void) read_symbol_or_prefix();
 
     SCOPES_RESULT(void) read_string(char terminator);
 
@@ -139,6 +143,7 @@ struct LexerParser {
     // parses the next sequence and returns it wrapped in a cell that points
     // to prev
     SCOPES_RESULT(ValueRef) parse_any();
+    SCOPES_RESULT(ValueRef) parse_string();
 
     SCOPES_RESULT(ValueRef) parse_naked(int column, Token end_token);
 
@@ -160,6 +165,7 @@ struct LexerParser {
     int string_len;
 
     ValueRef value;
+    std::unordered_map<Symbol, ConstIntRef, Symbol::Hash> prefix_symbol_map;
 };
 
 
