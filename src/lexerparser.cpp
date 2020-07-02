@@ -863,7 +863,7 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_any() {
             wrapped = it->second;
         } else {
             auto wrappedsym = ConstInt::symbol_from(
-                Symbol(String::join(String::from("str:"), sym.name())));
+                Symbol(String::join(String::from("prefix:"), sym.name())));
             prefix_symbol_map.insert({sym, wrappedsym});
             wrapped = wrappedsym;
         }
