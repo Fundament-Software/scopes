@@ -11,7 +11,7 @@ Using the Scopes Live Compiler
 
 After downloading and unpacking the latest release of Scopes, the easiest way
 to start it is to simply launch the executable shipped with the archive. It
-is usually located in the root directory, and on Unix-compatible systems
+is usually located in the root directory, and on Unix compatible systems
 it can simply be started from the terminal with:
 
 ..  code-block:: none
@@ -39,12 +39,6 @@ read-eval-print loop (REPL), also called a console. Here's an example:
      ///\\\
     ///  \\\  Scopes 0.14 (Apr 17 2019, 19:43:48)
     $0 ▶
-
-.. note::
-
-    At the time of writing, some console programs such as MSYS2 may not
-    display the Interactive Console's output properly.  Windows users
-    are advised to use PowerShell or another console program instead.
 
 Simple expressions can be written on a single line, followed by hitting the
 return key::
@@ -118,24 +112,6 @@ nicely as a comfy calculator::
 
 Integer numbers like ``6`` or ``65`` have type `i32`, real numbers with a
 fractional part like ``13.0`` or ``1.6`` have type `f32`.
-
-.. note::
-
-    When experimenting with the Interactive Console, you may have noticed that
-    if the whitespace characters between the operators and numbers are omitted
-    that the Interactive Console will display an error when evaluating the
-    expression. For example::
-
-        $0 ▶ 1+2+3
-        <string>:1:1: while expanding
-            1+2+3
-        error: syntax: identifier '1+2+3' is not declared in scope. Did you mean 'u32', 'f128', 'f32',
-        'i32', '+' or '+='?
-
-    This is because symbol identifiers in Scopes may contain any character
-    from the UTF-8 character set except whitespace characters and characters
-    from the set ``()[]{}"';#,``, where ``,`` is in itself a context-free
-    symbol.  See :doc:`dataformat` for details.
 
 Division always returns a real number. On the off-chance that you want an
 integer result without the fractional part, use the floor division operator
@@ -288,15 +264,6 @@ for such a task, computing the first few numbers of the fibonacci sequence::
     8
     $0 = 13
 
-.. note::
-
-    The body of the conditional block is indented: indentation is Scopes’ way
-    of grouping statements. At the console, you have to type a tab or four
-    spaces for each indented line. In practice you will prepare more
-    complicated input for Scopes with a text editor; all decent text editors
-    have an auto-indent facility. Note that each line within a basic block
-    must be indented by the same amount.
-
 This example introduces several new features.
 
 * The first line declares the entry point of a loop so we can jump back
@@ -317,6 +284,12 @@ This example introduces several new features.
   compare any two numbers using `<` (less than), `>` (greater than),
   `==` (equal to), `<=` (less than or equal to), `>=` (greater than or equal to)
   and `\!=` (not equal to).
+* The body of the conditional block is indented: indentation is Scopes' way of
+  grouping statements. At the console, you have to type a tab or four spaces for
+  each indented line. In practice you will prepare more complicated input for
+  Scopes with a text editor; all decent text editors have an auto-indent
+  facility. Note that each line within a basic block must be indented by the
+  same amount.
 
 Controlling Flow
 ----------------
@@ -330,7 +303,7 @@ You have seen a small bit of `if` in that fibonacci example. `if` is your
 go-to solution for any task that requires the program to make decisions.
 Another example::
 
-    $0 ▶ sc_prompt "please enter a word: " ""
+    $0 ▶ __prompt "please enter a word: " ""
     please enter a word: bang
     $0 $1 = true "bang"
     $2 ▶ if ($1 < "n")
@@ -353,26 +326,6 @@ You can also use `if` to decide on an expression::
     ....         "wisely"
     ....
     you chose poorly
-
-Likewise, `if` can be used to evaluate the 'truth' of a bool::
-
-    $0 ▶ let x = true
-    $0 ▶ print "you chose"
-    ....     if x
-    ....         "truly"
-    ....     else
-    ....         "falsely"
-    ....
-    you chose truly
-
-    $0 ▶ let x = false
-    $0 ▶ print "you chose"
-    ....     if (not x)
-    ....         "falsely"
-    ....     else
-    ....         "truly"
-    ....
-    you chose falsely
 
 Defining Functions
 ``````````````````

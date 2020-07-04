@@ -3,7 +3,7 @@ Scopes for C/C++ Users
 
 This is an introduction of Scopes for C/C++ users. We are going to highlight
 commonalities and differences between both languages. At the end of this
-introduction, a reader should have a better understanding of how C/C++ concepts
+introduction, you will have a better understanding of how C/C++ concepts
 translate to Scopes, and which idiosyncrasies to expect.
 
 Execution
@@ -13,10 +13,10 @@ C/C++ requires programs to be built and linked before they can be executed. For
 this, a build system is typically employed.
 
 In contrast, Scopes' primary execution mode is live, which means that the
-compiler remains on-line while the program is running, allowing the compilation
-of additional functions on demand, and use of other services provided by the
+compiler remains on-line while the program is running, permitting to compile
+additional functions on demand, and to use other services provided by the
 Scopes runtime library. Programs are compiled transparently and cached in the
-background to minimize loading times. This mechanism is designed to be
+background to optimize loading times. This mechanism is designed to be
 maintenance-free.
 
 However, Scopes can also build object files compatible with GCC and Clang at
@@ -24,17 +24,17 @@ runtime using `compile-object`, which makes it both suitable for classic offline
 compilation and as foundation for a build system.
 
 When building objects with Scopes, certain restrictions apply. The generated
-object file has no ties to the Scopes runtime, and so the corresponding Scopes
-code must not use any first-class objects as constants. Instead, such code may
-use the ``sc_*`` functions exported by the Scopes runtime, but must be linked
-with ``libscopesrt`` to make those symbols available.
+object file has no ties to the Scopes runtime, and so you must not use any first
+class objects as constants in your program. You may use ``sc_*`` functions
+exported by the Scopes runtime, but must link with ``libscopesrt`` to make
+those symbols available.
 
 Compiler Errors
 ---------------
 
 At compile time, C/C++ compilers attempt to catch and report as many errors
-encountered as possible by default, with minimal contextual information
-provided to prevent bloating the error report further.
+encountered as possible by default, with minimal contextual information provided
+to prevent bloating the error report further.
 
 In contrast, Scopes terminates compilation at the first error encountered,
 providing a compiler stack trace highlighting the individual steps in
@@ -47,19 +47,15 @@ C/C++ programs are debugged at runtime by using a step debugger like GDB or
 WinDbg, or by what is commonly referred to as "printf debugging".
 
 Scopes generates DWARF/COFF debug information for its programs and therefore
-supports step debuggers like GDB which understand the format.
-
-.. note::
-
-    At the time of writing, due to a limitation in LLVM, debug information
-    generated at runtime is currently not available on Windows. Object
-    files are not affected by this limitation.
+supports step debuggers like GDB which understand the format. Due to a
+limitation in LLVM, debug information generated at runtime is currently not
+available on Windows. Object files are not affected by this limitation.
 
 Two ways of "printf debugging" are provided, the function `report`, which prints
 the runtime value of the arguments provided, and the builtin `dump`, which
 prints, at compile time, the instruction and type of the arguments provided,
-allowing inspection of constants and types of variables with the inferred type.
-Both functions prefix their output by the source location of where they were
+allowing to inspect constants and types of variables with inferred type. Both
+functions prefix their output by the source location of where they were
 called, so they are easy to remove when the session is over.
 
 Indentation
@@ -81,14 +77,13 @@ For symbolic tokens that can be used to bind names to values and types, C
 accepts the character set of ``0-9A-Za-z_``. This allows users to concatenate
 many tokens without separating whitespace, such as in ``x+y``.
 
-Instead of a list of allowed characters, Scopes instead maintains an exclusion
-list of characters that terminate a symbolic sequence. These characters are
+Instead of a whitelist of permitted characters, Scopes only maintains a
+blacklist of characters that terminate a symbolic sequence. These characters are
 the whitespace characters and characters from the set ``()[]{}"';#,``, where
-``,`` is in itself a context-free symbol.
+``,`` is in itself a context free symbol.
 
-This means that ``x+y`` would be read as a single token. A semantically-\
-equivalent expression in Scopes would have to be written as ``x + y``. See
-:doc:`dataformat` for details.
+This means that ``x+y`` would be read as a single token. A semantically
+equivalent expression in Scopes would have to be written as ``x + y``.
 
 Keywords
 --------
@@ -108,7 +103,7 @@ just one basic form::
         ...
         argumentN
 
-The value and type of the head controls whether the expression is dispatched to:
+The value and type of the head controls whether the expression is dispatched to
 
 * A syntax macro (called a `sugar`), called at expansion time, which has
   complete control over which, when and how remaining arguments will be expanded
@@ -123,26 +118,26 @@ As a result of this principle, there are no keywords in Scopes. Every single
 symbol can be rebound or deleted, globally or just for one scope.
 
 Scopes also supports wildcard syntax macros (wildcard sugars), which can be
-applied to any expression or symbol before the expansion begins, and which an
-author can use to implement exceptions to the head dispatch rule. One of these
-exceptions, for instance, is infix notation support.
+applied to either any expression or symbol before the expansion begins, and
+which can be used to implement exceptions to the head dispatch rule. One of
+these exceptions for instance is infix notation support.
 
 Infix Expressions
 -----------------
 
 C/C++ offers a fixed set of infix operators which are recognized during parsing
 and translated to AST nodes right then. They can be used within expressions
-but must be placed in parentheses or separated by semicolon or comma from
+but must be put in parentheses or separated by semicolon or comma from
 neighboring expressions in argument or statement lists.
 
 Scopes also offers a set of commonly used infix operators not unlike the ones
 provided by C, utilizing the same associativity and nearly the same precedence
-(notably, the `<<` and `>>` operators use a different precedence), but renaming
-and adding operators where it improves clarity.
+(the `<<` and `>>` operators use a different precedence), but renaming and
+adding operators where it improves clarity.
 
-Unlike C/C++, Scopes allows the definition of new scoped infix operators at the
-user's convenience using `define-infix<` and `define-infix>`, as a simple alias
-to an existing sugar, spice or function.
+Unlike C/C++, Scopes allows to define new scoped infix operators at the users
+convenience using `define-infix<` and `define-infix>`, as a simple alias to an
+existing sugar, spice or function.
 
 An infix expression is recognized by looking for an infix definition for the
 second token of an expression. If a matching definition is found, all tokens
@@ -152,8 +147,8 @@ The infix expression must follow the pattern ``(x0 op x1 op ... op xN)`` to be
 recognized. If an odd argument is not a valid infix token, a syntax error
 will be raised.
 
-Scopes deliberately does not implement any concept of mixed infix, prefix, or
-postfix expressions to keep confusion to a minimum. Even infix expressions
+Scopes does deliberately not implement any concept of mixed infix, prefix
+or postfix expressions to keep confusion to a minimum. Even infix expressions
 can be entirely disabled by replacing the default wildcard sugar.
 
 A special symbol sugar exists which aims to simplify trivial container lookups.
@@ -244,10 +239,10 @@ a globally accessible value, within a function it represents a stack value.
         printf("%i\n", variable3);
     }
 
-In Scopes, expressions are bound to names using `let`, which only binds an
-expression or value to a name. The type of the value and where it is stored
-depends entirely on the expression that produces it. The `local` and `global`
-forms must be used to explicitly allocate a stack or data segment value::
+In Scopes, expressions are bound to names using `let`. `let` does only perform
+the binding. The type of the value and where it is stored depends entirely on
+the expression that produces it. The `local` and `global` forms must be used to
+explicitly allocate a stack or data segment value::
 
     # a compile time constant integer
     let constant = 100
@@ -276,7 +271,7 @@ forms must be used to explicitly allocate a stack or data segment value::
         # variable3 is a constant
         print variable3
 
-Unlike in C/C++, declarations of the same name within the same scope are
+Unlike in C/C++, declarations of the same name within the same scope are also
 permitted, and the previous binding is still accessible during evaluation
 of the right-hand side::
 
@@ -456,7 +451,7 @@ Overloading
 
 C++ allows overloading of functions by specifying multiple functions with
 the same name but different type signatures. On call, the call arguments types
-are used to deduce the correct function to use:
+are used to deduce the correct function to use.
 
 .. code-block:: c++
 
@@ -468,7 +463,7 @@ are used to deduce the correct function to use:
     int overloaded (float a, float b) { return 3; }
 
 Scopes offers a similar mechanism as a library form, but requires that
-overloads are grouped at the time of declaration. The first form that
+overloads must be grouped at the time of declaration. The first form that
 matches argument types implicitly is selected, in order of declaration::
 
     fn... overloaded
@@ -506,30 +501,30 @@ available to every future translation unit. This guarantees that a particular
 template is only instantiated once.
 
 When objects are compiled through `compile-object`, only functions exported
-through the scope argument, and all functions they depend on, are guaranteed to
-be included. Objects are complete. Previously generated functions will not be
-externally defined, but will be redefined as private functions within the
-object's translation unit. The same rules apply to global variables.
+through the scope argument are guaranteed to be included, and all functions
+they depend on. Objects are complete. Previously generated functions will not
+be externally defined, but will be redefined as private functions within the
+objects translation unit. The same rules apply to global variables.
 
 Using Third Party Libraries
 ---------------------------
 
 With C/C++, third party libraries are typically built in a separate build
-process provided by their developer, either as static or shared libraries.
-Their definitions are made available through include files that an author
-can embed into translation units using the ``#include`` preprocessing
-command. The libraries' precompiled symbols are typically merged into the
-executable during linking or at runtime, either when the process is mapped
-into memory or function pointers are loaded manually from the library.
+process provided by the libraries developer, either as static or shared
+libraries. Their definitions are made available through include files that one
+can embed into one's own translation units using the ``#include`` preprocessing
+command. The libraries' precompiled symbols are merged into the executable
+during linking or at runtime, either when the process is mapped into memory
+or function pointers are loaded manually from the library.
 
 Scopes provides a module system which allows shipping libraries as sources.
 Any scopes source file can be imported as a module. When a module is first
 imported using `import` or `using import`, its main body is compiled and
-executed. The returned scope which contains the module's exported functions and
-types is cached under the module's name and returned to the importing program.
-The module's functions and types are now available to the program and can be
+executed. The returned scope which contains the modules' exported functions and
+types is cached under the modules name and returned to the importing program.
+The modules' functions and types are now available to the program and can be
 embedded directly into its translation unit. No code is generated until the
-libraries' or module's functions are actually used.
+libraries' functions are actually used.
 
 Scopes also supports embedding existing third party C libraries in the classical
 way, using `include`, `load-library` and `load-object`::
@@ -704,7 +699,7 @@ Virtual Methods
 
 As Scopes doesn't provide a native abstraction for composition by inheritance,
 virtual methods are not supported out of the box, but can be implemented through
-its extensive domain-specific language support.
+its extensive domain specific language support.
 
 Classes
 -------
@@ -766,9 +761,9 @@ trivially provide this feature via `inline` functions::
             fn compare ()
                 value == x
 
-Partial template specialization allows the choice of different implementations
+Partial template specialization allows to choose different implementations
 depending on instantiation arguments. The same mechanism is also used to do
-type-based dispatch. Here is an example:
+type based dispatch. Here is an example:
 
 .. code-block:: c++
 
@@ -842,13 +837,9 @@ Here is an example that changes the default constructor of a struct::
 Destructors
 -----------
 
-C++ provides so-called destructors which permit the execution of code when a
-value goes out of scope. Destructors typically free resources, but can also be
-used to switch contexts. This is commonly used in C++ as part of a programming
-technique used to bind the life cycle of a resource to that of a corresponding
-object. This technique is generally referred to as *Resource Acquisition Is
-Initialization* or `RAII <https://en.cppreference.com/w/cpp/language/raii>`_,
-in the C++ community, or as *Scope-Bound Resource Management* (SBRM).
+C++ provides so-called destructors which permit to execute code when a value goes
+out of scope. Destructors typically free resources, but can also be used to
+switch contexts.
 
 .. code-block:: c++
 
@@ -912,15 +903,15 @@ in a struct, class or namespace.
         return Accumulable(a.value + b.value);
     }
 
-Scopes supports operator overloading through informally-specified operator
-protocols that any type can support by exposing dispatch methods bound to
+Scopes supports operator overloading through informally specified operator
+protocols that that any type can support by exposing dispatch methods bound to
 special attributes. See this equivalent example, which applies not only to
 structs, but any type definition::
 
     struct Accumulable
         # one compile time function for all left-hand side variants receives
-          left-hand and right-hand types and returns a function which can
-          perform the operation or void.
+            left-hand and right-hand types and returns a function which can
+            perform the operation or void.
         inline __+ (cls T)
             # test for type + type
             static-if (T == this-type)
@@ -952,8 +943,8 @@ and algorithmic container types.
 Scopes supports the C standard library through the clang bridge accessible
 by the `include` mechanism.
 
-At the time of writing, only a few containers from the C++ standard library
-have functional equivalents in Scopes yet. Here is a comparison table:
+Only a few containers from the C++ standard library have functional equivalents
+in Scopes yet. Here is a comparison table:
 
 ======================= ====================
 C++                     Scopes
@@ -970,7 +961,7 @@ C++                     Scopes
 Memory Handling & Management
 ----------------------------
 
-C and C++ use a stack-based machine model that is compatible with native
+C and C++ use a stack based machine model that is compatible with native
 targets. Within this model, mutable memory can be pre-allocated globally,
 on the function's stack and in main memory, called the "heap".
 
@@ -991,15 +982,15 @@ C/C++                               Scopes
 ``malloc(sizeof(T) * size)``        `malloc-array T size`
 =================================== ===================================
 
-In addition, C++ allows the management of memory by recursively invoking a
-type-defined destructor on stack values when exiting a bracketed scope, as well
-as on globals when the program is exited or a library unloaded. Based on this
-mechanism and intricate elision rules, various smart pointer types are
-implemented, of which the most useful is ``std::unique_ptr``, which is a type
-that manages the lifetime of a single heap value until it goes out of scope.
+In addition, C++ allows to manage memory by recursively invoking a type-defined
+destructor on stack values when exiting a bracketed scope, as well as on globals
+when the program is exited or a library unloaded. Based on this mechanism and
+intricate elision rules, various smart pointer types are implemented, of which
+the most useful is ``std::unique_ptr``, which is a type that manages the
+lifetime of a single heap value until it goes out of scope.
 
-In Scopes, types can be defined as unique, which instructs Scopes to manage the
-the lifetime of values in a similar fashion as what C++ does. In addition, weak
+In Scopes, types can be defined as unique, which instructs scope to manage the
+lifetime of values in a similar fashion as C++ does. In addition, weak
 references to these values (direct or indirect) can be borrowed as "views",
 which become inaccessible as soon as the viewed unique value goes out of scope.
 This mechanism incurs no performance cost at runtime. See `Destructors`_ for
@@ -1009,10 +1000,10 @@ Closures
 --------
 
 C++ supports runtime closures through the ``std::function`` type, which allows
-the implicit binding of values to a function, so that when the function is
-called, the bound values become available to the function without having to
-pass them as arguments. In functional programming, this process can be used to
-implement currying.
+to implicitly bind values to a function, so that when the function is called,
+the bound values become available to the function without having to pass them
+as arguments. In functional programming, this process can be used to implement
+currying.
 
 ..  code-block:: c++
 
@@ -1032,8 +1023,8 @@ implement currying.
     }
 
 Scopes supports compile time closures natively, as demonstrated previously, but
-runtime closures are also supported through so-called captures. The example
-above would be translated as follows::
+runtime closures are also supported through so-called captures. Above example
+would be translated as follows::
 
     fn print_bound_constant ()
         let y = 42
@@ -1066,7 +1057,7 @@ elements of a collection.
     }
 
     // C-style for-loop implementing an iterator
-    for (iter_t it = first(container), int k = 0; is_valid(it); it = next(it), ++k) {
+    for (iter_t it = first(container), int k = 0; is_valid(it); it = next(it), k++) {
         process(k, at(it));
     }
 
@@ -1116,9 +1107,9 @@ Targeting Shader Programs
 -------------------------
 
 C/C++ do not offer a native way to compile functions to shader code. However,
-various third party solutions exist to provide equivalent features. The GLSL
-(GL shader language) offers a C-like domain-specific language to write shaders
-that has enough overlap with C/C++ in order to allow users to share
+there exist various third party solutions to provide equivalent features. The
+GLSL (GL shader language) offers a C-like domain specific language to write
+shaders that has enough overlap with C/C++ in order to allow users to share
 definitions.
 
 Scopes is able to natively compile functions to SPIR-V as well as GLSL at
@@ -1167,6 +1158,8 @@ The program output is as follows:
         color = _24;
     }
 
+
+
 Exceptions
 ----------
 
@@ -1195,7 +1188,7 @@ the ``try .. catch`` form.
     }
 
 Scopes supports a form of structured exception handling that is monomorphic,
-light-weight and C compatible. A value of any type can be raised using the
+light weight and C compatible. A value of any type can be raised using the
 ``raise`` form, and handled using the ``try .. except`` form::
 
     using import struct
@@ -1212,13 +1205,13 @@ light-weight and C compatible. A value of any type can be raised using the
 
 The presence of an exception modifies the return type of a function to a hidden
 tagged union type which returns which path the function returned on, and
-both the return and exception value, of which only the appropriate value has
-been set.
+both return and exception value, of which only the appropriate value has been
+set.
 
 Monomorphic means that in contrast to C++, Scopes does not allow more than one
-exception type per expression to be backpropagated. If an author wishes to
-support a polymorphic type, they can use `enum` to define a tagged union type
-which can be dispatched to the correct exception type.
+exception type per expression to be backpropagated. If you wish to support a
+polymorphic type, you can use `enum` to define a tagged union type which can be
+dispatched to the correct exception type.
 
 ABI Compliance
 --------------
