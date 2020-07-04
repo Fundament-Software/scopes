@@ -6,4 +6,4 @@ With contributions from
 * James Austin
 * Matt Keeter
 * Westerbly Snaydley
-
+* Shawn Walker-Salas
