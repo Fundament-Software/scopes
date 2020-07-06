@@ -7,3 +7,4 @@ With contributions from
 * Matt Keeter
 * Westerbly Snaydley
 * Shawn Walker-Salas
+* Russ Powers
