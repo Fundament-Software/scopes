@@ -38,6 +38,7 @@
 #include <llvm-c/Support.h>
 #include <llvm-c/DebugInfo.h>
 #include <llvm-c/BitWriter.h>
+#include <llvm-c/DebugInfo.h>
 
 #include "llvm/IR/Module.h"
 //#include "llvm/IR/DebugInfoMetadata.h"
@@ -104,6 +105,12 @@ static void build_and_run_opt_passes(LLVMModuleRef module, int opt_level) {
 
 const double deg2rad = 0.017453292519943295;
 const double rad2deg = 57.29577951308232;
+
+// LLVM DWARF debug constants
+const unsigned DW_ATE_float = 4;
+const unsigned DW_ATE_signed = 5;
+const unsigned DW_ATE_unsigned = 7;
+const unsigned DW_TAG_structure_type = 19;
 
 struct PointerNamespace {
 
@@ -229,6 +236,7 @@ struct LLVMIRGenerator {
 
     typedef std::vector<LLVMValueRef> LLVMValueRefs;
     typedef std::vector<LLVMTypeRef> LLVMTypeRefs;
+    typedef std::vector<LLVMMetadataRef> LLVMMetadataRefs;
 
     std::unordered_map<Symbol, LLVMMetadataRef, Symbol::Hash> file2value;
     std::unordered_map<void *, LLVMValueRef> ptr2global;
@@ -308,6 +316,24 @@ struct LLVMIRGenerator {
     };
 
     std::unordered_map< PMIntrinsicKey, LLVMValueRef, HashPMIntrinsicKey > pm_intrinsics;
+
+    LLVMMetadataRef debug_voidT;
+    LLVMMetadataRef debug_i1T;
+    LLVMMetadataRef debug_i8T;
+    LLVMMetadataRef debug_i16T;
+    LLVMMetadataRef debug_i32T;
+    LLVMMetadataRef debug_i64T;
+    LLVMMetadataRef debug_f32T;
+    LLVMMetadataRef debug_f32x2T;
+    LLVMMetadataRef debug_f64T;
+    LLVMMetadataRef debug_f80T;
+    LLVMMetadataRef debug_f128T;
+    LLVMMetadataRef debug_rawstringT;
+    LLVMMetadataRef debug_noneT;
+    std::unordered_map<const Type *, LLVMMetadataRef> debug_type_cache;
+    std::vector<const Type *> debug_type_todo;
+    std::vector<std::pair<LLVMMetadataRef, LLVMMetadataRef>> debug_type_to_replace;
+    LLVMMetadataRef current_debug_block = nullptr;
 
     bool use_debug_info = true;
     bool generate_object = false;
@@ -707,6 +733,47 @@ struct LLVMIRGenerator {
         return LLVMStructType(types, sz, false);
     }
 
+//     LLVMMetadataRef abi_struct_debug_type(const ABIClass *classes, size_t sz) {
+//         LLVMMetadataRef types[sz];
+//         size_t k = 0;
+//         for (size_t i = 0; i < sz; ++i) {
+//             ABIClass cls = classes[i];
+//             switch(cls) {
+//             case ABI_CLASS_SSE: {
+//                 types[i] = debug_f32T; k++;
+//             } break;
+//             case ABI_CLASS_SSESF: {
+//                 types[i] = debug_f32T; k++;
+//             } break;
+//             case ABI_CLASS_SSEDF: {
+//                 types[i] = debug_f64T; k++;
+//             } break;
+//             case ABI_CLASS_INTEGER: {
+//                 types[i] = debug_i64T; k++;
+//             } break;
+//             case ABI_CLASS_INTEGERSI: {
+//                 types[i] = debug_i32T; k++;
+//             } break;
+//             case ABI_CLASS_INTEGERSI16: {
+//                 types[i] = debug_i16T; k++;
+//             } break;
+//             case ABI_CLASS_INTEGERSI8: {
+//                 types[i] = debug_i8T; k++;
+//             } break;
+//             default: {
+//                 // do nothing
+// #if 0
+//                 StyledStream ss;
+//                 ss << "unhandled ABI class: " <<
+//                     abi_class_to_string(cls) << std::endl;
+// #endif
+//             } break;
+//             }
+//         }
+//         if (k != sz) return nullptr;
+//         return LLVMDIBuilderCreateStructType(di_builder, "", 0, nullptr, 0, LLVMStructType(types, sz, false);
+//     }
+
     SCOPES_RESULT(LLVMValueRef) abi_import_argument(const Type *param_type, LLVMValueRef func, size_t &k) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         ABIClass classes[MAX_ABI_CLASSES];
@@ -965,6 +1032,191 @@ struct LLVMIRGenerator {
         return typeref;
     }
 
+    SCOPES_RESULT(LLVMMetadataRef) create_llvm_debug_type(const Type *type) {
+        SCOPES_RESULT_TYPE(LLVMMetadataRef);
+        switch(type->kind()) {
+        case TK_Qualify: {
+            auto qt = cast<QualifyType>(type);
+            auto lltype = SCOPES_GET_RESULT(_type_to_llvm_debug_type(qt->type));
+            auto rq = try_qualifier<ReferQualifier>(type);
+            if (rq) {
+                lltype = LLVMDIBuilderCreatePointerType(di_builder, lltype, PointerType::size() * 8, 0, 0, "", 0);
+            }
+            return lltype;
+        } break;
+        case TK_Integer: {
+            auto it = cast<IntegerType>(type);
+            // TODO: Better way to get the name?
+            StyledString ss = StyledString::plain();
+            stream_type_name(ss.out, it);
+            auto name = ss.cppstr();
+            auto dwate = it->issigned ? DW_ATE_signed : DW_ATE_unsigned;
+            return LLVMDIBuilderCreateBasicType(di_builder, name.c_str(), name.size(), it->width, dwate, LLVMDIFlagZero);
+        }
+        case TK_Real: {
+            auto rt = cast<RealType>(type);
+            // TODO: Better way to get the name?
+            StyledString ss = StyledString::plain();
+            stream_type_name(ss.out, rt);
+            auto name = ss.cppstr();
+            return LLVMDIBuilderCreateBasicType(di_builder, name.c_str(), name.size(), rt->width, DW_ATE_float, LLVMDIFlagZero);
+        }
+        case TK_Pointer: {
+            auto ll_inner_type = SCOPES_GET_RESULT(_type_to_llvm_debug_type(cast<PointerType>(type)->element_type));
+            return LLVMDIBuilderCreatePointerType(di_builder, ll_inner_type, PointerType::size() * 8, 0, 0, "", 0);
+        }
+        case TK_Array:
+        case TK_Matrix: {
+            auto ai = cast<ArrayLikeType>(type);
+            auto ll_el_type = SCOPES_GET_RESULT(_type_to_llvm_debug_type(ai->element_type));
+            LLVMMetadataRef subranges[] = { LLVMDIBuilderGetOrCreateSubrange(di_builder, 0, ai->count()) }; // TODO: n-dimensional arrays?
+            auto size = SCOPES_GET_RESULT(size_of(ai)) * 8;
+            auto align = SCOPES_GET_RESULT(align_of(ai)) * 8;
+            return LLVMDIBuilderCreateArrayType(di_builder, size, align, ll_el_type, subranges, 1);
+        } break;
+        case TK_Vector: {
+            auto vi = cast<ArrayLikeType>(type);
+            LLVMMetadataRef subranges[] = { LLVMDIBuilderGetOrCreateSubrange(di_builder, 0, vi->count()) }; // Is this a static count? Should it be an expr?
+            auto ll_el_type = SCOPES_GET_RESULT(_type_to_llvm_debug_type(vi->element_type));
+            auto size = SCOPES_GET_RESULT(size_of(vi)) * 8;
+            auto align = SCOPES_GET_RESULT(align_of(vi)) * 8;
+            return LLVMDIBuilderCreateVectorType(di_builder, size, align, ll_el_type, subranges, 1);
+        } break;
+        case TK_Arguments: {
+            if (type == empty_arguments_type())
+                return LLVMDIBuilderCreateBasicType(di_builder, "void", 4, 0, DW_ATE_unsigned, LLVMDIFlagZero);
+            return create_llvm_debug_type(cast<ArgumentsType>(type)->to_tuple_type());
+        } break;
+        case TK_Tuple: {
+            auto ti = cast<TupleType>(type);
+            LLVMMetadataRef difile = source_file_to_scope(active_function.anchor()->path);
+            auto tuple_name = sc_type_key(ti)._0.name();
+            return build_debug_struct_type(ti, tuple_name);
+        } break;
+        case TK_Typename: {
+            if (type == TYPE_Sampler) {
+                SCOPES_ERROR(CGenTypeUnsupportedInTarget, TYPE_Sampler);
+            }
+            auto tn = cast<TypenameType>(type);
+            if (!tn->is_opaque()) {
+                switch(tn->storage()->kind()) {
+                case TK_Tuple: {
+                    debug_type_todo.push_back(type);
+                } break;
+                default: {
+                    return create_llvm_debug_type(tn->storage());
+                } break;
+                }
+            }
+            LLVMMetadataRef difile = source_file_to_scope(active_function.anchor()->path);
+            if (tn->is_opaque()) {
+                return LLVMDIBuilderCreateStructType(di_builder, difile, tn->name()->data, tn->name()->count, difile, 0, 0, 0, LLVMDIFlagZero, nullptr, nullptr, 0, 0, nullptr, "", 0);
+            } else {
+                return LLVMDIBuilderCreateReplaceableCompositeType(di_builder, DW_TAG_structure_type, tn->name()->data, tn->name()->count, difile, difile, 0, 0, 0, 0, LLVMDIFlagFwdDecl, "", 0);
+            }
+        } break;
+        case TK_Function: {
+            // Is there a way to add the actual function signature?
+            auto fi = cast<FunctionType>(type);
+            size_t count = fi->argument_types.size();
+            auto rtype = abi_return_type(fi);
+            bool use_sret = is_memory_class(rtype);
+            return LLVMDIBuilderCreateBasicType(di_builder, "Function", 8, PointerType::size(), DW_ATE_unsigned, LLVMDIFlagZero);
+        } break;
+        case TK_SampledImage: {
+            SCOPES_ERROR(CGenTypeUnsupportedInTarget, TYPE_SampledImage);
+        } break;
+        case TK_Image: {
+            SCOPES_ERROR(CGenTypeUnsupportedInTarget, TYPE_Image);
+        } break;
+        case TK_Sampler: {
+            SCOPES_ERROR(CGenTypeUnsupportedInTarget, TYPE_Sampler);
+        } break;
+        default: break;
+        };
+
+        SCOPES_ERROR(CGenFailedToTranslateType, type);
+    }
+
+    SCOPES_RESULT(LLVMMetadataRef) _type_to_llvm_debug_type(const Type *type) {
+        SCOPES_RESULT_TYPE(LLVMMetadataRef);
+        auto it = debug_type_cache.find(type);
+        if (it == debug_type_cache.end()) {
+            LLVMMetadataRef result = SCOPES_GET_RESULT(create_llvm_debug_type(type));
+            debug_type_cache.insert({type, result});
+            return result;
+        } else {
+            return it->second;
+        }
+    }
+
+    SCOPES_RESULT(LLVMMetadataRef) type_to_llvm_debug_type(const Type *type) {
+        SCOPES_RESULT_TYPE(LLVMMetadataRef);
+        auto typeref = SCOPES_GET_RESULT(_type_to_llvm_debug_type(type));
+        SCOPES_CHECK_RESULT(finalize_debug_types());
+        return typeref;
+    }
+
+    SCOPES_RESULT(LLVMMetadataRef) build_debug_struct_type(const TupleType* ti, const String* name) {
+        SCOPES_RESULT_TYPE(LLVMMetadataRef);
+        size_t count = ti->values.size();
+        LLVMMetadataRef elements[count];
+        LLVMMetadataRef difile = source_file_to_scope(active_function.anchor()->path);
+        std::string temp_str;
+        for (size_t i = 0; i < count; ++i) {
+            auto name_res = ti->field_name(i);
+            const char* field_name = nullptr;
+            size_t field_name_len = 0;
+            if (name_res.ok()) {
+                auto fname = name_res.unsafe_extract().name();
+                field_name = fname->data;
+                field_name_len = fname->count;
+            }
+            if (field_name_len == 0) {
+                temp_str = std::string("field_") + std::to_string(i);
+                field_name = temp_str.c_str();
+                field_name_len = temp_str.length();
+            }
+            auto lltype = SCOPES_GET_RESULT(_type_to_llvm_debug_type(ti->values[i]));
+            auto size = SCOPES_GET_RESULT(size_of(ti->values[i])) * 8;
+            auto align = SCOPES_GET_RESULT(align_of(ti->values[i])) * 8;
+            elements[i] = LLVMDIBuilderCreateMemberType(di_builder, difile, field_name, field_name_len, difile, 0, size, align, ti->offsets[i] * 8, LLVMDIFlagZero, lltype);
+        }
+        auto size = SCOPES_GET_RESULT(size_of(ti)) * 8;
+        auto align = SCOPES_GET_RESULT(align_of(ti)) * 8;
+        return LLVMDIBuilderCreateStructType(di_builder, difile, name->data, name->count, difile, 0, size, align, LLVMDIFlagZero, nullptr, elements, count, 0, nullptr, "", 0);
+    }
+
+    SCOPES_RESULT(size_t) finalize_debug_types() {
+        SCOPES_RESULT_TYPE(size_t);
+        size_t result = debug_type_todo.size();
+        while (!debug_type_todo.empty()) {
+            const Type *T = debug_type_todo.back();
+            debug_type_todo.pop_back();
+            auto tn = cast<TypenameType>(T);
+            if (tn->is_opaque())
+                continue;
+            LLVMMetadataRef LLT = SCOPES_GET_RESULT(_type_to_llvm_debug_type(T));
+            const Type *ST = tn->storage();
+            switch(ST->kind()) {
+            case TK_Tuple: {
+                auto ti = cast<TupleType>(ST);
+                auto llst = SCOPES_GET_RESULT(build_debug_struct_type(ti, tn->name()));
+                debug_type_to_replace.push_back({LLT, llst});
+            } break;
+            default: assert(false); break;
+            }
+        }
+        return result;
+    }
+
+    void replace_debug_types() {
+        for (auto pair : debug_type_to_replace) {
+            LLVMMetadataReplaceAllUsesWith(pair.first, pair.second);
+        }
+        debug_type_to_replace.clear();
+    }
+
     static Error *last_llvm_error;
     static void fatal_error_handler(const char *Reason) {
         last_llvm_error = ErrorCGenBackendFailed::from(strdup(Reason));
@@ -1110,10 +1362,29 @@ struct LLVMIRGenerator {
         for (size_t i = 0; i < paramcount; ++i) {
             ParameterRef param = params[i];
             LLVMValueRef val = SCOPES_GET_RESULT(abi_import_argument(param->get_type(), func, k));
+            if (use_debug_info) {
+                auto subprogram = LLVMGetSubprogram(func);
+                current_debug_block = subprogram;
+                auto ty = LLVMTypeOf(val);
+                auto alloc = LLVMBuildAlloca(builder, ty, ""); // TODO: Should this be safe_alloca(LLVMTypeOf(val), val);
+                LLVMBuildStore(builder, val, alloc);
+                val = LLVMBuildLoad(builder, alloc, "");
+                auto name = param->name.name();
+                auto anchor = param.anchor();
+                LLVMMetadataRef difile = source_file_to_scope(anchor->path);
+                auto dty = SCOPES_GET_RESULT(type_to_llvm_debug_type(param->get_type())); // TODO: This could be different than the abi-adjusted one, need to somehow take that into account
+                auto divar = LLVMDIBuilderCreateParameterVariable(di_builder, subprogram, name->data, name->count, i + 1, difile, anchor->lineno, dty, true, LLVMDIFlagZero);
+                auto expr = LLVMDIBuilderCreateExpression(di_builder, 0, 0);
+                LLVMDIBuilderInsertDeclareAtEnd(di_builder, alloc, divar, expr, anchor_to_location(anchor), LLVMGetInsertBlock(builder));
+            }
+            
             assert(val);
             bind(ValueIndex(param), val);
         }
         SCOPES_CHECK_RESULT(translate_block(node->body));
+        if (use_debug_info) {
+            current_debug_block = nullptr;
+        }
         return {};
     }
 
@@ -1204,11 +1475,23 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(void) translate_block(const Block &node) {
         SCOPES_RESULT_TYPE(void);
+        LLVMMetadataRef parent_block = nullptr;
+        if (use_debug_info) {
+            parent_block = current_debug_block;
+            if (!node.body.empty()) {
+                auto anchor = node.body[0].anchor();
+                LLVMMetadataRef difile = source_file_to_scope(anchor->path);
+                current_debug_block = LLVMDIBuilderCreateLexicalBlock(di_builder, current_debug_block, difile, anchor->lineno, anchor->column);
+            }
+        }
         for (auto entry : node.body) {
             SCOPES_CHECK_RESULT(translate_instruction(entry));
         }
         if (node.terminator) {
             SCOPES_CHECK_RESULT(translate_instruction(node.terminator));
+        }
+        if (use_debug_info) {
+            current_debug_block = parent_block;
         }
         return {};
     }
@@ -1559,6 +1842,19 @@ struct LLVMIRGenerator {
             val = safe_alloca(ty, count);
         } else {
             val = safe_alloca(ty);
+        }
+        if (use_debug_info) {
+            LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
+            LLVMValueRef func = LLVMGetBasicBlockParent(bb);
+            auto subprogram = LLVMGetSubprogram(func);
+            auto name = node->name.name();
+            auto anchor = node.anchor();
+            LLVMMetadataRef difile = source_file_to_scope(anchor->path);
+            auto dty = SCOPES_GET_RESULT(type_to_llvm_debug_type(node->type));
+            //printf("%s\n", name->data);
+            auto divar = LLVMDIBuilderCreateAutoVariable(di_builder, subprogram, name->data, name->count, difile, anchor->lineno, dty, true, LLVMDIFlagZero, 0);
+            auto expr = LLVMDIBuilderCreateExpression(di_builder, 0, 0);
+            LLVMDIBuilderInsertDeclareAtEnd(di_builder, val, divar, expr, anchor_to_location(anchor), LLVMGetInsertBlock(builder));
         }
         map_phi({ val }, node);
         return {};
@@ -2605,11 +2901,26 @@ struct LLVMIRGenerator {
         }
     }
 
+    void init_debug_types() {
+        debug_voidT = LLVMDIBuilderCreateBasicType(di_builder, "void", 4, 0, DW_ATE_unsigned, LLVMDIFlagZero);
+        debug_i1T = LLVMDIBuilderCreateBasicType(di_builder, "i1", 2, 1, DW_ATE_signed, LLVMDIFlagZero);
+        debug_i8T = LLVMDIBuilderCreateBasicType(di_builder, "i8", 2, 8, DW_ATE_signed, LLVMDIFlagZero);
+        debug_i16T = LLVMDIBuilderCreateBasicType(di_builder, "i16", 3, 16, DW_ATE_signed, LLVMDIFlagZero);
+        debug_i32T = LLVMDIBuilderCreateBasicType(di_builder, "i32", 3, 32, DW_ATE_signed, LLVMDIFlagZero);
+        debug_i64T = LLVMDIBuilderCreateBasicType(di_builder, "i64", 3, 64, DW_ATE_signed, LLVMDIFlagZero);
+        debug_f32T = LLVMDIBuilderCreateBasicType(di_builder, "f32", 3, 32, DW_ATE_float, LLVMDIFlagZero);
+        debug_f32x2T = LLVMDIBuilderCreateVectorType(di_builder, 2, 0, debug_f32T, nullptr, 0); // FIXME: No idea how subscript works
+        debug_f64T = LLVMDIBuilderCreateBasicType(di_builder, "f64", 3, 32, DW_ATE_float, LLVMDIFlagZero);
+        debug_f80T = LLVMDIBuilderCreateBasicType(di_builder, "f80", 3, 80, DW_ATE_float, LLVMDIFlagZero);
+        debug_f128T = LLVMDIBuilderCreateBasicType(di_builder, "f128", 4, 128, DW_ATE_float, LLVMDIFlagZero);
+        debug_noneT = LLVMDIBuilderCreateBasicType(di_builder, "none", 4, 0, DW_ATE_unsigned, LLVMDIFlagZero); // TODO: Not sure
+        debug_rawstringT = LLVMDIBuilderCreatePointerType(di_builder, debug_i8T, PointerType::size() * 8, 0, 0, "", 0);
+    }
+
     void setup_generate(const char *module_name) {
         module = LLVMModuleCreateWithName(module_name);
         builder = LLVMCreateBuilder();
         di_builder = LLVMCreateDIBuilder(module);
-
         if (use_debug_info) {
             const char *DebugStr = "Debug Info Version";
             LLVMValueRef DbgVer[3];
@@ -2641,6 +2952,8 @@ struct LLVMIRGenerator {
                 /*DebugInfoForProfiling*/ false);
 
             //LLVMAddNamedMetadataOperand(module, "llvm.dbg.cu", dicu);
+
+            init_debug_types();
         }
     }
 
@@ -2658,6 +2971,10 @@ struct LLVMIRGenerator {
         SCOPES_RESULT_TYPE(void);
         size_t k = SCOPES_GET_RESULT(finalize_types());
         assert(!k);
+        size_t kd = SCOPES_GET_RESULT(finalize_debug_types());
+        assert(!kd);
+
+        replace_debug_types();
 
         LLVMDisposeBuilder(builder);
         LLVMDIBuilderFinalize(di_builder);
