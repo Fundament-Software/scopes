@@ -47,6 +47,7 @@
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/JITEventListener.h"
 #include "llvm/Object/SymbolSize.h"
+#include "llvm/BinaryFormat/Dwarf.h"
 //#include "llvm/Support/Timer.h"
 //#include "llvm/Support/raw_os_ostream.h"
 
@@ -105,12 +106,6 @@ static void build_and_run_opt_passes(LLVMModuleRef module, int opt_level) {
 
 const double deg2rad = 0.017453292519943295;
 const double rad2deg = 57.29577951308232;
-
-// LLVM DWARF debug constants
-const unsigned DW_ATE_float = 4;
-const unsigned DW_ATE_signed = 5;
-const unsigned DW_ATE_unsigned = 7;
-const unsigned DW_TAG_structure_type = 19;
 
 struct PointerNamespace {
 
@@ -1034,6 +1029,7 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMMetadataRef) create_llvm_debug_type(const Type *type) {
         SCOPES_RESULT_TYPE(LLVMMetadataRef);
+        using namespace llvm::dwarf;
         switch(type->kind()) {
         case TK_Qualify: {
             auto qt = cast<QualifyType>(type);
@@ -1089,7 +1085,6 @@ struct LLVMIRGenerator {
         } break;
         case TK_Tuple: {
             auto ti = cast<TupleType>(type);
-            LLVMMetadataRef difile = source_file_to_scope(active_function.anchor()->path);
             auto tuple_name = sc_type_key(ti)._0.name();
             return build_debug_struct_type(ti, tuple_name);
         } break;
@@ -1116,11 +1111,7 @@ struct LLVMIRGenerator {
             }
         } break;
         case TK_Function: {
-            // Is there a way to add the actual function signature?
-            auto fi = cast<FunctionType>(type);
-            size_t count = fi->argument_types.size();
-            auto rtype = abi_return_type(fi);
-            bool use_sret = is_memory_class(rtype);
+            // TODO: Is there a way to add the actual function signature?
             return LLVMDIBuilderCreateBasicType(di_builder, "Function", 8, PointerType::size(), DW_ATE_unsigned, LLVMDIFlagZero);
         } break;
         case TK_SampledImage: {
@@ -1164,11 +1155,11 @@ struct LLVMIRGenerator {
         LLVMMetadataRef difile = source_file_to_scope(active_function.anchor()->path);
         std::string temp_str;
         for (size_t i = 0; i < count; ++i) {
-            auto name_res = ti->field_name(i);
+            auto name_res = type_key(ti->values[i])._0;
             const char* field_name = nullptr;
             size_t field_name_len = 0;
-            if (name_res.ok()) {
-                auto fname = name_res.unsafe_extract().name();
+            if (name_res != SYM_Unnamed) {
+                auto fname = name_res.name();
                 field_name = fname->data;
                 field_name_len = fname->count;
             }
@@ -1377,7 +1368,7 @@ struct LLVMIRGenerator {
                 auto expr = LLVMDIBuilderCreateExpression(di_builder, 0, 0);
                 LLVMDIBuilderInsertDeclareAtEnd(di_builder, alloc, divar, expr, anchor_to_location(anchor), LLVMGetInsertBlock(builder));
             }
-            
+
             assert(val);
             bind(ValueIndex(param), val);
         }
@@ -2902,6 +2893,7 @@ struct LLVMIRGenerator {
     }
 
     void init_debug_types() {
+        using namespace llvm::dwarf;
         debug_voidT = LLVMDIBuilderCreateBasicType(di_builder, "void", 4, 0, DW_ATE_unsigned, LLVMDIFlagZero);
         debug_i1T = LLVMDIBuilderCreateBasicType(di_builder, "i1", 2, 1, DW_ATE_signed, LLVMDIFlagZero);
         debug_i8T = LLVMDIBuilderCreateBasicType(di_builder, "i8", 2, 8, DW_ATE_signed, LLVMDIFlagZero);
