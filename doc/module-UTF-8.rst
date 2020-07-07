@@ -11,7 +11,6 @@ an UTF-8 aware `char` function.
    yields the offending byte character.
 .. inline:: (encoder coll)
    
-   convert an integer codepoint to i8 byte array chunks of 1 to 4 bytes length
-   the collector forwards two arguments, the number of bytes required
-   and a buffer containing those bytes, which is only valid for this call.
+   convert an integer codepoint to i8 bytes.
+   the collector forwards a byte at a time.
 .. spice:: (char ...)

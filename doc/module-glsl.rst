@@ -6,7 +6,7 @@ and access external variables for shader programs.
 
 .. define:: gl_ClipDistance
 
-   A constant of type `[f32 x ?]`.
+   A constant of type `(array f32)`.
 .. define:: gl_FragCoord
 
    A constant of type `vec4`.
@@ -168,11 +168,11 @@ and access external variables for shader programs.
    A constant of type `Symbol`.
 .. type:: DispatchIndirectCommand
 
-   A plain type of supertype `CStruct` and of storage type `{num_groups_x=u32 num_groups_y=u32 num_groups_z=u32}`.
+   A plain type of supertype `CStruct` and of storage type `(tuple (num_groups_x = u32) (num_groups_y = u32) (num_groups_z = u32))`.
 
 .. type:: DrawArraysIndirectCommand
 
-   A plain type of supertype `CStruct` and of storage type `{count=u32 instanceCount=u32 first=u32 baseInstance=u32}`.
+   A plain type of supertype `CStruct` and of storage type `(tuple (count = u32) (instanceCount = u32) (first = u32) (baseInstance = u32))`.
 
 .. type:: ceil
 
@@ -272,137 +272,306 @@ and access external variables for shader programs.
 
    A plain type of supertype `gsampler1D$3` and of storage type `<SampledImage <Image ivec4 '1D sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: isampler1DArray
 
    A plain type of supertype `gsampler1DArray$3` and of storage type `<SampledImage <Image ivec4 '1D array sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: isampler2D
 
    A plain type of supertype `gsampler2D$3` and of storage type `<SampledImage <Image ivec4 '2D sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: isampler2DArray
 
    A plain type of supertype `gsampler2DArray$3` and of storage type `<SampledImage <Image ivec4 '2D array sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: isampler2DMS
 
    A plain type of supertype `gsampler2DMS$3` and of storage type `<SampledImage <Image ivec4 '2D ms sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: isampler2DMSArray
 
    A plain type of supertype `gsampler2DMSArray$3` and of storage type `<SampledImage <Image ivec4 '2D array ms sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: isampler2DRect
 
    A plain type of supertype `gsampler2DRect$3` and of storage type `<SampledImage <Image ivec4 'Rect sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: isampler3D
 
    A plain type of supertype `gsampler3D$3` and of storage type `<SampledImage <Image ivec4 '3D sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: isamplerBuffer
 
    A plain type of supertype `gsamplerBuffer$3` and of storage type `<SampledImage <Image ivec4 'Buffer sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: isamplerCube
 
    A plain type of supertype `gsamplerCube$3` and of storage type `<SampledImage <Image ivec4 'Cube sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: isamplerCubeArray
 
    A plain type of supertype `gsamplerCubeArray$3` and of storage type `<SampledImage <Image ivec4 'Cube array sampled 'Unknown>>`.
+
+   .. inline:: (__typecall cls _texture _sampler)
+.. type:: itexture1D
+
+   A plain type labeled ``<Image ivec4 '1D sampled 'Unknown>`` of supertype `Image` and of storage type `<Image ivec4 '1D sampled 'Unknown>`.
+
+.. type:: itexture1DArray
+
+   A plain type labeled ``<Image ivec4 '1D array sampled 'Unknown>`` of supertype `Image` and of storage type `<Image ivec4 '1D array sampled 'Unknown>`.
+
+.. type:: itexture2D
+
+   A plain type labeled ``<Image ivec4 '2D sampled 'Unknown>`` of supertype `Image` and of storage type `<Image ivec4 '2D sampled 'Unknown>`.
+
+.. type:: itexture2DArray
+
+   A plain type labeled ``<Image ivec4 '2D array sampled 'Unknown>`` of supertype `Image` and of storage type `<Image ivec4 '2D array sampled 'Unknown>`.
+
+.. type:: itexture2DMS
+
+   A plain type labeled ``<Image ivec4 '2D ms sampled 'Unknown>`` of supertype `Image` and of storage type `<Image ivec4 '2D ms sampled 'Unknown>`.
+
+.. type:: itexture2DMSArray
+
+   A plain type labeled ``<Image ivec4 '2D array ms sampled 'Unknown>`` of supertype `Image` and of storage type `<Image ivec4 '2D array ms sampled 'Unknown>`.
+
+.. type:: itexture2DRect
+
+   A plain type labeled ``<Image ivec4 'Rect sampled 'Unknown>`` of supertype `Image` and of storage type `<Image ivec4 'Rect sampled 'Unknown>`.
+
+.. type:: itexture3D
+
+   A plain type labeled ``<Image ivec4 '3D sampled 'Unknown>`` of supertype `Image` and of storage type `<Image ivec4 '3D sampled 'Unknown>`.
+
+.. type:: itextureBuffer
+
+   A plain type labeled ``<Image ivec4 'Buffer sampled 'Unknown>`` of supertype `Image` and of storage type `<Image ivec4 'Buffer sampled 'Unknown>`.
+
+.. type:: itextureCube
+
+   A plain type labeled ``<Image ivec4 'Cube sampled 'Unknown>`` of supertype `Image` and of storage type `<Image ivec4 'Cube sampled 'Unknown>`.
+
+.. type:: itextureCubeArray
+
+   A plain type labeled ``<Image ivec4 'Cube array sampled 'Unknown>`` of supertype `Image` and of storage type `<Image ivec4 'Cube array sampled 'Unknown>`.
+
+.. type:: sampler
+
+   A plain type labeled ``Sampler`` of supertype `immutable` and of storage type `Sampler`.
 
 .. type:: sampler1D
 
    A plain type of supertype `gsampler1D$2` and of storage type `<SampledImage <Image vec4 '1D sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: sampler1DArray
 
    A plain type of supertype `gsampler1DArray$2` and of storage type `<SampledImage <Image vec4 '1D array sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: sampler2D
 
    A plain type of supertype `gsampler2D$2` and of storage type `<SampledImage <Image vec4 '2D sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: sampler2DArray
 
    A plain type of supertype `gsampler2DArray$2` and of storage type `<SampledImage <Image vec4 '2D array sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: sampler2DMS
 
    A plain type of supertype `gsampler2DMS$2` and of storage type `<SampledImage <Image vec4 '2D ms sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: sampler2DMSArray
 
    A plain type of supertype `gsampler2DMSArray$2` and of storage type `<SampledImage <Image vec4 '2D array ms sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: sampler2DRect
 
    A plain type of supertype `gsampler2DRect$2` and of storage type `<SampledImage <Image vec4 'Rect sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: sampler3D
 
    A plain type of supertype `gsampler3D$2` and of storage type `<SampledImage <Image vec4 '3D sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: samplerBuffer
 
    A plain type of supertype `gsamplerBuffer$2` and of storage type `<SampledImage <Image vec4 'Buffer sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: samplerCube
 
    A plain type of supertype `gsamplerCube$2` and of storage type `<SampledImage <Image vec4 'Cube sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: samplerCubeArray
 
    A plain type of supertype `gsamplerCubeArray$2` and of storage type `<SampledImage <Image vec4 'Cube array sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: smoothstep
 
    An opaque type of supertype `OverloadedFunction`.
+
+.. type:: texture1D
+
+   A plain type labeled ``<Image vec4 '1D sampled 'Unknown>`` of supertype `Image` and of storage type `<Image vec4 '1D sampled 'Unknown>`.
+
+.. type:: texture1DArray
+
+   A plain type labeled ``<Image vec4 '1D array sampled 'Unknown>`` of supertype `Image` and of storage type `<Image vec4 '1D array sampled 'Unknown>`.
+
+.. type:: texture2D
+
+   A plain type labeled ``<Image vec4 '2D sampled 'Unknown>`` of supertype `Image` and of storage type `<Image vec4 '2D sampled 'Unknown>`.
+
+.. type:: texture2DArray
+
+   A plain type labeled ``<Image vec4 '2D array sampled 'Unknown>`` of supertype `Image` and of storage type `<Image vec4 '2D array sampled 'Unknown>`.
+
+.. type:: texture2DMS
+
+   A plain type labeled ``<Image vec4 '2D ms sampled 'Unknown>`` of supertype `Image` and of storage type `<Image vec4 '2D ms sampled 'Unknown>`.
+
+.. type:: texture2DMSArray
+
+   A plain type labeled ``<Image vec4 '2D array ms sampled 'Unknown>`` of supertype `Image` and of storage type `<Image vec4 '2D array ms sampled 'Unknown>`.
+
+.. type:: texture2DRect
+
+   A plain type labeled ``<Image vec4 'Rect sampled 'Unknown>`` of supertype `Image` and of storage type `<Image vec4 'Rect sampled 'Unknown>`.
+
+.. type:: texture3D
+
+   A plain type labeled ``<Image vec4 '3D sampled 'Unknown>`` of supertype `Image` and of storage type `<Image vec4 '3D sampled 'Unknown>`.
+
+.. type:: textureBuffer
+
+   A plain type labeled ``<Image vec4 'Buffer sampled 'Unknown>`` of supertype `Image` and of storage type `<Image vec4 'Buffer sampled 'Unknown>`.
+
+.. type:: textureCube
+
+   A plain type labeled ``<Image vec4 'Cube sampled 'Unknown>`` of supertype `Image` and of storage type `<Image vec4 'Cube sampled 'Unknown>`.
+
+.. type:: textureCubeArray
+
+   A plain type labeled ``<Image vec4 'Cube array sampled 'Unknown>`` of supertype `Image` and of storage type `<Image vec4 'Cube array sampled 'Unknown>`.
 
 .. type:: usampler1D
 
    A plain type of supertype `gsampler1D$4` and of storage type `<SampledImage <Image uvec4 '1D sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: usampler1DArray
 
    A plain type of supertype `gsampler1DArray$4` and of storage type `<SampledImage <Image uvec4 '1D array sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: usampler2D
 
    A plain type of supertype `gsampler2D$4` and of storage type `<SampledImage <Image uvec4 '2D sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: usampler2DArray
 
    A plain type of supertype `gsampler2DArray$4` and of storage type `<SampledImage <Image uvec4 '2D array sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: usampler2DMS
 
    A plain type of supertype `gsampler2DMS$4` and of storage type `<SampledImage <Image uvec4 '2D ms sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: usampler2DMSArray
 
    A plain type of supertype `gsampler2DMSArray$4` and of storage type `<SampledImage <Image uvec4 '2D array ms sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: usampler2DRect
 
    A plain type of supertype `gsampler2DRect$4` and of storage type `<SampledImage <Image uvec4 'Rect sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: usampler3D
 
    A plain type of supertype `gsampler3D$4` and of storage type `<SampledImage <Image uvec4 '3D sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: usamplerBuffer
 
    A plain type of supertype `gsamplerBuffer$4` and of storage type `<SampledImage <Image uvec4 'Buffer sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: usamplerCube
 
    A plain type of supertype `gsamplerCube$4` and of storage type `<SampledImage <Image uvec4 'Cube sampled 'Unknown>>`.
 
+   .. inline:: (__typecall cls _texture _sampler)
 .. type:: usamplerCubeArray
 
    A plain type of supertype `gsamplerCubeArray$4` and of storage type `<SampledImage <Image uvec4 'Cube array sampled 'Unknown>>`.
+
+   .. inline:: (__typecall cls _texture _sampler)
+.. type:: utexture1D
+
+   A plain type labeled ``<Image uvec4 '1D sampled 'Unknown>`` of supertype `Image` and of storage type `<Image uvec4 '1D sampled 'Unknown>`.
+
+.. type:: utexture1DArray
+
+   A plain type labeled ``<Image uvec4 '1D array sampled 'Unknown>`` of supertype `Image` and of storage type `<Image uvec4 '1D array sampled 'Unknown>`.
+
+.. type:: utexture2D
+
+   A plain type labeled ``<Image uvec4 '2D sampled 'Unknown>`` of supertype `Image` and of storage type `<Image uvec4 '2D sampled 'Unknown>`.
+
+.. type:: utexture2DArray
+
+   A plain type labeled ``<Image uvec4 '2D array sampled 'Unknown>`` of supertype `Image` and of storage type `<Image uvec4 '2D array sampled 'Unknown>`.
+
+.. type:: utexture2DMS
+
+   A plain type labeled ``<Image uvec4 '2D ms sampled 'Unknown>`` of supertype `Image` and of storage type `<Image uvec4 '2D ms sampled 'Unknown>`.
+
+.. type:: utexture2DMSArray
+
+   A plain type labeled ``<Image uvec4 '2D array ms sampled 'Unknown>`` of supertype `Image` and of storage type `<Image uvec4 '2D array ms sampled 'Unknown>`.
+
+.. type:: utexture2DRect
+
+   A plain type labeled ``<Image uvec4 'Rect sampled 'Unknown>`` of supertype `Image` and of storage type `<Image uvec4 'Rect sampled 'Unknown>`.
+
+.. type:: utexture3D
+
+   A plain type labeled ``<Image uvec4 '3D sampled 'Unknown>`` of supertype `Image` and of storage type `<Image uvec4 '3D sampled 'Unknown>`.
+
+.. type:: utextureBuffer
+
+   A plain type labeled ``<Image uvec4 'Buffer sampled 'Unknown>`` of supertype `Image` and of storage type `<Image uvec4 'Buffer sampled 'Unknown>`.
+
+.. type:: utextureCube
+
+   A plain type labeled ``<Image uvec4 'Cube sampled 'Unknown>`` of supertype `Image` and of storage type `<Image uvec4 'Cube sampled 'Unknown>`.
+
+.. type:: utextureCubeArray
+
+   A plain type labeled ``<Image uvec4 'Cube array sampled 'Unknown>`` of supertype `Image` and of storage type `<Image uvec4 'Cube array sampled 'Unknown>`.
 
 .. inline:: (atomicAdd mem data)
 .. inline:: (atomicAnd mem data)
@@ -477,37 +646,37 @@ and access external variables for shader programs.
 .. sugar:: (uniform ...)
 .. compiledfn:: (EmitVertex ...)
 
-   An external function of type ``void<-()``.
+   An external function of type ``(void <-: ())``.
 .. compiledfn:: (EndPrimitive ...)
 
-   An external function of type ``void<-()``.
+   An external function of type ``(void <-: ())``.
 .. compiledfn:: (packHalf2x16 ...)
 
-   An external function of type ``u32<-(vec2)``.
+   An external function of type ``(u32 <-: (vec2))``.
 .. compiledfn:: (packSnorm2x16 ...)
 
-   An external function of type ``u32<-(vec2)``.
+   An external function of type ``(u32 <-: (vec2))``.
 .. compiledfn:: (packSnorm4x8 ...)
 
-   An external function of type ``u32<-(vec4)``.
+   An external function of type ``(u32 <-: (vec4))``.
 .. compiledfn:: (packUnorm2x16 ...)
 
-   An external function of type ``u32<-(vec2)``.
+   An external function of type ``(u32 <-: (vec2))``.
 .. compiledfn:: (packUnorm4x8 ...)
 
-   An external function of type ``u32<-(vec4)``.
+   An external function of type ``(u32 <-: (vec4))``.
 .. compiledfn:: (unpackHalf2x16 ...)
 
-   An external function of type ``vec2<-(u32)``.
+   An external function of type ``(vec2 <-: (u32))``.
 .. compiledfn:: (unpackSnorm2x16 ...)
 
-   An external function of type ``vec2<-(u32)``.
+   An external function of type ``(vec2 <-: (u32))``.
 .. compiledfn:: (unpackSnorm4x8 ...)
 
-   An external function of type ``vec4<-(u32)``.
+   An external function of type ``(vec4 <-: (u32))``.
 .. compiledfn:: (unpackUnorm2x16 ...)
 
-   An external function of type ``vec2<-(u32)``.
+   An external function of type ``(vec2 <-: (u32))``.
 .. compiledfn:: (unpackUnorm4x8 ...)
 
-   An external function of type ``vec4<-(u32)``.
+   An external function of type ``(vec4 <-: (u32))``.

@@ -1,6 +1,7 @@
 #!/usr/bin/env scopes
 using import Array
 using import Map
+using import Set
 import UTF-8
 let char = UTF-8.char
 

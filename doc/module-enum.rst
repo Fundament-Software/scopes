@@ -9,6 +9,8 @@ sugar.
    An opaque type.
 
    .. spice:: (__dispatch ...)
-.. inline:: (Option ...)
-.. sugar:: (dispatch ...)
+   .. spice:: (__unsafe-dispatch2 ...)
+   .. spice:: (apply ...)
+   .. inline:: (literal self)
+   .. spice:: (unsafe-extract-payload ...)
 .. sugar:: (enum ...)

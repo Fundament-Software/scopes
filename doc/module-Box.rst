@@ -15,7 +15,7 @@ Provides a unique reference container for heap allocated values.
    .. spice:: (__getattr ...)
    .. spice:: (__imply ...)
    .. spice:: (__methodcall ...)
-   .. spice:: (__repr ...)
+   .. inline:: (__repr self)
    .. spice:: (__static-imply ...)
    .. inline:: (make-cast-op f const?)
    .. inline:: (new T args...)

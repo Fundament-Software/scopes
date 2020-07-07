@@ -44,7 +44,7 @@ Running this program will output:
 
 .. type:: FunctionChain
 
-   A plain type of storage type `_type<*>`.
+   A plain type of storage type `(opaque@ _type)`.
 
    .. spice:: (__call ...)
    .. inline:: (__repr self)

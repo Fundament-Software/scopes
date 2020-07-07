@@ -25,6 +25,7 @@ fashion.
    .. inline:: (__typecall cls value)
    .. fn:: (check self)
    .. fn:: (refcount)
+   .. fn:: (reset-refcount)
    .. fn:: (test-refcount-balanced)
    .. fn:: (value self)
 .. sugar:: (features ...)

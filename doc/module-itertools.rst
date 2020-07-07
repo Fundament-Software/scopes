@@ -41,31 +41,11 @@ generators and collectors.
 .. inline:: (mux collector...)
    
    send input into multiple collectors which each fork the target collector
+.. inline:: (permutate-range ...)
 .. inline:: (reduce init f)
 .. inline:: (take n coll)
    
    limit collector to output n items
-.. sugar:: (--> ...)
-   
-   Expands a processing chain into nested expressions so that each expression
-   is passed as tailing argument to the following expression.
-   
-   `__` can be used as a placeholder token to position the previous expression.
-   
-   example::
-   
-       --> x
-           f
-           g
-           h 2 __
-           k
-   
-   expands to::
-   
-       k
-           h 2
-               g
-                   f x
 .. spice:: (compose ...)
 .. spice:: (join ...)
 .. spice:: (span ...)

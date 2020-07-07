@@ -56,11 +56,29 @@ than in registers or the stack.
       Construct a new element with arguments `args...` directly in a newly
       assigned slot of array `self`. When the `array` is of `GrowingArray`
       type, this operation will transparently resize the array's storage.
+   .. type:: insert
+
+      
+      Insert `value` at `index` into the array `self` and return a reference
+      to the new element. When the `array` is of `GrowingArray` type, this
+      operation will transparently resize the array's storage.
+      This operation offsets the index of each following element by 1.
+      If index is omitted, `insert` operates like `append`.
+
+   .. fn:: (last self)
+   .. fn:: (pop self)
+      
+      Remove element with highest index from array `self` and return it.
+   .. fn:: (remove self index)
+      
+      Remove element at index from array `self` and return it.
+      This operation offsets the index of each following element by -1.
    .. fn:: (resize self count args...)
       
       Resize the array to the specified count. Items are apppend or removed
       to meet the desired count.
-   .. inline:: (sort self key)
+   .. inline:: (reverse self)
+   .. inline:: (sort self key ...)
       
       Sort elements of array `self` from smallest to largest, either using
       the `<` operator supplied by the element type, or by using the key
