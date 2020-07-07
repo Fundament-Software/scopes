@@ -548,141 +548,155 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
     return ValueRef();
 }
 
-ValueRef wrap_value(const Type *T, const ValueRef &value) {
+static ValueRef wrap_value_inner(const Type *T, const ValueRef &value) {
     auto _anchor = value.anchor();
+    T = strip_qualifiers(T);
+    auto ST = storage_type(T).assert_ok();
+    auto kind = ST->kind();
+    switch(kind) {
+    case TK_Pointer: {
+        return REF(CallTemplate::from(g_sc_const_pointer_new, {
+                REF(ConstPointer::type_from(T)),
+                REF(CallTemplate::from(g_bitcast, { value, g_voidstar })) }));
+    } break;
+    case TK_Integer: {
+        auto ti = cast<IntegerType>(ST);
+        if (ti->width <= 64ull) {
+            return REF(CallTemplate::from(g_sc_const_int_new, {
+                    REF(ConstPointer::type_from(T)),
+                    REF(CallTemplate::from(ti->issigned?g_sext:g_zext, { value,
+                    g_u64 })) }));
+        } else {
+            // big integer
+            auto targettype = local_ro_pointer_type(TYPE_U64);
+            auto result = REF(Expression::unscoped_from());
+            auto mem = REF(CallTemplate::from(g_alloca, {
+                    REF(ConstPointer::type_from(T))
+                }));
+            result->append(mem);
+            result->append(REF(CallTemplate::from(g_store, { value, mem })));
+            auto castmem =
+                REF(CallTemplate::from(g_bitcast, { mem,
+                    REF(ConstPointer::type_from(targettype)) }));
+            result->append(castmem);
+            size_t numwords = (ti->width + 63ull) / 64ull;
+            result->append(REF(CallTemplate::from(g_sc_const_int_words_new, {
+                    REF(ConstPointer::type_from(T)),
+                    REF(ConstInt::from(TYPE_I32, numwords)),
+                    castmem
+                })));
+            return result;
+        }
+    } break;
+    case TK_Real: {
+        //auto ti = cast<RealType>(ST);
+        return REF(CallTemplate::from(g_sc_const_real_new, {
+                REF(ConstPointer::type_from(T)),
+                REF(CallTemplate::from(g_fpext, { value,
+                g_f64 })) }));
+    } break;
+    case TK_Vector: {
+        auto at = cast<VectorType>(ST);
+        auto result = REF(Expression::unscoped_from());
+        auto ET = at->element_type;
+        auto numvals = (int)at->count();
+        auto numelems = REF(ConstInt::from(TYPE_I32, numvals));
+        auto buf = REF(CallTemplate::from(g_alloca_array, {
+                REF(ConstPointer::type_from(TYPE_ValueRef)),
+                numelems
+            }));
+        result->append(buf);
+        for (int i = 0; i < numvals; ++i) {
+            auto idx = REF(ConstInt::from(TYPE_I32, i));
+            auto arg =
+                REF(CallTemplate::from(g_extractelement, { value, idx }));
+            auto wrapped_arg = wrap_value(ET, arg);
+            assert(wrapped_arg);
+            result->append(
+                REF(CallTemplate::from(g_store, {
+                    wrapped_arg,
+                    REF(CallTemplate::from(g_getelementptr, { buf, idx }))
+                })));
+        }
+        result->append(REF(CallTemplate::from(g_sc_const_aggregate_new,
+            { REF(ConstPointer::type_from(T)), numelems, buf })));
+        return result;
+    } break;
+    case TK_Array:
+    case TK_Matrix: {
+        auto at = cast<ArrayLikeType>(ST);
+        auto result = REF(Expression::unscoped_from());
+        auto ET = at->element_type;
+        auto numvals = (int)at->count();
+        auto numelems = REF(ConstInt::from(TYPE_I32, numvals));
+        auto buf = REF(CallTemplate::from(g_alloca_array, {
+                REF(ConstPointer::type_from(TYPE_ValueRef)),
+                numelems
+            }));
+        result->append(buf);
+        for (int i = 0; i < numvals; ++i) {
+            auto idx = REF(ConstInt::from(TYPE_I32, i));
+            auto arg =
+                REF(CallTemplate::from(g_extractvalue, { value, idx }));
+            auto wrapped_arg = wrap_value(ET, arg);
+            assert(wrapped_arg);
+            result->append(
+                REF(CallTemplate::from(g_store, {
+                    wrapped_arg,
+                    REF(CallTemplate::from(g_getelementptr, { buf, idx }))
+                })));
+        }
+        result->append(REF(CallTemplate::from(g_sc_const_aggregate_new,
+            { REF(ConstPointer::type_from(T)), numelems, buf })));
+        return result;
+    } break;
+    case TK_Tuple: {
+        auto tt = cast<TupleType>(ST);
+        auto result = REF(Expression::unscoped_from());
+        auto numelems = REF(ConstInt::from(TYPE_I32, tt->values.size()));
+        auto buf = REF(CallTemplate::from(g_alloca_array, {
+                REF(ConstPointer::type_from(TYPE_ValueRef)),
+                numelems
+            }));
+        result->append(buf);
+        for (int i = 0; i < tt->values.size(); ++i) {
+            auto idx = REF(ConstInt::from(TYPE_I32, i));
+            auto arg =
+                REF(CallTemplate::from(g_extractvalue, { value, idx }));
+            auto argT = tt->values[i];
+            auto wrapped_arg = wrap_value(argT, arg);
+            assert(wrapped_arg);
+            result->append(
+                REF(CallTemplate::from(g_store, {
+                    wrapped_arg,
+                    REF(CallTemplate::from(g_getelementptr, { buf, idx }))
+                })));
+        }
+        result->append(REF(CallTemplate::from(g_sc_const_aggregate_new,
+            { REF(ConstPointer::type_from(T)), numelems, buf })));
+        return result;
+    } break;
+    default:
+        break;
+    }
+    return ValueRef();
+}
+
+ValueRef wrap_value(const Type *T, const ValueRef &value) {
     if (is_value_stage_constant(value)) {
         return ConstAggregate::ast_from(value);
     }
     if (!is_opaque(T)) {
-        T = strip_qualifiers(T);
-        auto ST = storage_type(T).assert_ok();
-        auto kind = ST->kind();
-        switch(kind) {
-        case TK_Pointer: {
-            return REF(CallTemplate::from(g_sc_const_pointer_new, {
-                    REF(ConstPointer::type_from(T)),
-                    REF(CallTemplate::from(g_bitcast, { value, g_voidstar })) }));
-        } break;
-        case TK_Integer: {
-            auto ti = cast<IntegerType>(ST);
-            if (ti->width <= 64ull) {
-                return REF(CallTemplate::from(g_sc_const_int_new, {
-                        REF(ConstPointer::type_from(T)),
-                        REF(CallTemplate::from(ti->issigned?g_sext:g_zext, { value,
-                        g_u64 })) }));
-            } else {
-                // big integer
-                auto targettype = local_ro_pointer_type(TYPE_U64);
-                auto result = REF(Expression::unscoped_from());
-                auto mem = REF(CallTemplate::from(g_alloca, {
-                        REF(ConstPointer::type_from(T))
-                    }));
-                result->append(mem);
-                result->append(REF(CallTemplate::from(g_store, { value, mem })));
-                auto castmem =
-                    REF(CallTemplate::from(g_bitcast, { mem,
-                        REF(ConstPointer::type_from(targettype)) }));
-                result->append(castmem);
-                size_t numwords = (ti->width + 63ull) / 64ull;
-                result->append(REF(CallTemplate::from(g_sc_const_int_words_new, {
-                        REF(ConstPointer::type_from(T)),
-                        REF(ConstInt::from(TYPE_I32, numwords)),
-                        castmem
-                    })));
-                return result;
-            }
-        } break;
-        case TK_Real: {
-            //auto ti = cast<RealType>(ST);
-            return REF(CallTemplate::from(g_sc_const_real_new, {
-                    REF(ConstPointer::type_from(T)),
-                    REF(CallTemplate::from(g_fpext, { value,
-                    g_f64 })) }));
-        } break;
-        case TK_Vector: {
-            auto at = cast<VectorType>(ST);
-            auto result = REF(Expression::unscoped_from());
-            auto ET = at->element_type;
-            auto numvals = (int)at->count();
-            auto numelems = REF(ConstInt::from(TYPE_I32, numvals));
-            auto buf = REF(CallTemplate::from(g_alloca_array, {
-                    REF(ConstPointer::type_from(TYPE_ValueRef)),
-                    numelems
-                }));
-            result->append(buf);
-            for (int i = 0; i < numvals; ++i) {
-                auto idx = REF(ConstInt::from(TYPE_I32, i));
-                auto arg =
-                    REF(CallTemplate::from(g_extractelement, { value, idx }));
-                auto wrapped_arg = wrap_value(ET, arg);
-                assert(wrapped_arg);
-                result->append(
-                    REF(CallTemplate::from(g_store, {
-                        wrapped_arg,
-                        REF(CallTemplate::from(g_getelementptr, { buf, idx }))
-                    })));
-            }
-            result->append(REF(CallTemplate::from(g_sc_const_aggregate_new,
-                { REF(ConstPointer::type_from(T)), numelems, buf })));
-            return result;
-        } break;
-        case TK_Array:
-        case TK_Matrix: {
-            auto at = cast<ArrayLikeType>(ST);
-            auto result = REF(Expression::unscoped_from());
-            auto ET = at->element_type;
-            auto numvals = (int)at->count();
-            auto numelems = REF(ConstInt::from(TYPE_I32, numvals));
-            auto buf = REF(CallTemplate::from(g_alloca_array, {
-                    REF(ConstPointer::type_from(TYPE_ValueRef)),
-                    numelems
-                }));
-            result->append(buf);
-            for (int i = 0; i < numvals; ++i) {
-                auto idx = REF(ConstInt::from(TYPE_I32, i));
-                auto arg =
-                    REF(CallTemplate::from(g_extractvalue, { value, idx }));
-                auto wrapped_arg = wrap_value(ET, arg);
-                assert(wrapped_arg);
-                result->append(
-                    REF(CallTemplate::from(g_store, {
-                        wrapped_arg,
-                        REF(CallTemplate::from(g_getelementptr, { buf, idx }))
-                    })));
-            }
-            result->append(REF(CallTemplate::from(g_sc_const_aggregate_new,
-                { REF(ConstPointer::type_from(T)), numelems, buf })));
-            return result;
-        } break;
-        case TK_Tuple: {
-            auto tt = cast<TupleType>(ST);
-            auto result = REF(Expression::unscoped_from());
-            auto numelems = REF(ConstInt::from(TYPE_I32, tt->values.size()));
-            auto buf = REF(CallTemplate::from(g_alloca_array, {
-                    REF(ConstPointer::type_from(TYPE_ValueRef)),
-                    numelems
-                }));
-            result->append(buf);
-            for (int i = 0; i < tt->values.size(); ++i) {
-                auto idx = REF(ConstInt::from(TYPE_I32, i));
-                auto arg =
-                    REF(CallTemplate::from(g_extractvalue, { value, idx }));
-                auto argT = tt->values[i];
-                auto wrapped_arg = wrap_value(argT, arg);
-                assert(wrapped_arg);
-                result->append(
-                    REF(CallTemplate::from(g_store, {
-                        wrapped_arg,
-                        REF(CallTemplate::from(g_getelementptr, { buf, idx }))
-                    })));
-            }
-            result->append(REF(CallTemplate::from(g_sc_const_aggregate_new,
-                { REF(ConstPointer::type_from(T)), numelems, buf })));
-            return result;
-        } break;
-        default:
-            break;
+        auto result = wrap_value_inner(T, value);
+        if (!is_plain(T) && !is_view(T)) {
+            auto _anchor = value.anchor();
+            auto expr = REF(Expression::unscoped_from());
+            expr->append(result);
+            expr->append(REF(CallTemplate::from(g_lose, {value})));
+            expr->append(result);
+            return expr;
         }
+        return result;
     }
     return ValueRef();
 }

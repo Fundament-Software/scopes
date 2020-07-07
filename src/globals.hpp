@@ -30,6 +30,7 @@ namespace scopes {
     T(g_load, "load") \
     T(g_move, "move") \
     T(g_view, "view") \
+    T(g_lose, "lose") \
     /*T(g_copy, "copy")*/ \
     T(g_free, "free") \
     T(g_getelementptr, "getelementptr") \

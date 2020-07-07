@@ -90,4 +90,9 @@ do
     test (q == "init")
     test ((String "test") == "test")
 
+# testing proper globalization
+local s = (String "test")
+run-stage;
+test (s == "test")
+
 ;

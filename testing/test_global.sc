@@ -42,4 +42,11 @@ test ((struct-access) == 11)
 test ((struct-access) == 12)
 test ((struct-access) == 13)
 
+# properly moving an object across a run-stage
+local o = (One 101)
+test ((One.refcount) == 1)
+run-stage;
+test ((One.refcount) == 1)
+One.reset-refcount;
 
+;
