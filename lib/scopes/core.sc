@@ -5864,7 +5864,8 @@ spice memocall (f args...)
         let value = (sc_prove `(f args...))
         for arg in ('args value)
             if (not ('pure? arg))
-                hide-traceback; error "all returned arguments must be pure"
+                hide-traceback; error@ ('anchor arg) "while checking result"
+                    "all returned arguments must be pure"
         sc_map_set key value
         value
 

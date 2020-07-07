@@ -26,5 +26,5 @@ let dststr =
 print dststr
 test (dststr == srcstr)
 
+test ((UTF-8.char "?") == 63)
 
-print (UTF-8.char "?")

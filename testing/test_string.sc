@@ -1,4 +1,5 @@
 using import testing
+using import String
 
 # raw string blocks
 ###################
@@ -59,3 +60,34 @@ C.extern.printf str
 print (imply str rawstring)
 for k in str
     print k
+
+# strings objects
+###################
+
+do
+    local s : String
+    test ((countof s) == 0)
+    test ((s @ 0) == 0:i8)
+    s = "salvage"
+    test ((countof s) == 7)
+    test (s == "salvage")
+    test (s != "solvager")
+    test (s != "solvag")
+    test (s != "salvate")
+    test (s >= "salvage")
+    test (s > "Salvage")
+    test (s < "zal")
+    s = ("test" as rawstring)
+    test ((countof s) == 4)
+    s ..= s
+    test (s == "testtest")
+    let t = (copy s)
+    for a b in (zip s t)
+        test (a == b)
+    test (s == t)
+    test ((hash s) == (hash t))
+    local q : String = "init"
+    test (q == "init")
+    test ((String "test") == "test")
+
+;
