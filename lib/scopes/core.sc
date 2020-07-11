@@ -3993,6 +3993,33 @@ fn patterns-from-namestr (base-dir namestr)
 inline slice (value start end)
     rslice (lslice value end) start
 
+fn find-module-path (base-dir name)
+    #assert-typeof name Symbol
+    let namestr = (dots-to-slashes (name as string))
+    let all-patterns = (patterns-from-namestr base-dir namestr)
+    loop (patterns = all-patterns)
+        if (empty? patterns)
+            hide-traceback;
+            error
+                .. "failed to find module '" (repr name) "'\n"
+                    \ "no such module '" (as name string) "' in paths:"
+                    loop (patterns str = all-patterns "")
+                        if (empty? patterns)
+                            break str
+                        let pattern patterns = (decons patterns)
+                        let pattern = (pattern as string)
+                        let module-path = (make-module-path pattern namestr)
+                        repeat patterns
+                            .. str "\n"  "    " module-path
+        let pattern patterns = (decons patterns)
+        let pattern = (pattern as string)
+        let module-path = (sc_realpath (make-module-path pattern namestr))
+        if (empty? module-path)
+            repeat patterns
+        if (not (sc_is_file module-path))
+            repeat patterns
+        return module-path
+
 fn require-from (base-dir name)
     #assert-typeof name Symbol
     let namestr = (dots-to-slashes (name as string))
