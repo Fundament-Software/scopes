@@ -1,11 +1,19 @@
+<style type="text/css" rel="stylesheet">body { counter-reset: chapter 10; }</style>
+
 console
 =======
 
 Implements the read-eval-print loop for Scopes' console.
 
-.. type:: read-eval-print-loop
+*type*{.property} `read-eval-print-loop`{.descname} [](#scopes.type.read-eval-print-loop "Permalink to this definition"){.headerlink} {#scopes.type.read-eval-print-loop}
 
-   An opaque type of supertype `OverloadedFunction`.
+:   An opaque type of supertype `OverloadedFunction`.
 
-   .. inline:: (parameter-defaults)
-   .. fn:: (templates global-scope show-logo history-path)
+    *inline*{.property} `parameter-defaults`{.descname} ()[](#scopes.read-eval-print-loop.inline.parameter-defaults "Permalink to this definition"){.headerlink} {#scopes.read-eval-print-loop.inline.parameter-defaults}
+
+    :   
+
+    *fn*{.property} `templates`{.descname} (*&ensp;global-scope show-logo history-path&ensp;*)[](#scopes.read-eval-print-loop.fn.templates "Permalink to this definition"){.headerlink} {#scopes.read-eval-print-loop.fn.templates}
+
+    :   
+

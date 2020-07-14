@@ -14,7 +14,7 @@
     parses the command-line and optionally enters the REPL.
 
 """"A string containing the folder path to the compiler environment. Typically
-    the compiler environment is the folder that contains the ``bin`` folder
+    the compiler environment is the folder that contains the `bin` folder
     containing the compiler executable.
 let compiler-dir
 """"A string constant containing the file path to the compiler executable.
@@ -24,8 +24,8 @@ let compiler-timestamp
 """"A boolean constant indicating if the compiler was built in debug mode.
 let debug-build?
 """"A string constant indicating the operating system the compiler was built
-    for. It equals to ``"linux"`` for Linux builds, ``"windows"`` for Windows
-    builds, ``"macos"`` for macOS builds and ``"unknown"`` otherwise.
+    for. It equals to `"linux"` for Linux builds, `"windows"` for Windows
+    builds, `"macos"` for macOS builds and `"unknown"` otherwise.
 let operating-system
 """"A constant of type `i32` indicating the maximum number of recursions
     permitted for an inline. When this number is exceeded, an error is raised
@@ -79,7 +79,8 @@ fn error (msg)
     raise (sc_error_new msg)
 
 fn error@ (anchor traceback-msg error-msg)
-    """"usage example::
+    """"usage example:
+
             error@ ('anchor value) "while checking parameter" "error in value"
     hide-traceback;
     let err = (sc_error_new error-msg)
@@ -87,7 +88,8 @@ fn error@ (anchor traceback-msg error-msg)
     raise err
 
 fn error@+ (error anchor traceback-msg)
-    """"usage example::
+    """"usage example:
+
             except (err)
                 error@+ err ('anchor value) "while processing stream"
     hide-traceback;
@@ -450,9 +452,9 @@ let storagecast =
             let T = (sc_type_storage (sc_value_type self))
             return (sc_valueref_tag (sc_value_anchor args) `(bitcast self T))
 
-"""".. spice:: (&? value)
+""""*spice*{.property} `&?`{.descname} (*&ensp;value&ensp;*)[](#scopes.spice.&? "Permalink to this definition"){.headerlink} {#scopes.Generator.spice.&?}
 
-       Returns `true` if `value` is a reference, otherwise `false`.
+    :   Returns `true` if `value` is a reference, otherwise `false`.
 let &? =
     box-spice-macro
         fn "&?" (args)
@@ -1208,23 +1210,23 @@ sc_typename_type_set_opaque Struct
     Each generator instance is equivalent to a closure that when called returns
     four functions:
 
-    * A function ``state... <- fn start ()`` which returns the initial state of
+    * A function `state... <- fn start ()` which returns the initial state of
       the generator as an arbitrary number of arbitrarily typed values. The
       initially returned state defines the format of the generators internal
       state.
-    * A function ``bool <- fn valid? (state...)`` which takes the current
+    * A function `bool <- fn valid? (state...)` which takes the current
       generator state and returns `true` when the generator can resolve the
       state to a collection item, otherwise `false`, indicating that the
       generator has been depleted.
-    * A function ``value... <- fn at (state...)`` which takes the current
+    * A function `value... <- fn at (state...)` which takes the current
       generator state and returns the collection item this state maps to. The
-      function may not be called for a state for which ``valid?`` has reported
+      function may not be called for a state for which `valid?` has reported
       to be depleted.
-    * A function ``state... <- fn next (state...)`` which takes the current
+    * A function `state... <- fn next (state...)` which takes the current
       generator state and returns the state mapping to the next item in the
       collection. The new state must have the same type signature as the
       previous state. The function may not be called for a state for which
-      ``valid?`` has reported to be depleted.
+      `valid?` has reported to be depleted.
 
     It is allowed to call any of these functions multiple times with any valid
     state, effectively restarting the Generator at an arbitrary point, as
@@ -1232,7 +1234,7 @@ sc_typename_type_set_opaque Struct
     circumstances a Generator may choose to be impure, but should be documented
     accordingly.
 
-    Here is a typical pattern for constructing a generator::
+    Here is a typical pattern for constructing a generator:
 
         inline make-generator (container)
             Generator
@@ -1249,7 +1251,7 @@ sc_typename_type_set_opaque Struct
                     # return the next iterator in sequence
                     'next container it...
 
-    The generator can then be subsequently used like this::
+    The generator can then be subsequently used like this:
 
         # this example prints up to two elements returned by a generator
         # generate a new instance bound to container
@@ -2226,10 +2228,10 @@ inline intdiv (a b)
         box-spice-macro
             fn "scope-typecall" (args)
                 """"There are two ways to create a new Scope:
-                    ``Scope``
+                    `Scope`
                         creates an empty scope without parent
-                    ``Scope parent``
-                        creates an empty scope descending from ``parent``
+                    `Scope parent`
+                        creates an empty scope descending from `parent`
                 let argc = ('argcount args)
                 verify-count argc 1 2
                 switch argc
@@ -3175,11 +3177,11 @@ fn va-option-branch (args)
 """"A symbol table of type `Scope` which holds configuration options and module
     contents. It is managed by the module import system.
 
-    ``package.path`` holds a list of all search paths in the form of simple
+    `package.path` holds a list of all search paths in the form of simple
     string patterns. Changing it alters the way modules are searched for in
     the next run stage.
 
-    ``package.modules`` is another scope symbol table mapping full module
+    `package.modules` is another scope symbol table mapping full module
     paths to their contents. When a module is first imported, its contents
     are cached in this table. Subsequent imports of the same module will be
     resolved to these cached contents.
@@ -3193,8 +3195,8 @@ let package = (sc_typename_type "scopes.package" typename)
     modules = `[(Scope)]
 
 fn clone-scope-contents (a b)
-    """"Join two scopes ``a`` and ``b`` into a new scope so that the
-        root of ``a`` descends from ``b``.
+    """"Join two scopes `a` and `b` into a new scope so that the
+        root of `a` descends from `b`.
     # search first upwards for the root scope of a, then clone a
         piecewise with the cloned scopes as parents
     let parent = ('parent a)
@@ -3617,7 +3619,7 @@ let va-option =
 'set-symbols Generator
     __typecall =
         inline "Generator-new" (cls start valid? at next)
-            """"Takes four functions ``start``, ``valid?``, ``at`` and ``next``
+            """"Takes four functions `start`, `valid?`, `at` and `next`
                 and returns a new generator ready for use.
             Closure->Generator
                 inline "get-iter-init" ()
@@ -3635,11 +3637,11 @@ let va-option =
                 `(self)
 
 'set-docstring Generator '__call
-    """".. spice:: (__call self)
+    """"*spice*{.property} `__call`{.descname} (*&ensp;self&ensp;*)[](#scopes.Generator.spice.__call "Permalink to this definition"){.headerlink} {#scopes.Generator.spice.__call}
 
-           Returns, in this order, the four functions ``start``, ``valid?``,
-           ``init`` and ``next`` which are required to enumerate generator
-           `self`.
+        :   Returns, in this order, the four functions `start`, `valid?`,
+            `init` and `next` which are required to enumerate generator
+            `self`.
 
 # typical pattern for a generator:
     inline make-generator (container)
@@ -3666,33 +3668,33 @@ fn next-head? (next)
                 return (at as Symbol) ('anchor at)
     _ unnamed unknown-anchor
 
-"""".. sugar:: (for name ... _:in gen body...)
+""""*sugar*{.property} (`for`{.descname} *&ensp;name ...&ensp;* `in`{.descname} *&ensp;gen body...&ensp;*) [](#scopes.sugar.for-name-in-gen-body "Permalink to this definition"){.headerlink} {#scopes.sugar.for-name-in-gen-body}
 
-    Defines a loop that enumerates all elements in collection or sequence
-    `gen`, unpacking each element and binding its arguments to the names
-    defined by `name ...`.
+    :   Defines a loop that enumerates all elements in collection or sequence
+        `gen`, unpacking each element and binding its arguments to the names
+        defined by `name ...`.
 
-    `gen` must either be of type `Generator` or provide a cast to
-    `Generator`.
+        `gen` must either be of type `Generator` or provide a cast to
+        `Generator`.
 
-    Within the loop body, special forms ``break`` and ``continue`` can be used
-    to abort the loop early or skip ahead to the next element. The loop
-    will always evaluate to no arguments.
+        Within the loop body, special forms `break` and `continue` can be used
+        to abort the loop early or skip ahead to the next element. The loop
+        will always evaluate to no arguments.
 
-    For a loop form that permits you to maintain additional state and break
-    with a value, see `fold`.
+        For a loop form that permits you to maintain additional state and break
+        with a value, see `fold`.
 
-    Usage example::
+        Usage example:
 
-        # print numbers from 0 to 9, skipping number 5
-        for i in (range 100)
-            if (i == 10)
-                # abort the loop
-                break;
-            if (i == 5)
-                # skip this index
-                continue;
-            print i
+            # print numbers from 0 to 9, skipping number 5
+            for i in (range 100)
+                if (i == 10)
+                    # abort the loop
+                    break;
+                if (i == 5)
+                    # skip this index
+                    continue;
+                print i
 define for
     sugar-block-scope-macro
         fn "expand-for" (topexpr scope)
@@ -5520,7 +5522,7 @@ define sugar
 
 fn uncomma (l)
     """"uncomma list l, wrapping all comma separated symbols as new lists
-        example::
+        example:
 
             (uncomma '(a , b c d , e f , g h)) -> '(a (b c d) (e f) (g h))
     fn comma-separated? (l)
@@ -5736,11 +5738,11 @@ define va@
                 let at = (at as i32)
                 'getarg args (at + 1)
 
-"""".. spice:: (va-map f ...)
+""""*spice*{.property} `va-map`{.descname} (*&ensp;f ...&ensp;*)[](#scopes.spice.va-map "Permalink to this definition"){.headerlink} {#scopes.spice.va-map}
 
-       Filter each argument in `...` through `f` and return the resulting list
-       of arguments. Arguments where `f` returns void are filtered from the
-       result.
+    :   Filter each argument in `...` through `f` and return the resulting list
+        of arguments. Arguments where `f` returns void are filtered from the
+        result.
 define va-map
     spice-macro
         fn "va-map" (args)
@@ -5758,10 +5760,10 @@ define va-map
                             sc_prove ('tag `(f arg) ('anchor arg))
                     _ (('typeof outarg) != void) outarg
 
-"""".. spice:: (va-range a (? b))
+""""*spice*{.property} `va-range`{.descname} (*&ensp;a [ b ]&ensp;*)[](#scopes.spice.va-range "Permalink to this definition"){.headerlink} {#scopes.spice.va-range}
 
-       If `b` is not specified, returns a sequence of integers from zero to `b`,
-       otherwise a sequence of integers from `a` to `b`.
+    :   If `b` is not specified, returns a sequence of integers from zero to `b`,
+        otherwise a sequence of integers from `a` to `b`.
 define va-range
     spice-macro
         fn "va-range" (args)
@@ -6789,21 +6791,21 @@ sugar unlet ((name as Symbol) names...)
 # fold iteration
 #-------------------------------------------------------------------------------
 
-"""".. sugar:: (fold (state ... _:= init...) _:for name ... _:in gen body...)
+""""*sugar*{.property} (`fold `{.descname} (*&ensp;state ...&ensp;* `=`{.descname} *&ensp;init...&ensp;*) `for`{.descname} *&ensp;name ...&ensp;* `in`{.descname} *&ensp;gen body...&ensp;*) [](#scopes.sugar.fold-state-init-for-name-in-gen-body "Permalink to this definition"){.headerlink} {#scopes.sugar.fold-state-init-for-name-in-gen-body}
 
-       This is a combination of the `loop` and `for` forms. It enumerates all
-       elements in collection or sequence `gen`, unpacking each element and
-       binding its arguments to the names defined by `name ...`, while
-       the loop state `state ...` is initialized from `init...`.
+    :   This is a combination of the `loop` and `for` forms. It enumerates all
+        elements in collection or sequence `gen`, unpacking each element and
+        binding its arguments to the names defined by `name ...`, while
+        the loop state `state ...` is initialized from `init...`.
 
-       Similar to `loop`, the body expression must return the next state of
-       the loop. The state of `gen` is transparently maintained and does not
-       have to be managed.
+        Similar to `loop`, the body expression must return the next state of
+        the loop. The state of `gen` is transparently maintained and does not
+        have to be managed.
 
-       Unlike `for`, `fold` requires calls to ``break`` to pass a state
-       compatible with `state ...`. Otherwise they serve the same function.
+        Unlike `for`, `fold` requires calls to `break` to pass a state
+        compatible with `state ...`. Otherwise they serve the same function.
 
-       Usage example::
+        Usage example:
 
             # add numbers from 0 to 9, skipping number 5, and print the result
             print
@@ -7881,9 +7883,9 @@ typedef MethodsAccessor
 
 """"This function can be used in conjunction with `from`:
 
-    from (methodsof <object>) let method1 method2
+        from (methodsof <object>) let method1 method2
 
-    now the imported methods are implicitly bound to <object> and can be
+    now the imported methods are implicitly bound to `<object>` and can be
     called directly.
 spice methodsof (context)
     typedef BoundMethodsAccessor < MethodsAccessor

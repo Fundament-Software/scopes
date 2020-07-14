@@ -1,0 +1,77 @@
+body {
+    counter-reset: chapter;
+}
+
+div.section h1 {
+    counter-reset: section;
+}
+
+div.section h2 {
+    counter-reset: subsection;
+}
+
+div.section h3 {
+    counter-reset: subsubsection;
+}
+
+div.section h1#the-scopes-programming-infrastructure:before, h1#search:before {
+    content: none;
+}
+
+div.section h1:before {
+    content: counter(chapter) ". ";
+}
+
+div.section h2:before {
+    counter-increment: section;
+    content: counter(chapter) "." counter(section) ". ";
+}
+
+div.section h3:before {
+    counter-increment: subsection;
+    content: counter(chapter) "." counter(section) "." counter(subsection) ". ";
+}
+
+div.section h4:before {
+    counter-increment: subsubsection;
+    content: counter(chapter) "." counter(section) "." counter(subsection) "." counter(subsubsection) ". ";
+}
+
+div.wy-menu {
+    counter-reset: menu-chapter
+}
+
+div.wy-menu>ul li.toctree-l1 {
+    counter-increment: menu-chapter;
+    counter-reset: menu-section;
+}
+
+div.wy-menu>ul li.toctree-l1>a:before {
+    content: counter(menu-chapter) ". ";
+}
+
+div.wy-menu>ul li.toctree-l2 {
+    counter-increment: menu-section;
+    counter-reset: menu-subsection;
+}
+
+div.wy-menu>ul li.toctree-l2>a:before {
+    content: counter(menu-chapter) "." counter(menu-section) ". ";
+}
+
+div.wy-menu>ul li.toctree-l3 {
+    counter-increment: menu-subsection;
+    counter-reset: menu-subsubsection;
+}
+
+div.wy-menu>ul li.toctree-l3>a:before {
+    content: counter(menu-chapter) "." counter(menu-section) "." counter(menu-subsection) ". ";
+}
+
+div.wy-menu>ul li.toctree-l4 {
+    counter-increment: menu-subsubsection;
+}
+
+div.wy-menu>ul li.toctree-l4>a:before {
+    content: counter(menu-chapter) "." counter(menu-section) "." counter(menu-subsection) "." counter(menu-subsubsection) ". ";
+}

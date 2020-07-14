@@ -65,10 +65,10 @@ typedef+ Array
         default ()
 
     inline __typecall (cls element-type capacity)
-        """"Construct a mutable array type of ``element-type`` with a variable or
+        """"Construct a mutable array type of `element-type` with a variable or
             fixed maximum capacity.
 
-            If ``capacity`` is defined, then it specifies the maximum number
+            If `capacity` is defined, then it specifies the maximum number
             of array elements permitted. If it is undefined, then an initial
             capacity of 16 elements is assumed, which is doubled whenever
             it is exceeded, allowing for an indefinite number of elements.
@@ -269,11 +269,11 @@ typedef+ Array
 
 """"The supertype and constructor for arrays of fixed size.
 
-    To construct a new fixed array type::
+    To construct a new fixed array type:
 
         FixedArray element-type capacity
 
-    Instantiate a new array with mutable memory::
+    Instantiate a new array with mutable memory:
 
         local new-array : (FixedArray element-type capacity)
 typedef+ FixedArray
@@ -339,11 +339,11 @@ let DEFAULT_CAPACITY = (1:usize << 2:usize)
     have a default capacity of 4, and grow by factor 2.7 each time their
     capacity is exceeded.
 
-    To construct a new growing array type::
+    To construct a new growing array type:
 
         GrowingArray element-type
 
-    Instantiate a new array with mutable memory::
+    Instantiate a new array with mutable memory:
 
         local new-array : (GrowingArray element-type) [(capacity = ...)]
 typedef+ GrowingArray

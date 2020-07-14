@@ -182,14 +182,14 @@ define span (spice-macro (fn (args) (rtl-multiop args `span 2)))
 define join (spice-macro (fn (args) (rtl-multiop args `join 2)))
 
 # based on https://en.wikipedia.org/wiki/Heap%27s_algorithm
+""""Return a generator that iterates all permutations of the range from 0
+    to `n`, where `n` must be smaller than 256, and returns a vector of
+    `element-type` for each iteration. If `element-type` is omitted, the
+    default element type will be i32.
+
+    The generator will perform `n!` iterations to complete.
 @@ memo
 inline permutate-range (n element-type)
-    """"Return a generator that iterates all permutations of the range from 0
-        to `n`, where `n` must be smaller than 256, and returns a vector of
-        `element-type` for each iteration. If `element-type` is omitted, the
-        default element type will be i32.
-
-        The generator will perform `n!` iterations to complete.
     static-assert (n < 256) "permutation vector too large"
     let element-type =
         static-if (none? element-type) i32
@@ -606,12 +606,12 @@ inline retain1 (mapl child coll)
     static-if (none? coll) _retain1
     else (_retain1 coll)
 
+""""feeds the input through a composition of collectors and feeds the
+    input along with the composition output to the next collector.
+    if mapl is not none, it allows to specify the portion of the input that
+    will be passed to the end point.
 @@ spice-quote
 inline retain (mapl ...)
-    """"feeds the input through a composition of collectors and feeds the
-        input along with the composition output to the next collector.
-        if mapl is not none, it allows to specify the portion of the input that
-        will be passed to the end point.
     retain1 mapl (compose ...)
 
 unlet cascade1 retain1

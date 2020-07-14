@@ -175,10 +175,10 @@ typedef+ StringBase
         static-if ((ET == i8) and (T == string)) cls
 
     inline __typecall (cls element-type capacity)
-        """"Construct a mutable string type of ``element-type`` with a variable or
+        """"Construct a mutable string type of `element-type` with a variable or
             fixed maximum capacity.
 
-            If ``capacity`` is defined, then it specifies the maximum number
+            If `capacity` is defined, then it specifies the maximum number
             of string elements permitted. If it is undefined, then an initial
             capacity of 16 elements is assumed, which is doubled whenever
             it is exceeded, allowing for an indefinite number of elements.
@@ -337,11 +337,11 @@ typedef+ StringBase
 
 """"The supertype and constructor for strings of fixed size.
 
-    To construct a new fixed string type::
+    To construct a new fixed string type:
 
         FixedString element-type capacity
 
-    Instantiate a new string with mutable memory::
+    Instantiate a new string with mutable memory:
 
         local new-string : (FixedString element-type capacity)
 typedef+ FixedString
@@ -416,11 +416,11 @@ let DEFAULT_CAPACITY = (1:usize << 2:usize)
     have a default capacity of 4, and grow by factor 2.7 each time their
     capacity is exceeded.
 
-    To construct a new growing string type::
+    To construct a new growing string type:
 
         GrowingString element-type
 
-    Instantiate a new string with mutable memory::
+    Instantiate a new string with mutable memory:
 
         local new-string : (GrowingString element-type) [(capacity = ...)]
 typedef+ GrowingString

@@ -27,7 +27,7 @@ syntax: regexp
 ^testing/test\.o$
 ^testing/(_)?test\.wasm$
 ^scopes[.]h$
-^doc/_build/
+^doc/site
 ^bin/
 ^src/known_symbols.hpp
 ^Makefile$

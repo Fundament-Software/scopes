@@ -165,22 +165,23 @@ sugar test-compiler-error (args...)
                             repr sxcond
                 else body
 
-sugar features (args...)
-    """"A feature matrix that tests 2-d permutations
+""""A feature matrix that tests 2-d permutations
 
-        usage:
+    usage:
+
         features    B1  B2  B3 ...
             ---
             A1      Y   N   Y
             A2      N   Y   N
             A3      Y   N   Q
 
-        will expand to:
+    will expand to:
+
         do
             Y A1 B1; N A1 B2; Y A1 B3
             N A2 B1; Y A2 B2; N A2 B3
             Y A3 B1; N A3 B2; Q A3 B3
-
+sugar features (args...)
     let header rest =
         loop (header rest = '() args...)
             if (empty? rest)

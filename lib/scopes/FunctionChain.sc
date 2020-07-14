@@ -9,7 +9,7 @@
     A function chain implements a compile-time observer pattern that allows
     a module to call back into dependent modules in a decoupled way.
 
-    See following example::
+    See following example:
 
         using import FunctionChain
 
@@ -36,8 +36,6 @@
         activate 3
 
     Running this program will output:
-
-    ..  code-block:: none
 
         first handler activated with argument 1
         handler activated with argument 1
@@ -103,11 +101,11 @@ typedef FunctionChain : (storageof type)
         let func = ('@ self 'chain)
         'tag `(func args...) ('anchor args)
 
-"""".. sugar:: (fnchain name)
+""""*sugar*{.property} (`fnchain`{.descname} *&ensp;name&ensp;*) [](#scopes.sugar.fnchain "Permalink to this definition"){.headerlink} {#scopes.sugar.fnchain}
 
-       Binds a new unique and empty function chain to identifier `name`. The
-       function chain's typename is going to incorporate the name of the module
-       in which it was declared.
+    :   Binds a new unique and empty function chain to identifier `name`. The
+        function chain's typename is going to incorporate the name of the module
+        in which it was declared.
 sugar fnchain (name)
     let symbol? = (('typeof name) == Symbol)
     let namestr =

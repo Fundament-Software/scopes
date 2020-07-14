@@ -9,8 +9,7 @@ Functions
 
 yes yes
 
-Variable Arguments
-^^^^^^^^^^^^^^^^^^
+### Variable Arguments ###
 
 Bindings
 --------

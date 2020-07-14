@@ -1,9 +1,20 @@
+<style type="text/css" rel="stylesheet">body { counter-reset: chapter 17; }</style>
+
 spicetools
 ==========
 
 spicetools provides various utilities which aid with the implementation
 of new spices.
 
-.. fn:: (gen-argument-matcher failfunc expr scope params)
-.. inline:: (parse-argument-matcher failfunc expr scope params cb)
-.. sugar:: (spice-match ...)
+*fn*{.property} `gen-argument-matcher`{.descname} (*&ensp;failfunc expr scope params&ensp;*)[](#scopes.fn.gen-argument-matcher "Permalink to this definition"){.headerlink} {#scopes.fn.gen-argument-matcher}
+
+:   
+
+*inline*{.property} `parse-argument-matcher`{.descname} (*&ensp;failfunc expr scope params cb&ensp;*)[](#scopes.inline.parse-argument-matcher "Permalink to this definition"){.headerlink} {#scopes.inline.parse-argument-matcher}
+
+:   
+
+*sugar*{.property} (`spice-match`{.descname} *&ensp;...&ensp;*) [](#scopes.sugar.spice-match "Permalink to this definition"){.headerlink} {#scopes.sugar.spice-match}
+
+:   
+

@@ -1,3 +1,7 @@
+<style type="text/css" rel="stylesheet">
+body { counter-reset: chapter 1; }
+</style>
+
 About Scopes
 ============
 

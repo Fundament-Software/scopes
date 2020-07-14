@@ -14,7 +14,7 @@
 
     `__` can be used as a placeholder token to position the previous expression.
 
-    example::
+    example:
 
         --> x
             f
@@ -22,7 +22,7 @@
             h 2 __
             k
 
-    expands to::
+    expands to:
 
         k
             h 2

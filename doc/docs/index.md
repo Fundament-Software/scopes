@@ -1,8 +1,3 @@
-.. Scopes documentation master file, created by
-   sphinx-quickstart on Tue Sep 22 07:49:51 2015.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 The Scopes Programming Infrastructure
 =====================================
 
@@ -13,30 +8,8 @@ language repository.
 
 Contents:
 
-.. toctree::
-   :maxdepth: 2
-   :numbered:
-
-   about
-   intro
-   tutorial
-   cpp_users
-   dataformat
-   modules
-
-..
-   architecture
-   Scopeslang
-   debugging
-   meta
-   lang
-   capi
-   reference
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
+- [About Scopes](about.md)
+- [Getting Started](intro.md)
+- [The Scopes Tutorial](tutorial.md)
+- [Scopes for C/C++ Users](cpp_users.md)
+- [Notation](dataformat.md)

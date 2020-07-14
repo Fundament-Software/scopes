@@ -1,33 +1,32 @@
-
 echo "generating core..." \
-    && ./build_reference.sc > module-core.rst \
+    && ./build_reference.sc core.sc 6 > ./docs/module-core.md \
     && echo "generating Array..." \
-    && ./build_reference.sc Array > module-Array.rst \
+    && ./build_reference.sc Array 7 > ./docs/module-Array.md \
     && echo "generating Box..." \
-    && ./build_reference.sc Box > module-Box.rst \
+    && ./build_reference.sc Box 8 > ./docs/module-Box.md \
     && echo "generating Capture..." \
-    && ./build_reference.sc Capture > module-Capture.rst \
+    && ./build_reference.sc Capture 9 > ./docs/module-Capture.md \
     && echo "generating console..." \
-    && ./build_reference.sc console > module-console.rst \
+    && ./build_reference.sc console 10 > ./docs/module-console.md \
     && echo "generating enum..." \
-    && ./build_reference.sc enum > module-enum.rst \
+    && ./build_reference.sc enum 11 > ./docs/module-enum.md \
     && echo "generating FunctionChain..." \
-    && ./build_reference.sc FunctionChain > module-FunctionChain.rst \
+    && ./build_reference.sc FunctionChain 12 > ./docs/module-FunctionChain.md \
     && echo "generating glm..." \
-    && ./build_reference.sc glm > module-glm.rst \
+    && ./build_reference.sc glm 13 > ./docs/module-glm.md \
     && echo "generating glsl..." \
-    && ./build_reference.sc glsl > module-glsl.rst \
+    && ./build_reference.sc glsl 14 > ./docs/module-glsl.md \
     && echo "generating itertools..." \
-    && ./build_reference.sc itertools > module-itertools.rst \
+    && ./build_reference.sc itertools 15 > ./docs/module-itertools.md \
     && echo "generating Map..." \
-    && ./build_reference.sc Map > module-Map.rst \
+    && ./build_reference.sc Map 16 > ./docs/module-Map.md \
     && echo "generating spicetools..." \
-    && ./build_reference.sc spicetools > module-spicetools.rst \
+    && ./build_reference.sc spicetools 17 > ./docs/module-spicetools.md \
     && echo "generating struct..." \
-    && ./build_reference.sc struct > module-struct.rst \
+    && ./build_reference.sc struct 18 > ./docs/module-struct.md \
     && echo "generating testing..." \
-    && ./build_reference.sc testing > module-testing.rst \
+    && ./build_reference.sc testing 19 > ./docs/module-testing.md \
     && echo "generating UTF-8..." \
-    && ./build_reference.sc UTF-8 > module-UTF-8.rst \
+    && ./build_reference.sc UTF-8 20 > ./docs/module-UTF-8.md \
     && make clean && make html
 
