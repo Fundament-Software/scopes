@@ -72,3 +72,19 @@ This module implements a key -> value store using hashtables.
 
 :   An unique type of supertype `Enum` and of storage type `(tuple u8 (tuple (vector i8 1)))`.
 
+    *inline*{.property} `__==`{.descname} (*&ensp;A B&ensp;*)[](#scopes.MapError.inline.__== "Permalink to this definition"){.headerlink} {#scopes.MapError.inline.__==}
+
+    :   
+
+    *fn*{.property} `__drop`{.descname} (*&ensp;self&ensp;*)[](#scopes.MapError.fn.__drop "Permalink to this definition"){.headerlink} {#scopes.MapError.fn.__drop}
+
+    :   
+
+    *fn*{.property} `__hash`{.descname} (*&ensp;self&ensp;*)[](#scopes.MapError.fn.__hash "Permalink to this definition"){.headerlink} {#scopes.MapError.fn.__hash}
+
+    :   
+
+    *fn*{.property} `__repr`{.descname} (*&ensp;self&ensp;*)[](#scopes.MapError.fn.__repr "Permalink to this definition"){.headerlink} {#scopes.MapError.fn.__repr}
+
+    :   
+

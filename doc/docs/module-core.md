@@ -2052,6 +2052,10 @@ parses the command-line and optionally enters the REPL.
 
 :   An opaque type of supertype `aggregate`.
 
+    *inline*{.property} `__==`{.descname} (*&ensp;cls T&ensp;*)[](#scopes.tuple.inline.__== "Permalink to this definition"){.headerlink} {#scopes.tuple.inline.__==}
+
+    :   
+
     *builtin*{.property} `__@`{.descname} (*&ensp;...&ensp;*)[](#scopes.tuple.builtin.__@ "Permalink to this definition"){.headerlink} {#scopes.tuple.builtin.__@}
 
     :   
@@ -2694,6 +2698,26 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
+*inline*{.property} `compile`{.descname} (*&ensp;func flags...&ensp;*)[](#scopes.inline.compile "Permalink to this definition"){.headerlink} {#scopes.inline.compile}
+
+:   
+
+*inline*{.property} `compile-glsl`{.descname} (*&ensp;version target func flags...&ensp;*)[](#scopes.inline.compile-glsl "Permalink to this definition"){.headerlink} {#scopes.inline.compile-glsl}
+
+:   
+
+*inline*{.property} `compile-object`{.descname} (*&ensp;target file-kind path table flags...&ensp;*)[](#scopes.inline.compile-object "Permalink to this definition"){.headerlink} {#scopes.inline.compile-object}
+
+:   
+
+*inline*{.property} `compile-spirv`{.descname} (*&ensp;target func flags...&ensp;*)[](#scopes.inline.compile-spirv "Permalink to this definition"){.headerlink} {#scopes.inline.compile-spirv}
+
+:   
+
+*fn*{.property} `compiler-version-string`{.descname} ()[](#scopes.fn.compiler-version-string "Permalink to this definition"){.headerlink} {#scopes.fn.compiler-version-string}
+
+:   
+
 *inline*{.property} `convert-assert-args`{.descname} (*&ensp;args cond msg&ensp;*)[](#scopes.inline.convert-assert-args "Permalink to this definition"){.headerlink} {#scopes.inline.convert-assert-args}
 
 :   
@@ -3004,6 +3028,10 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
+*fn*{.property} `print-logo`{.descname} ()[](#scopes.fn.print-logo "Permalink to this definition"){.headerlink} {#scopes.fn.print-logo}
+
+:   
+
 *fn*{.property} `ptrcmp!=`{.descname} (*&ensp;t1 t2&ensp;*)[](#scopes.fn.ptrcmp!= "Permalink to this definition"){.headerlink} {#scopes.fn.ptrcmp!=}
 
 :   
@@ -3133,6 +3161,18 @@ parses the command-line and optionally enters the REPL.
 :   
 
 *fn*{.property} `split-dotted-symbol`{.descname} (*&ensp;env name&ensp;*)[](#scopes.fn.split-dotted-symbol "Permalink to this definition"){.headerlink} {#scopes.fn.split-dotted-symbol}
+
+:   
+
+*inline*{.property} `static-compile`{.descname} (*&ensp;func flags...&ensp;*)[](#scopes.inline.static-compile "Permalink to this definition"){.headerlink} {#scopes.inline.static-compile}
+
+:   
+
+*inline*{.property} `static-compile-glsl`{.descname} (*&ensp;version target func flags...&ensp;*)[](#scopes.inline.static-compile-glsl "Permalink to this definition"){.headerlink} {#scopes.inline.static-compile-glsl}
+
+:   
+
+*inline*{.property} `static-compile-spirv`{.descname} (*&ensp;target func flags...&ensp;*)[](#scopes.inline.static-compile-spirv "Permalink to this definition"){.headerlink} {#scopes.inline.static-compile-spirv}
 
 :   
 

@@ -223,6 +223,10 @@ written in the GL shader language.
 
     :   
 
+    *fn*{.property} `__repr`{.descname} (*&ensp;self&ensp;*)[](#scopes.mat-type.fn.__repr "Permalink to this definition"){.headerlink} {#scopes.mat-type.fn.__repr}
+
+    :   
+
     *spice*{.property} `__typecall`{.descname} (*&ensp;...&ensp;*)[](#scopes.mat-type.spice.__typecall "Permalink to this definition"){.headerlink} {#scopes.mat-type.spice.__typecall}
 
     :   
@@ -491,6 +495,10 @@ written in the GL shader language.
 
     :   
 
+    *fn*{.property} `__repr`{.descname} (*&ensp;self&ensp;*)[](#scopes.vec-type.fn.__repr "Permalink to this definition"){.headerlink} {#scopes.vec-type.fn.__repr}
+
+    :   
+
     *spice*{.property} `__rimply`{.descname} (*&ensp;...&ensp;*)[](#scopes.vec-type.spice.__rimply "Permalink to this definition"){.headerlink} {#scopes.vec-type.spice.__rimply}
 
     :   
@@ -528,6 +536,10 @@ written in the GL shader language.
 :   A plain type of supertype `gvec4` and of storage type `(vector f32 4)`.
 
 *inline*{.property} `dot`{.descname} (*&ensp;u v&ensp;*)[](#scopes.inline.dot "Permalink to this definition"){.headerlink} {#scopes.inline.dot}
+
+:   
+
+*inline*{.property} `transpose`{.descname} (*&ensp;m&ensp;*)[](#scopes.inline.transpose "Permalink to this definition"){.headerlink} {#scopes.inline.transpose}
 
 :   
 

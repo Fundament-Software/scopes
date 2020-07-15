@@ -14,6 +14,11 @@ generators and collectors.
 
 :   
 
+*inline*{.property} `bitdim`{.descname} (*&ensp;x n...&ensp;*)[](#scopes.inline.bitdim "Permalink to this definition"){.headerlink} {#scopes.inline.bitdim}
+
+:   a variant of dim optimized for power of two sizes; the dimensions are
+    specified as exponents of 2
+
 *inline*{.property} `cascade`{.descname} (*&ensp;collector...&ensp;*)[](#scopes.inline.cascade "Permalink to this definition"){.headerlink} {#scopes.inline.cascade}
 
 :   two collectors:
@@ -31,6 +36,10 @@ generators and collectors.
 *inline*{.property} `demux`{.descname} (*&ensp;init-value f collector...&ensp;*)[](#scopes.inline.demux "Permalink to this definition"){.headerlink} {#scopes.inline.demux}
 
 :   
+
+*inline*{.property} `dim`{.descname} (*&ensp;x n...&ensp;*)[](#scopes.inline.dim "Permalink to this definition"){.headerlink} {#scopes.inline.dim}
+
+:   a branchless generator that iterates multidimensional coordinates
 
 *inline*{.property} `each`{.descname} (*&ensp;generator collector&ensp;*)[](#scopes.inline.each "Permalink to this definition"){.headerlink} {#scopes.inline.each}
 
@@ -82,6 +91,13 @@ generators and collectors.
 *inline*{.property} `reduce`{.descname} (*&ensp;init f&ensp;*)[](#scopes.inline.reduce "Permalink to this definition"){.headerlink} {#scopes.inline.reduce}
 
 :   
+
+*inline*{.property} `retain`{.descname} (*&ensp;mapl ...&ensp;*)[](#scopes.inline.retain "Permalink to this definition"){.headerlink} {#scopes.inline.retain}
+
+:   feeds the input through a composition of collectors and feeds the
+    input along with the composition output to the next collector.
+    if mapl is not none, it allows to specify the portion of the input that
+    will be passed to the end point.
 
 *inline*{.property} `take`{.descname} (*&ensp;n coll&ensp;*)[](#scopes.inline.take "Permalink to this definition"){.headerlink} {#scopes.inline.take}
 

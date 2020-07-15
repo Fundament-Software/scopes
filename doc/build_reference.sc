@@ -61,7 +61,7 @@ fn entry-key (x)
     let s = (key as string)
     ..
         do
-            if (T == Closure) "C"
+            if ((T == Closure) or ((T == Unknown) and (('kind entry) == value-kind-template))) "C"
             elseif (T == Builtin) "E"
             elseif (T == SugarMacro) "D"
             elseif (T == SpiceMacro) "F"
@@ -178,11 +178,21 @@ fn print-entry (module parent key entry parent-name opts...)
             io-write! docstr
         io-write! "\n"
         return;
-    if (T == Closure)
-        let func = (entry as Closure)
-        let docstr2 = ('docstring func)
+
+    let is-unwrapped-closure? = ((T == Unknown) and (('kind entry) == value-kind-template))
+    if (T == Closure or is-unwrapped-closure?)
+        let docstr2 =
+            if is-unwrapped-closure?
+                ""
+            else
+                ('docstring (entry as Closure))
+
         let label =
-            sc_closure_get_template func
+            if is-unwrapped-closure?
+                entry
+            else
+                (sc_closure_get_template (entry as Closure))
+
         if (docstring-is-complete docstr2)
             io-write! docstr2
             io-write! "\n"

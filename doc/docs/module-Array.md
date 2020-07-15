@@ -37,10 +37,10 @@ than in registers or the stack.
 
     *inline*{.property} `__typecall`{.descname} (*&ensp;cls element-type capacity&ensp;*)[](#scopes.Array.inline.__typecall "Permalink to this definition"){.headerlink} {#scopes.Array.inline.__typecall}
 
-    :   Construct a mutable array type of ``element-type`` with a variable or
+    :   Construct a mutable array type of `element-type` with a variable or
         fixed maximum capacity.
         
-        If ``capacity`` is defined, then it specifies the maximum number
+        If `capacity` is defined, then it specifies the maximum number
         of array elements permitted. If it is undefined, then an initial
         capacity of 16 elements is assumed, which is doubled whenever
         it is exceeded, allowing for an indefinite number of elements.
