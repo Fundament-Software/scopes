@@ -1,1 +1,1 @@
-pip install -I ./ScopesLexer
+./ScopesLexer
