@@ -888,6 +888,7 @@ parses the command-line and optionally enters the REPL.
     
     Here is a typical pattern for constructing a generator:
     
+        :::scopes
         inline make-generator (container)
             Generator
                 inline "start" ()
@@ -905,6 +906,7 @@ parses the command-line and optionally enters the REPL.
     
     The generator can then be subsequently used like this:
     
+        :::scopes
         # this example prints up to two elements returned by a generator
         # generate a new instance bound to container
         let gen = (make-generator container)
@@ -2762,12 +2764,14 @@ parses the command-line and optionally enters the REPL.
 
 :   usage example:
     
+        :::scopes
         error@ ('anchor value) "while checking parameter" "error in value"
 
 *fn*{.property} `error@+`{.descname} (*&ensp;error anchor traceback-msg&ensp;*)[](#scopes.fn.error@+ "Permalink to this definition"){.headerlink} {#scopes.fn.error@+}
 
 :   usage example:
     
+        :::scopes
         except (err)
             error@+ err ('anchor value) "while processing stream"
 
@@ -3279,6 +3283,7 @@ parses the command-line and optionally enters the REPL.
 :   uncomma list l, wrapping all comma separated symbols as new lists
     example:
     
+        :::scopes
         (uncomma '(a , b c d , e f , g h)) -> '(a (b c d) (e f) (g h))
 
 *fn*{.property} `unpack-infix-op`{.descname} (*&ensp;op&ensp;*)[](#scopes.fn.unpack-infix-op "Permalink to this definition"){.headerlink} {#scopes.fn.unpack-infix-op}
@@ -3425,6 +3430,7 @@ parses the command-line and optionally enters the REPL.
 
     Usage example:
 
+        :::scopes
         # add numbers from 0 to 9, skipping number 5, and print the result
         print
             fold (sum = 0) for i in (range 100)
@@ -4641,6 +4647,7 @@ parses the command-line and optionally enters the REPL.
 
 :   This function can be used in conjunction with `from`:
     
+        :::scopes
         from (methodsof <object>) let method1 method2
     
     now the imported methods are implicitly bound to `<object>` and can be

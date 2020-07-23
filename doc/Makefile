@@ -2,9 +2,9 @@
 #
 
 # You can set these variables from the command line.
-MKDOCSOPTS    =
 MKDOCS        = mkdocs
 BUILDDIR      = site
+PYBUILDDIR    = site-packages
 
 # User-friendly check for MkDocs
 ifeq ($(shell which $(MKDOCS) >/dev/null 2>&1; echo $$?), 1)
@@ -18,11 +18,17 @@ help:
 	@echo "Please use \`make <target>' where <target> is one of"
 	@echo "  clean      to discard generated documentation"
 	@echo "  html       to make standalone HTML files"
+	@echo "  serve      to start a web server in preview mode for editing"
 
 clean:
-	rm -rf $(BUILDDIR)/*
+	rm -rf $(BUILDDIR)/* $(PYBUILDDIR)/*
 
 html:
-	$(MKDOCS) $(MKDOCSOPTS) build -d $(BUILDDIR)
+	pip install --upgrade -I ./ScopesLexer -t $(PYBUILDDIR)
+	PYTHONPATH="$(PYBUILDDIR);$(PYTHONPATH)" python -B -m mkdocs build -d "$(BUILDDIR)"
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/."
+
+serve:
+	pip install --upgrade -I ./ScopesLexer -t $(PYBUILDDIR)
+	PYTHONPATH="$(PYBUILDDIR);$(PYTHONPATH)" python -B -m mkdocs serve

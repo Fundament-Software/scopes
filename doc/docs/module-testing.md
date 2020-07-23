@@ -77,6 +77,7 @@ fashion.
     
     usage:
     
+        :::scopes
         features    B1  B2  B3 ...
             ---
             A1      Y   N   Y
@@ -85,6 +86,7 @@ fashion.
     
     will expand to:
     
+        :::scopes
         do
             Y A1 B1; N A1 B2; Y A1 B3
             N A2 B1; Y A2 B2; N A2 B3

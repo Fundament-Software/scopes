@@ -81,6 +81,7 @@ fn error (msg)
 fn error@ (anchor traceback-msg error-msg)
     """"usage example:
 
+            :::scopes
             error@ ('anchor value) "while checking parameter" "error in value"
     hide-traceback;
     let err = (sc_error_new error-msg)
@@ -90,6 +91,7 @@ fn error@ (anchor traceback-msg error-msg)
 fn error@+ (error anchor traceback-msg)
     """"usage example:
 
+            :::scopes
             except (err)
                 error@+ err ('anchor value) "while processing stream"
     hide-traceback;
@@ -1236,6 +1238,7 @@ sc_typename_type_set_opaque Struct
 
     Here is a typical pattern for constructing a generator:
 
+        :::scopes
         inline make-generator (container)
             Generator
                 inline "start" ()
@@ -1253,6 +1256,7 @@ sc_typename_type_set_opaque Struct
 
     The generator can then be subsequently used like this:
 
+        :::scopes
         # this example prints up to two elements returned by a generator
         # generate a new instance bound to container
         let gen = (make-generator container)
@@ -1270,7 +1274,6 @@ sc_typename_type_set_opaque Struct
                 # container has one more item; print it
                 print (at state...)
         # we are done; no cleanup necessary
-
 let Generator = (sc_typename_type "Generator" typename)
 'set-plain-storage Generator ('storageof Closure)
 
@@ -5524,6 +5527,7 @@ fn uncomma (l)
     """"uncomma list l, wrapping all comma separated symbols as new lists
         example:
 
+            :::scopes
             (uncomma '(a , b c d , e f , g h)) -> '(a (b c d) (e f) (g h))
     fn comma-separated? (l)
         loop (next = l)
@@ -6807,6 +6811,7 @@ sugar unlet ((name as Symbol) names...)
 
         Usage example:
 
+            :::scopes
             # add numbers from 0 to 9, skipping number 5, and print the result
             print
                 fold (sum = 0) for i in (range 100)
@@ -7883,6 +7888,7 @@ typedef MethodsAccessor
 
 """"This function can be used in conjunction with `from`:
 
+        :::scopes
         from (methodsof <object>) let method1 method2
 
     now the imported methods are implicitly bound to `<object>` and can be

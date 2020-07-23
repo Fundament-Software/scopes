@@ -341,10 +341,12 @@ let DEFAULT_CAPACITY = (1:usize << 2:usize)
 
     To construct a new growing array type:
 
+        :::scopes
         GrowingArray element-type
 
     Instantiate a new array with mutable memory:
 
+        :::scopes
         local new-array : (GrowingArray element-type) [(capacity = ...)]
 typedef+ GrowingArray
     let parent-type = this-type

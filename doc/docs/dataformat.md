@@ -24,98 +24,99 @@ At a Glance
 As a summary, here is an example that provides an overview of all
 the notation aspects:
 
-    # below is some random data without any schema
+```scopes
+# below is some random data without any schema
 
-    # a naked list of five 32-bit signed integers
-    1 2 3 4 5
+# a naked list of five 32-bit signed integers
+1 2 3 4 5
 
-    # a list that begins with a symbol 'float-values:' and contains a braced
-    # sublist of floats.
-    float-values: (1.0 2.0 3.1 4.2 5.5:f64 inf nan)
+# a list that begins with a symbol 'float-values:' and contains a braced
+# sublist of floats.
+float-values: (1.0 2.0 3.1 4.2 5.5:f64 inf nan)
 
-    # we can also nest the sublist using indentation
-    # note the extravagant heading, another context-free symbol.
-    ==string-values==
-        "A" "B" "NCC-1701\n" "\xFFD\xFF" "\"E\""
+# we can also nest the sublist using indentation
+# note the extravagant heading, another context-free symbol.
+==string-values==
+    "A" "B" "NCC-1701\n" "\xFFD\xFF" "\"E\""
 
-    # a single top-level element, a single-line string
-    "I am Locutus of Borg."
+# a single top-level element, a single-line string
+"I am Locutus of Borg."
 
-    # a raw block string; four double quotes mark the start
-    """"
-        Ma'am is acceptable in a crunch, but I prefer Captain.
-                                        -- Kathryn Janeway
+# a raw block string; four double quotes mark the start
+""""
+    Ma'am is acceptable in a crunch, but I prefer Captain.
+                                    -- Kathryn Janeway
 
-    # a list of pairs (also lists), arranged horizontally
-    (1 x) (2 y) (3 z)
-    # same list, with last two entries arranged vertically
+# a list of pairs (also lists), arranged horizontally
+(1 x) (2 y) (3 z)
+# same list, with last two entries arranged vertically
+(1 x)
+    (2 y)
+    (3 z)
+# we can line up all entries by using a semicolon to indicate an empty head
+;
     (1 x)
-        (2 y)
-        (3 z)
-    # we can line up all entries by using a semicolon to indicate an empty head
-    ;
-        (1 x)
-        (2 y)
-        (3 z)
-    # parentheses can also be removed for each line entry
-    ;
-        1 x
-        2 y
-        3 z
+    (2 y)
+    (3 z)
+# parentheses can also be removed for each line entry
+;
+    1 x
+    2 y
+    3 z
 
-    # appending values to the parent list in the next line
-    symbol-values one two three four five \
-        six seven-of-nine ten
+# appending values to the parent list in the next line
+symbol-values one two three four five \
+    six seven-of-nine ten
 
-    # line continuation can also begin at the start of the next line
-    ::typed-integers:: 0:u8 1:i8 2:i16 3:u16
-        \ 4:u32 5:i32 6:u64 7:i64
+# line continuation can also begin at the start of the next line
+::typed-integers:: 0:u8 1:i8 2:i16 3:u16
+    \ 4:u32 5:i32 6:u64 7:i64
 
-    # which comes in handy when we want to continue the parent list
-    people like
-        jim kirk
-        commander spock
-        hikari sulu
-        \ and many more
+# which comes in handy when we want to continue the parent list
+people like
+    jim kirk
+    commander spock
+    hikari sulu
+    \ and many more
 
-    # a list with a symbol header and two entries
-    address-list
-        # a list with a header and three more lists of two values each
-        entry
-            name: "Jean-Luc Picard"
-            age: 59
-            address: picard@enterprise.org
-        entry
-            # the semicolon acts as list separator
-            name: "Worf, Son of Mogh"; age: 24; address: worf@house-of-mogh.co.klingon
-        # line comments double as block comments
-        #entry
-            name: "Natasha Yar"
-            age: 27
-            address: natasha.yar@enterprise.org
+# a list with a symbol header and two entries
+address-list
+    # a list with a header and three more lists of two values each
+    entry
+        name: "Jean-Luc Picard"
+        age: 59
+        address: picard@enterprise.org
+    entry
+        # the semicolon acts as list separator
+        name: "Worf, Son of Mogh"; age: 24; address: worf@house-of-mogh.co.klingon
+    # line comments double as block comments
+    #entry
+        name: "Natasha Yar"
+        age: 27
+        address: natasha.yar@enterprise.org
 
-    # the same list with braced notation; within braced lists,
-      indentation is meaningless.
-    (address-list
-        # a list with a header and three more lists of two values each
-        (entry
-            (name: "Jean-Luc Picard")
-            (age: 59)
-            (address: picard@enterprise.org))
-        (entry (name: "Worf, Son of Mogh") (age: 24)
-            (address: worf@house-of-mogh.co.klingon)))
+# the same list with braced notation; within braced lists,
+    indentation is meaningless.
+(address-list
+    # a list with a header and three more lists of two values each
+    (entry
+        (name: "Jean-Luc Picard")
+        (age: 59)
+        (address: picard@enterprise.org))
+    (entry (name: "Worf, Son of Mogh") (age: 24)
+        (address: worf@house-of-mogh.co.klingon)))
 
-    # a list of comma separated values - a comma is always recorded as
-      a separate symbol, so the list has nine entries
-    1, 2, 3,4, 5
+# a list of comma separated values - a comma is always recorded as
+    a separate symbol, so the list has nine entries
+1, 2, 3,4, 5
 
-    # a list of options beginning with a symbol in a list with
-      square brace style
-    [task]
-        cmd = "bash"
-        # the last element is a symbol in a list with curly brace style
-        working-dir = {project-base}
-
+# a list of options beginning with a symbol in a list with
+    square brace style
+[task]
+    cmd = "bash"
+    # the last element is a symbol in a list with curly brace style
+    working-dir = {project-base}
+```
 
 
 Formatting Rules
@@ -147,14 +148,16 @@ Both line and block comments are initiated with a single token, `#`. A comment
 lasts from its beginning token to the first non-whitespace character with an equal
 or lower indentation level. Some examples of valid comments:
 
-    # a line comment
-    not a comment
-    # a block comment that continues
-      in the next line because the line has
-      a higher indentation level. Note, that
-            comments do not need to respect
-        indentation rules
-    but this line is not a comment
+```scopes
+# a line comment
+not a comment
+# a block comment that continues
+    in the next line because the line has
+    a higher indentation level. Note, that
+        comments do not need to respect
+    indentation rules
+but this line is not a comment
+```
 
 ### Strings ###
 
@@ -168,8 +171,10 @@ copied over verbatim.
 
 Here are some examples of valid strings:
 
-    "a single-line string in double quotations"
-    "return: \n, tab: \t, backslash: \\, double quote: \", nbsp: \xFF."
+```scopes
+"a single-line string in double quotations"
+"return: \n, tab: \t, backslash: \\, double quote: \", nbsp: \xFF."
+```
 
 ### Raw Block Strings ###
 
@@ -180,13 +185,15 @@ character that has a lower indentation.
 
 Here are some examples of valid raw block strings:
 
-    """"a single-line string as a block string
-    # commented line inbetween
-    """"// a multi-line string that describes a valid C function
-        #include <stdio.h>
-        void a_function_in_c() {
-            printf("hello world\n");
-        }
+```scopes
+""""a single-line string as a block string
+# commented line inbetween
+""""// a multi-line string that describes a valid C function
+    #include <stdio.h>
+    void a_function_in_c() {
+        printf("hello world\n");
+    }
+```
 
 ### Symbols ###
 
@@ -201,16 +208,18 @@ As a special case, `,` is always parsed as a single character.
 
 Here are some examples of valid symbols:
 
-    # classic underscore notation
-    some_identifier _some_identifier
-    # hyphenated
-    some-identifier
-    # mixed case
-    SomeIdentifier
-    # fantasy operators
-    &+ >~ >>= and= str+str
-    # numbered
-    _42 =303
+```scopes
+# classic underscore notation
+some_identifier _some_identifier
+# hyphenated
+some-identifier
+# mixed case
+SomeIdentifier
+# fantasy operators
+&+ >~ >>= and= str+str
+# numbered
+_42 =303
+```
 
 ### Numbers ###
 
@@ -226,18 +235,20 @@ to the number as well as a numerical typename that is one of: `i8`, `i16`,
 
 Here are some examples of valid numbers:
 
-    # positive and negative integers in decimal and hexadecimal notation
-    0 +23 42 -303 12 -1 -0x20 0xAFFE
-    # positive and negative reals
-    0.0 1.0 3.14159 -2.0 0.000003 0xa400.a400
-    # reals in scientific notation
-    1.234e+24 -1e-12
-    # special reals
-    +inf -inf nan
-    # zero as unsigned 64-bit integer and as signed 8-bit integer
-    0:u64 0:i8
-    # a floating-point number with double precision
-    1.0:f64
+```scopes
+# positive and negative integers in decimal and hexadecimal notation
+0 +23 42 -303 12 -1 -0x20 0xAFFE
+# positive and negative reals
+0.0 1.0 3.14159 -2.0 0.000003 0xa400.a400
+# reals in scientific notation
+1.234e+24 -1e-12
+# special reals
++inf -inf nan
+# zero as unsigned 64-bit integer and as signed 8-bit integer
+0:u64 0:i8
+# a floating-point number with double precision
+1.0:f64
+```
 
 ### Lists ###
 
@@ -249,14 +260,16 @@ only separated by whitespace. They typically describe expressions in Scopes.
 
 Here are some examples of valid lists:
 
-    # a list of numbers in naked format
-    1 2 3 4 5
-    # three empty braced lists within a naked list
-    () () ()
-    # a list containing a symbol, a string, an integer, a real, and an empty list
-    (print (.. "hello world") 303 606 909)
-    # three nesting lists
-    ((()))
+```scopes
+# a list of numbers in naked format
+1 2 3 4 5
+# three empty braced lists within a naked list
+() () ()
+# a list containing a symbol, a string, an integer, a real, and an empty list
+(print (.. "hello world") 303 606 909)
+# three nesting lists
+((()))
+```
 
 Naked & Braced Lists
 --------------------
@@ -268,9 +281,11 @@ to what [Lisp](http://en.wikipedia.org/wiki/Lisp_(programming_language)) and
 [Scheme](http://en.wikipedia.org/wiki/Scheme_(programming_language)) authors
 know as *restricted* [S-expressions](https://en.wikipedia.org/wiki/S-expression>):
 
-    (print
-        (.. "Hello" "World")
-        303 606 909)
+```scopes
+(print
+    (.. "Hello" "World")
+    303 606 909)
+```
 
 As a modern alternative, Scopes offers a *naked notation* where the scope of
 lists is implicitly balanced by indentation, an approach used by
@@ -282,42 +297,46 @@ other languages.
 
 This source parses as the same list in the previous, braced example:
 
-    # The same list as above, but in naked format.
-        A sub-paragraph continues the list.
-    print
-        # elements on a single line with or without sub-paragraph are wrapped
-          in a list.
-        .. "Hello" "World"
+```scopes
+# The same list as above, but in naked format.
+    A sub-paragraph continues the list.
+print
+    # elements on a single line with or without sub-paragraph are wrapped
+        in a list.
+    .. "Hello" "World"
 
-        # values that should not be wrapped have to be prefixed with an
-          escape token which causes a continuation of the parent list
-        \ 303 606 909
+    # values that should not be wrapped have to be prefixed with an
+        escape token which causes a continuation of the parent list
+    \ 303 606 909
+```
 
 ### Mixing Modes ###
 
 Naked lists can contain braced lists, and braced lists can
 contain naked lists:
 
-    # compute the value of (1 + 2 + (3 * 4)) and print the result
-    (print
-        (+ 1 2
-            (3 * 4)))
+```scopes
+# compute the value of (1 + 2 + (3 * 4)) and print the result
+(print
+    (+ 1 2
+        (3 * 4)))
 
-    # the same list in naked notation.
-      indented lists are appended to the parent list:
-    print
-        + 1 2
-            3 * 4
+# the same list in naked notation.
+    indented lists are appended to the parent list:
+print
+    + 1 2
+        3 * 4
 
-    # any part of a naked list can be braced
-    print
-        + 1 2 (3 * 4)
+# any part of a naked list can be braced
+print
+    + 1 2 (3 * 4)
 
-    # and a braced list can contain naked parts.
-      the escape character \ enters naked mode at its indentation level.
-    print
-        (+ 1 2
-            \ 3 * 4) # parsed as (+ 1 2 (3 * 4))
+# and a braced list can contain naked parts.
+    the escape character \ enters naked mode at its indentation level.
+print
+    (+ 1 2
+        \ 3 * 4) # parsed as (+ 1 2 (3 * 4))
+```
 
 Naked notation is strongly encouraged as it is more convenient for authors
 without specialized editors to write and balancing parentheses can be
@@ -334,13 +353,15 @@ square `[]` brace styles. They are merely meant for providing variety for
 writing SLN-based formats, and are expanded to simple lists during parsing.
 Some examples:
 
-    [a b c d]
-    # expands to
-    (\[\] a b c d)
+```scopes
+[a b c d]
+# expands to
+(\[\] a b c d)
 
-    {1 2 3 4}
-    # expands to
-    (\{\} 1 2 3 4)
+{1 2 3 4}
+# expands to
+(\{\} 1 2 3 4)
+```
 
 List Separators
 ---------------
@@ -355,24 +376,27 @@ mode by starting the head of the block with `;`.
 
 Here are some examples:
 
-    # in braced notation
-    (print a; print (a;b;); print c;)
-    # parses as
-    ((print a) (print ((a) (b))) (print c))
+```scopes
+# in braced notation
+(print a; print (a;b;); print c;)
+# parses as
+((print a) (print ((a) (b))) (print c))
 
-    # in naked notation
+# in naked notation
+;
+    print a; print b
     ;
-        print a; print b
-        ;
-            print c; print d
-    # parses as
-    ((print a) (print b) ((print c) (print d)))
+        print c; print d
+# parses as
+((print a) (print b) ((print c) (print d)))
+```
 
 !!! warning
 
     If semicolons are used with braced notation then any trailing elements that
     are not terminated with `;` will not be wrapped:
 
+        :::scopes
         # in braced notation
         (print a; print (a;b;); print c)
         # parses as
@@ -392,27 +416,37 @@ wants to wrap them in a list.
 
 Here is a braced list describing an expression printing the number 42:
 
-    (print 42)
+```scopes
+(print 42)
+```
 
 The naked equivalent declares two elements in a single line, which are implicitly
 wrapped in a single list:
 
-    print 42
+```scopes
+print 42
+```
 
 A single element on its own line is not wrapped:
 
-    print           # (print
-        42          #        42)
+```scopes
+print           # (print
+    42          #        42)
+```
 
 What if we want to just print a newline, passing no arguments?:
 
-    print           # print
+```scopes
+print           # print
+```
 
 The statement above will be ignored because a symbol is resolved but not called.
 One can make use of the `;` (split-statement) control
 character, which ends the current list:
 
-    print;          # (print)
+```scopes
+print;          # (print)
+```
 
 ### Continuation Lines ###
 
@@ -422,118 +456,138 @@ column limit (typically 80 or 100).
 
 In braced lists, the problem is easily corrected:
 
-    # import many symbols from an external module into the active namespace
-    (import-from "OpenGL"
-        glBindBuffer GL_UNIFORM_BUFFER glClear GL_COLOR_BUFFER_BIT
-        GL_STENCIL_BUFFER_BIT GL_DEPTH_BUFFER_BIT glViewport glUseProgram
-        glDrawArrays glEnable glDisable GL_TRIANGLE_STRIP)
+```scopes
+# import many symbols from an external module into the active namespace
+(import-from "OpenGL"
+    glBindBuffer GL_UNIFORM_BUFFER glClear GL_COLOR_BUFFER_BIT
+    GL_STENCIL_BUFFER_BIT GL_DEPTH_BUFFER_BIT glViewport glUseProgram
+    glDrawArrays glEnable glDisable GL_TRIANGLE_STRIP)
+```
 
 The naked approach interprets each new line as a nested list:
 
-    # produces runtime errors
-    import-from "OpenGL"
-        glBindBuffer GL_UNIFORM_BUFFER glClear GL_COLOR_BUFFER_BIT
-        GL_STENCIL_BUFFER_BIT GL_DEPTH_BUFFER_BIT glViewport glUseProgram
-        glDrawArrays glEnable glDisable GL_TRIANGLE_STRIP
+```scopes
+# produces runtime errors
+import-from "OpenGL"
+    glBindBuffer GL_UNIFORM_BUFFER glClear GL_COLOR_BUFFER_BIT
+    GL_STENCIL_BUFFER_BIT GL_DEPTH_BUFFER_BIT glViewport glUseProgram
+    glDrawArrays glEnable glDisable GL_TRIANGLE_STRIP
 
-    # braced equivalent of the term above; each line is interpreted
-    # as a function call and fails.
-    (import-from "OpenGL"
-        (glBindBuffer GL_UNIFORM_BUFFER glClear GL_COLOR_BUFFER_BIT)
-        (GL_STENCIL_BUFFER_BIT GL_DEPTH_BUFFER_BIT glViewport glUseProgram)
-        (glDrawArrays glEnable glDisable GL_TRIANGLE_STRIP))
+# braced equivalent of the term above; each line is interpreted
+# as a function call and fails.
+(import-from "OpenGL"
+    (glBindBuffer GL_UNIFORM_BUFFER glClear GL_COLOR_BUFFER_BIT)
+    (GL_STENCIL_BUFFER_BIT GL_DEPTH_BUFFER_BIT glViewport glUseProgram)
+    (glDrawArrays glEnable glDisable GL_TRIANGLE_STRIP))
+```
 
 This can be fixed by using the `splice-line` control character, `\`:
 
-    # correct solution using splice-line, postfix-style
-    import-from "OpenGL" \
-        glBindBuffer GL_UNIFORM_BUFFER glClear GL_COLOR_BUFFER_BIT \
-        GL_STENCIL_BUFFER_BIT GL_DEPTH_BUFFER_BIT glViewport glUseProgram \
-        glDrawArrays glEnable glDisable GL_TRIANGLE_STRIP
+```scopes
+# correct solution using splice-line, postfix-style
+import-from "OpenGL" \
+    glBindBuffer GL_UNIFORM_BUFFER glClear GL_COLOR_BUFFER_BIT \
+    GL_STENCIL_BUFFER_BIT GL_DEPTH_BUFFER_BIT glViewport glUseProgram \
+    glDrawArrays glEnable glDisable GL_TRIANGLE_STRIP
+```
 
 Unlike in other languages, and as previously demonstrated, `\` splices at the
 token level rather than the character level, and can also be placed at the
 beginning of nested lines, where the parent is still the active list:
 
-    # correct solution using the splice-line control character '\', prefix-style
-    import-from "OpenGL"
-        \ glBindBuffer GL_UNIFORM_BUFFER glClear GL_COLOR_BUFFER_BIT
-        \ GL_STENCIL_BUFFER_BIT GL_DEPTH_BUFFER_BIT glViewport glUseProgram
-        \ glDrawArrays glEnable glDisable GL_TRIANGLE_STRIP
+```scopes
+# correct solution using the splice-line control character '\', prefix-style
+import-from "OpenGL"
+    \ glBindBuffer GL_UNIFORM_BUFFER glClear GL_COLOR_BUFFER_BIT
+    \ GL_STENCIL_BUFFER_BIT GL_DEPTH_BUFFER_BIT glViewport glUseProgram
+    \ glDrawArrays glEnable glDisable GL_TRIANGLE_STRIP
+```
 
 ### Tail Splicing ###
 
 Naked notation is ideal for writing nested lists that accumulate at the tail:
 
-    # braced
-    (a b c
-        (d e f
-            (g h i))
-        (j k l))
+```scopes
+# braced
+(a b c
+    (d e f
+        (g h i))
+    (j k l))
 
-    # naked
-    a b c
-        d e f
-            g h i
-        j k l
+# naked
+a b c
+    d e f
+        g h i
+    j k l
+```
 
 However, there are complications when additional elements need to be spliced
 back into the parent list:
 
-    (a b c
-        (d e f
-            (g h i))
-        j k l)
+```scopes
+(a b c
+    (d e f
+        (g h i))
+    j k l)
+```
 
 Once again, we can reuse the splice-line control character `\` to get what we
 want:
 
-    a b c
-        d e f
-            g h i
-        \ j k l
+```scopes
+a b c
+    d e f
+        g h i
+    \ j k l
+```
 
 ### Left-Hand Nesting ###
 
 When using infix notation, conditional blocks, or functions producing functions,
 lists occur that nest at the head level rather than the tail:
 
-    ((((a b)
-        c d)
-            e f)
-                g h)
+```scopes
+((((a b)
+    c d)
+        e f)
+            g h)
+```
 
 The equivalent naked mode version makes extensive use of list separator and
 splice-line characters to describe the same tree:
 
-    # equivalent structure
+```scopes
+# equivalent structure
+;
     ;
         ;
-            ;
-                a b
-                \ c d
-            \ e f
-        \ g h
+            a b
+            \ c d
+        \ e f
+    \ g h
+```
 
 A more complex tree which also requires splicing elements back into the parent
 list can be implemented with the same combination of list separator and
 splice-line characters:
 
-    # braced
-    (a
-        ((b
-            (c d)) e)
-        f g
-        (h i))
+```scopes
+# braced
+(a
+    ((b
+        (c d)) e)
+    f g
+    (h i))
 
-    # naked
-    a
-        ;
-            b
-                c d
-            \ e
-        \ f g
-        h i
+# naked
+a
+    ;
+        b
+            c d
+        \ e
+    \ f g
+    h i
+```
 
 While this example demonstrates the versatility of the splice-line and list
 separator characters, use of partially braced notation may be easier to

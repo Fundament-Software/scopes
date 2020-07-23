@@ -339,10 +339,12 @@ typedef+ StringBase
 
     To construct a new fixed string type:
 
+        :::scopes
         FixedString element-type capacity
 
     Instantiate a new string with mutable memory:
 
+        :::scopes
         local new-string : (FixedString element-type capacity)
 typedef+ FixedString
     let parent-type = this-type
@@ -418,10 +420,12 @@ let DEFAULT_CAPACITY = (1:usize << 2:usize)
 
     To construct a new growing string type:
 
+        :::scopes
         GrowingString element-type
 
     Instantiate a new string with mutable memory:
 
+        :::scopes
         local new-string : (GrowingString element-type) [(capacity = ...)]
 typedef+ GrowingString
     let parent-type = this-type

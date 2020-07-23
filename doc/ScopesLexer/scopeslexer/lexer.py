@@ -113,7 +113,7 @@ class ScopesLexer(Lexer):
             return state.next_cursor - state.next_line + 1
 
         def location_error(msg):
-            print text
+            print(text)
             raise Exception("%i:%i: error: %s" % (state.lineno,column(),msg))
 
         def is_eof():

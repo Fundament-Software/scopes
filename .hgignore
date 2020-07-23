@@ -28,6 +28,7 @@ syntax: regexp
 ^testing/(_)?test\.wasm$
 ^scopes[.]h$
 ^doc/site
+^doc/site-packages
 ^bin/
 ^src/known_symbols.hpp
 ^Makefile$

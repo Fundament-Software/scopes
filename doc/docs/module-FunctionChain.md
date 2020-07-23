@@ -8,6 +8,7 @@ a module to call back into dependent modules in a decoupled way.
 
 See following example:
 
+    :::scopes
     using import FunctionChain
 
     # declare new function chain
@@ -34,6 +35,7 @@ See following example:
 
 Running this program will output:
 
+    :::text
     first handler activated with argument 1
     handler activated with argument 1
     last handler activated with argument 1

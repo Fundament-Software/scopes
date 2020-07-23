@@ -11,6 +11,7 @@
 
     See following example:
 
+        :::scopes
         using import FunctionChain
 
         # declare new function chain
@@ -37,6 +38,7 @@
 
     Running this program will output:
 
+        :::text
         first handler activated with argument 1
         handler activated with argument 1
         last handler activated with argument 1
@@ -44,7 +46,6 @@
         handler activated with argument 2
         last handler activated with argument 2
         handler activated with argument 3
-
 typedef FunctionChain : (storageof type)
     inline __repr (self)
         repr (bitcast self type)

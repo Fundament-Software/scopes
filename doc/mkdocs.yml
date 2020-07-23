@@ -22,8 +22,10 @@ nav:
         - "struct": module-struct.md
         - "testing": module-testing.md
         - "UTF-8": module-UTF-8.md
-theme: readthedocs
-extra_css: [extra.css]
+theme:
+    name: readthedocs
+    highlightjs: false
+extra_css: [extra.css, pygments.css]
 markdown_extensions:
     - admonition:
     - attr_list:

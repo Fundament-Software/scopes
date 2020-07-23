@@ -103,14 +103,16 @@ only parses programs as symbolic lists and postpones the interpretation of
 declarations until the last possible moment, expecting all expressions to follow
 just one basic form:
 
-    # classic braced expression
-    (head argument1 ... argumentN)
-    # naked syntax
-    head argument1 ... argumentN
-    # naked paragraph form
-    head argument1 ...
-        ...
-        argumentN
+```scopes
+# classic braced expression
+(head argument1 ... argumentN)
+# naked syntax
+head argument1 ... argumentN
+# naked paragraph form
+head argument1 ...
+    ...
+    argumentN
+```
 
 The value and type of the head controls whether the expression is dispatched to:
 
@@ -199,22 +201,24 @@ Scopes does not make such a distinction, and instead treats every declaration
 as an expression with a result type. The top level of a program is equivalent
 to its main function:
 
-    # the right hand side is not limited to constant expressions.
-    let MyInt = int
+```scopes
+# the right hand side is not limited to constant expressions.
+let MyInt = int
 
-    # legal at this level.
-    print "hello!"
+# legal at this level.
+print "hello!"
 
-    fn test (x)
-        let k = (x * x)
+fn test (x)
+    let k = (x * x)
 
-        let m =
-            do
-                # equivalent to statement expressions in GCC.
-                print "hello again!"
-                k * k
-        # even `return` declares an expression of type `noreturn`.
-        return m
+    let m =
+        do
+            # equivalent to statement expressions in GCC.
+            print "hello again!"
+            k * k
+    # even `return` declares an expression of type `noreturn`.
+    return m
+```
 
 Constants and Variables
 -----------------------
@@ -253,42 +257,46 @@ expression or value to a name. The type of the value and where it is stored
 depends entirely on the expression that produces it. The `local` and `global`
 forms must be used to explicitly allocate a stack or data segment value:
 
-    # a compile time constant integer
-    let constant = 100
+```scopes
+# a compile time constant integer
+let constant = 100
 
-    # not a global value, but allocated on the main function's stack
-    local variable1 = 0
-    # a global value mapped to data segment
-    global variable2 = 0
+# not a global value, but allocated on the main function's stack
+local variable1 = 0
+# a global value mapped to data segment
+global variable2 = 0
 
-    # variable1 is bound to another name - not a copy operation.
-      variable1_copy remains mutable.
-    let variable1_copy = variable1
+# variable1 is bound to another name - not a copy operation.
+    variable1_copy remains mutable.
+let variable1_copy = variable1
 
-    fn test ()
-        # just a rebind - not a copy operation
-        let variable3 = constant
-        # variable3 is not a reference, so can not be mutated.
-          we should have declared it as local for that.
-        # variable3 = variable2
+fn test ()
+    # just a rebind - not a copy operation
+    let variable3 = constant
+    # variable3 is not a reference, so can not be mutated.
+        we should have declared it as local for that.
+    # variable3 = variable2
 
-        print constant
-        # illegal: variable1 is a stack variable outside of function scope
-        # print variable1
-        # legal: variable2 is a global
-        print variable2
-        # variable3 is a constant
-        print variable3
+    print constant
+    # illegal: variable1 is a stack variable outside of function scope
+    # print variable1
+    # legal: variable2 is a global
+    print variable2
+    # variable3 is a constant
+    print variable3
+```
 
 Unlike in C/C++, declarations of the same name within the same scope are
 permitted, and the previous binding is still accessible during evaluation
 of the right-hand side:
 
-    let x = 1
-    # x is now bound to the value 3
-    let x = (x + 2)
-    # x is now bound to a string
-    let x = "test"
+```scopes
+let x = 1
+# x is now bound to the value 3
+let x = (x + 2)
+# x is now bound to a string
+let x = "test"
+```
 
 Lexical Scope
 -------------
@@ -298,18 +306,20 @@ Both C/C++ and Scopes employ lexical scope to control visibility of bound names.
 Unlike in C/C++, lexical scope is a first order object in Scopes and can be used
 by new declarative forms as well as to export symbols from modules:
 
-    let scope =
-        do
-            let x = 1
-            let y = "test"
+```scopes
+let scope =
+    do
+        let x = 1
+        let y = "test"
 
-            # build a new scope from locally bound names
-            locals;
+        # build a new scope from locally bound names
+        locals;
 
-    # scope is constant if all values in it are constant
-    static-assert (constant? scope)
-    # prints 1 "test"
-    print scope.x scope.y
+# scope is constant if all values in it are constant
+static-assert (constant? scope)
+# prints 1 "test"
+print scope.x scope.y
+```
 
 Macros
 ------
@@ -384,39 +394,41 @@ In Scopes, all function declarations are lazily typed, and `static-typify` can
 be used to instantiate concrete functions at compile time. Forward declarations
 are possible but must be completed within the same scope:
 
-    # forward declarations can not be typed
-    #fn typed_forward_decl
+```scopes
+# forward declarations can not be typed
+#fn typed_forward_decl
 
-    fn typed_decl (x text toggle)
-        return 0
+fn typed_decl (x text toggle)
+    return 0
 
-    # create typed function
-    let typed_decl = (static-typify typed_decl i32 rawstring bool)
+# create typed function
+let typed_decl = (static-typify typed_decl i32 rawstring bool)
 
-    # forward declaration of template has no parameter list
-    fn lazy_typed_decl_returns_void
+# forward declaration of template has no parameter list
+fn lazy_typed_decl_returns_void
 
-    # test1 is another template
-    fn test1 ()
-        # legal because test1 is not instantiated yet
-        # note: lazy_typed_decl_returns_void must be implemented before
-                test1 is instantiated.
-        lazy_typed_decl_returns_void 1 2 3
+# test1 is another template
+fn test1 ()
+    # legal because test1 is not instantiated yet
+    # note: lazy_typed_decl_returns_void must be implemented before
+            test1 is instantiated.
+    lazy_typed_decl_returns_void 1 2 3
 
-    # forward declaration of template with auto return type
-      note that all our forward declarations have no return type
-    fn lazy_typed_decl_returns_auto
+# forward declaration of template with auto return type
+    note that all our forward declarations have no return type
+fn lazy_typed_decl_returns_auto
 
-    fn test2 ()
-        # legal because test2 is not instantiated yet
-        lazy_typed_decl_returns_auto 1 2 3
+fn test2 ()
+    # legal because test2 is not instantiated yet
+    lazy_typed_decl_returns_auto 1 2 3
 
-    # implementation of template with auto return type
-    fn lazy_typed_decl_returns_auto (a b c)
-        return 0
+# implementation of template with auto return type
+fn lazy_typed_decl_returns_auto (a b c)
+    return 0
 
-    # instantiate test2
-    let test2 = (static-typify test2)
+# instantiate test2
+let test2 = (static-typify test2)
+```
 
 Variadic Arguments
 ------------------
@@ -431,29 +443,31 @@ Functions in Scopes do not support runtime variadic functions (although calling
 variadic C functions is supported), but support compile time variadic arguments.
 See the following example:
 
-    # any trailing parameter ending in '...' is interpreted to be variadic.
-    fn takes-varargs (x y rest...)
-        # count the number of arguments in rest...
-        let numargs = (va-countof rest...)
+```scopes
+# any trailing parameter ending in '...' is interpreted to be variadic.
+fn takes-varargs (x y rest...)
+    # count the number of arguments in rest...
+    let numargs = (va-countof rest...)
 
-        # use let's support for variadic values to split arguments into
-          first argument and remainder.
-        let z rest... = rest...
+    # use let's support for variadic values to split arguments into
+        first argument and remainder.
+    let z rest... = rest...
 
-        # get the 5th argument from rest...
-        let fifth_arg = (va@ 5 rest...)
+    # get the 5th argument from rest...
+    let fifth_arg = (va@ 5 rest...)
 
-        # iterate through all arguments, perform an action on each one
-          and store the result in a new variadic value.
-        let processed... =
-            va-map
-                inline (value)
-                    print value
-                    value + 1
-                rest...
+    # iterate through all arguments, perform an action on each one
+        and store the result in a new variadic value.
+    let processed... =
+        va-map
+            inline (value)
+                print value
+                value + 1
+            rest...
 
-        # return variadic result as multiple return values
-        return processed...
+    # return variadic result as multiple return values
+    return processed...
+```
 
 Overloading
 -----------
@@ -475,21 +489,23 @@ Scopes offers a similar mechanism as a library form, but requires that
 overloads are grouped at the time of declaration. The first form that
 matches argument types implicitly is selected, in order of declaration:
 
-    fn... overloaded
-    case (a : i32, b : i32)
-        return 0
-    case (a : i32, b : f32)
-        return 1
-    case (a : f32, b : i32)
-        return 2
+```scopes
+fn... overloaded
+case (a : i32, b : i32)
+    return 0
+case (a : i32, b : f32)
+    return 1
+case (a : f32, b : i32)
+    return 2
 
-    # expanding overloaded in a different file, limited to local scope
+# expanding overloaded in a different file, limited to local scope
 
-    # overwrites the previous declaration
-    fn... overloaded
-    case using overloaded # chains the previous declaration
-    case (a : f32, b : f32) # will be tried last
-        return 3
+# overwrites the previous declaration
+fn... overloaded
+case using overloaded # chains the previous declaration
+case (a : f32, b : f32) # will be tried last
+    return 3
+```
 
 Code Generation
 ---------------
@@ -538,39 +554,43 @@ libraries' or module's functions are actually used.
 Scopes also supports embedding existing third party C libraries in the classical
 way, using `include`, `load-library` and `load-object`:
 
-    # how to create trivial bindings for a C library
+```scopes
+# how to create trivial bindings for a C library
 
-    # include thirdparty.h and make its declarations available as a scope object
-    let thirdparty =
-        include "thirdparty.h"
-            options "-I" (module-dir .. "/../include") # specify options for clang
+# include thirdparty.h and make its declarations available as a scope object
+let thirdparty =
+    include "thirdparty.h"
+        options "-I" (module-dir .. "/../include") # specify options for clang
 
-    # access a define from thirdparty.h
-    if thirdparty.define.USE_SHARED_LIBRARY
-        # load thirdparty as a shared library from system search paths
-        if (operating-system == 'windows)
-            load-library "thirdparty.dll"
-        else
-            load-library "libthirdparty.so"
+# access a define from thirdparty.h
+if thirdparty.define.USE_SHARED_LIBRARY
+    # load thirdparty as a shared library from system search paths
+    if (operating-system == 'windows)
+        load-library "thirdparty.dll"
     else
-        # load thirdparty as a static library from an object file
-        load-object (module-dir .. "/../lib/thirdparty.o")
+        load-library "libthirdparty.so"
+else
+    # load thirdparty as a static library from an object file
+    load-object (module-dir .. "/../lib/thirdparty.o")
 
-    # assemble a ready-to-use scope object for this module
-    do
-        # import only symbols beginning with thirdparty
-        using thirdparty.define filter "^THIRDPARTY_.*$"
-        using thirdparty.typedef filter "^thirdparty_.*$"
-        using thirdparty.const filter "^thirdparty_.*$"
-        using thirdparty.extern filter "^thirdparty_.*$"
+# assemble a ready-to-use scope object for this module
+do
+    # import only symbols beginning with thirdparty
+    using thirdparty.define filter "^THIRDPARTY_.*$"
+    using thirdparty.typedef filter "^thirdparty_.*$"
+    using thirdparty.const filter "^thirdparty_.*$"
+    using thirdparty.extern filter "^thirdparty_.*$"
 
-        locals;
+    locals;
+```
 
 Externals using C signatures can also be defined and used directly:
 
-    let puts = (extern 'puts (function i32 rawstring))
-    # definition becomes immediately available
-    puts "hello\n"
+```scopes
+let puts = (extern 'puts (function i32 rawstring))
+# definition becomes immediately available
+puts "hello\n"
+```
 
 Type Primitives
 ---------------
@@ -639,17 +659,19 @@ Example example = { .value = 100, .text = "test" };
 
 to this equivalent declaration in Scopes:
 
-    using import struct
+```scopes
+using import struct
 
-    struct Example plain
-        value : i32
-        # type can be deduced from initializer
-        choice = false
-        text : rawstring = ""
+struct Example plain
+    value : i32
+    # type can be deduced from initializer
+    choice = false
+    text : rawstring = ""
 
-    global example : Example
-        value = 100
-        text = "test"
+global example : Example
+    value = 100
+    text = "test"
+```
 
 Methods
 -------
@@ -683,18 +705,20 @@ void use_example (Example example) {
 Scopes supports methods in a more explicit way that makes refactorings from
 function to method and back easier, both in declaration and in usage:
 
-    struct Example plain
-        value : i32
+```scopes
+struct Example plain
+    value : i32
 
-        # note the explicit presence of the object parameter
-        fn get_add_value (self n)
-            self.value + n
+    # note the explicit presence of the object parameter
+    fn get_add_value (self n)
+        self.value + n
 
-        fn print_value_plus_one (self)
-            print ('get_add_value self 1)
+    fn print_value_plus_one (self)
+        print ('get_add_value self 1)
 
-    fn use_example (example)
-        'print_value_plus_one example
+fn use_example (example)
+    'print_value_plus_one example
+```
 
 What happens here is that we call a quoted symbol with arguments. The call
 handler for the `Symbol` type rewrites `'methodname object arg0 ... argN`
@@ -715,26 +739,28 @@ Access modifiers are not available, but methods can be made "private" by keeping
 their definition local. Fields can not be hidden, but they can be visibly
 marked as private by convention:
 
-    struct Example plain
-        # an underscore indicates that the attribute is not meant to be
-          accessed directly.
-        _value : i32
+```scopes
+struct Example plain
+    # an underscore indicates that the attribute is not meant to be
+        accessed directly.
+    _value : i32
 
-        fn get_add_value (self n)
-            self._value + n
+    fn get_add_value (self n)
+        self._value + n
 
-        fn print_value_plus_one (self)
-            # use get_add_value directly
-            print (get_add_value self 1)
+    fn print_value_plus_one (self)
+        # use get_add_value directly
+        print (get_add_value self 1)
 
-        # unbind get_add_value from local scope to prevent it
-          from being added as an attribute to Example.
-        unlet get_add_value
+    # unbind get_add_value from local scope to prevent it
+        from being added as an attribute to Example.
+    unlet get_add_value
 
-    fn use_example (example)
-        # this operation is not possible from here:
-        # 'get_add_value example 1
-        'print_value_plus_one example
+fn use_example (example)
+    # this operation is not possible from here:
+    # 'get_add_value example 1
+    'print_value_plus_one example
+```
 
 Template Classes
 ----------------
@@ -756,16 +782,18 @@ struct Example {
 Scopes leverages constant expression folding and compile time closures to
 trivially provide this feature via `inline` functions:
 
-    # a function decorator memoizes the result so we get the same type for
-      the same arguments
-    @@ memo
-    inline Example (T x)
-        # construct type name from string
-        struct ("Example<" .. (tostring T) .. ">")
-            value : T
+```scopes
+# a function decorator memoizes the result so we get the same type for
+    the same arguments
+@@ memo
+inline Example (T x)
+    # construct type name from string
+    struct ("Example<" .. (tostring T) .. ">")
+        value : T
 
-            fn compare ()
-                value == x
+        fn compare ()
+            value == x
+```
 
 Partial template specialization allows the choice of different implementations
 depending on instantiation arguments. The same mechanism is also used to do
@@ -796,29 +824,31 @@ In Scopes, it is not necessary to create types in order to build single
 type based dispatch operators. Here are three ways to supply the same
 functionality:
 
-    include "stdlib.h"
+```scopes
+include "stdlib.h"
 
-    # a function that generates a function
-    @@ memo
-    inline to_int1 (T)
-        static-match T
-        case i32 _
-        case rawstring atoi
-        default
-            static-error "unsupported type"
+# a function that generates a function
+@@ memo
+inline to_int1 (T)
+    static-match T
+    case i32 _
+    case rawstring atoi
+    default
+        static-error "unsupported type"
 
-    # a function that performs the operation directly
-    inline to_int2 (x)
-        let T = (typeof x)
-        static-if (T == i32) x
-        elseif (T == rawstring) (atoi x)
-        else
-            static-error "unsupported type"
+# a function that performs the operation directly
+inline to_int2 (x)
+    let T = (typeof x)
+    static-if (T == i32) x
+    elseif (T == rawstring) (atoi x)
+    else
+        static-error "unsupported type"
 
-    # using the overloaded function abstraction
-    fn... to_int3
-    case (x : i32,) x
-    case (x : rawstring,) (atoi x)
+# using the overloaded function abstraction
+fn... to_int3
+case (x : i32,) x
+case (x : rawstring,) (atoi x)
+```
 
 Constructors
 ------------
@@ -830,15 +860,17 @@ first argument is the name of the type that has been called.
 
 Here is an example that changes the default constructor of a struct:
 
-    struct Example plain
-        _value : i32
+```scopes
+struct Example plain
+    _value : i32
 
-        inline __typecall (cls n)
-            # within the context of a struct definition, super-type is bound
-              to the super type of the struct we are defining. In this case
-              the supertype is `CStruct`.
-            super-type.__typecall cls
-                _value = (n * n)
+    inline __typecall (cls n)
+        # within the context of a struct definition, super-type is bound
+            to the super type of the struct we are defining. In this case
+            the supertype is `CStruct`.
+        super-type.__typecall cls
+            _value = (n * n)
+```
 
 Destructors
 -----------
@@ -870,19 +902,20 @@ referenced only at a single point within a program. Because of this guarantee,
 a unique type is able to supply a destructor through the `__drop` special method
 that is automatically called when the value goes out of scope:
 
-    struct Handle
-        _handle : voidstar
+```scopes
+struct Handle
+    _handle : voidstar
 
-        # constructor
-        inline __typecall (cls handle)
-            super-type.__typecall cls handle
+    # constructor
+    inline __typecall (cls handle)
+        super-type.__typecall cls handle
 
-        # destructor
-        inline __drop (self)
-            print "destroying handle"
-            free self._handle
-            return;
-
+    # destructor
+    inline __drop (self)
+        print "destroying handle"
+        free self._handle
+        return;
+```
 
 Operator Overloading
 --------------------
@@ -918,31 +951,33 @@ protocols that any type can support by exposing dispatch methods bound to
 special attributes. See this equivalent example, which applies not only to
 structs, but any type definition:
 
-    struct Accumulable
-        # one compile time function for all left-hand side variants receives
-          left-hand and right-hand types and returns a function which can
-          perform the operation or void.
-        inline __+ (cls T)
-            # test for type + type
-            static-if (T == this-type)
-                # return new closure
-                inline (self other)
-                    this-type (self.value + other.value)
-            # if T can be implicitly cast to i32, support it
-            elseif (imply? T i32)
-                inline (self other)
-                    this-type (self.value + other)
+```scopes
+struct Accumulable
+    # one compile time function for all left-hand side variants receives
+        left-hand and right-hand types and returns a function which can
+        perform the operation or void.
+    inline __+ (cls T)
+        # test for type + type
+        static-if (T == this-type)
+            # return new closure
+            inline (self other)
+                this-type (self.value + other.value)
+        # if T can be implicitly cast to i32, support it
+        elseif (imply? T i32)
+            inline (self other)
+                this-type (self.value + other)
 
-        # another function covers all right-hand side variants
-        inline __r+ (T cls)
-            static-if (imply? T i32)
-                inline (self other)
-                    this-type (self + other.value)
+    # another function covers all right-hand side variants
+    inline __r+ (T cls)
+        static-if (imply? T i32)
+            inline (self other)
+                this-type (self + other.value)
 
-        value : i32
+    value : i32
 
-        inline __repr (self)
-            tostring self.value
+    inline __repr (self)
+        tostring self.value
+```
 
 Standard Library
 ----------------
@@ -1032,20 +1067,22 @@ Scopes supports compile time closures natively, as demonstrated previously, but
 runtime closures are also supported through so-called captures. The example
 above would be translated as follows:
 
-    fn print_bound_constant ()
-        let y = 42
-        # capture constant `y` along with the function
-        fn f (x)
-            x + y
-        # prints 65
-        print (f 23)
+```scopes
+fn print_bound_constant ()
+    let y = 42
+    # capture constant `y` along with the function
+    fn f (x)
+        x + y
+    # prints 65
+    print (f 23)
 
-    fn print_bound_value (y)
-        # capture variable `y` along with the function
-        capture f (x) {y}
-            x + y
-        # prints 65
-        print (f 23)
+fn print_bound_value (y)
+    # capture variable `y` along with the function
+    capture f (x) {y}
+        x + y
+    # prints 65
+    print (f 23)
+```
 
 Loops
 -----
@@ -1083,28 +1120,30 @@ Scopes defines a single builtin primitive for loops which leverages
 backpropagation of immutable values, upon which various other library forms are
 implemented:
 
-    # implementing a counter using the range-based form
-    for i in (range 10)
-        print i
+```scopes
+# implementing a counter using the range-based form
+for i in (range 10)
+    print i
 
-    # implementing an iterator using the loop primitive and immutable values
-    loop (it k = (first container) 0)
-        if (is_valid it)
-            process k (at it)
-            repeat (next it) (k + 1)
-        else
-            # break can return values
-            break it k
+# implementing an iterator using the loop primitive and immutable values
+loop (it k = (first container) 0)
+    if (is_valid it)
+        process k (at it)
+        repeat (next it) (k + 1)
+    else
+        # break can return values
+        break it k
 
-    # implementing a counter using a while loop and mutation
-    local i = 0
-    while (i < 10)
-        print i
-        i += 1
+# implementing a counter using a while loop and mutation
+local i = 0
+while (i < 10)
+    print i
+    i += 1
 
-    # range-based form implementing an iterator
-    for key value in map
-        process key value
+# range-based form implementing an iterator
+for key value in map
+    process key value
+```
 
 In addition, with the `fold .. for .. in` form, Scopes combines both immutable
 loop and range-based form.
@@ -1126,17 +1165,19 @@ implement native GLSL types and functions.
 
 See the following example implementing and compiling a pixel shader:
 
-    using import glm
-    using import glsl
+```scopes
+using import glm
+using import glsl
 
-    in uv : vec2 (location = 0)
-    out color : vec4 (location = 1)
-    fn main ()
-        color = (vec4 (uv * 0.5 + 0.5) 0 1)
+in uv : vec2 (location = 0)
+out color : vec4 (location = 1)
+fn main ()
+    color = (vec4 (uv * 0.5 + 0.5) 0 1)
 
-    print
-        compile-glsl 330 'fragment
-            static-typify main
+print
+    compile-glsl 330 'fragment
+        static-typify main
+```
 
 The program output is as follows:
 
@@ -1175,37 +1216,39 @@ can be thrown as an exception using the `throw` keyword, and caught using
 the `try .. catch` form.
 
 ```c++
-    struct myexception {
-        const char *what;
-    };
+struct myexception {
+    const char *what;
+};
 
-    void main () {
-        try {
-            // throw value of type myexception
-            myexception exc = { "an error occurred" };
-            throw exc;
-        } catch (myexception& e) {
-            // print content to screen
-            std::cout << e.what << std::endl;
-        }
+void main () {
+    try {
+        // throw value of type myexception
+        myexception exc = { "an error occurred" };
+        throw exc;
+    } catch (myexception& e) {
+        // print content to screen
+        std::cout << e.what << std::endl;
     }
+}
 ```
 
 Scopes supports a form of structured exception handling that is monomorphic,
 light-weight and C compatible. A value of any type can be raised using the
 `raise` form, and handled using the `try .. except` form:
 
-    using import struct
+```scopes
+using import struct
 
-    struct myexception
-        what : string
+struct myexception
+    what : string
 
-    try
-        # raise value of type myexception
-        raise (myexception "an error occurred")
-    except (e)
-        # print content to screen
-        print e.what
+try
+    # raise value of type myexception
+    raise (myexception "an error occurred")
+except (e)
+    # print content to screen
+    print e.what
+```
 
 The presence of an exception modifies the return type of a function to a hidden
 tagged union type which returns which path the function returned on, and
