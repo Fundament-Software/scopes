@@ -1,1 +1,1 @@
-./ScopesLexer
+./doc/ScopesLexer
