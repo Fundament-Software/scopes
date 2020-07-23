@@ -1,5 +1,5 @@
 site_name: Scopes
-nav:
+pages:
     - "Scopes":
         - "About Scopes": about.md
         - "Getting Started": intro.md
