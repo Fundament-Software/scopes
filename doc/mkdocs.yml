@@ -1,4 +1,5 @@
 site_name: Scopes
+docs_dir: docs
 nav:
     - "Scopes":
         - "About Scopes": about.md
