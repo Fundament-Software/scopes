@@ -15,7 +15,7 @@ using import spicetools
 # generators
 #---------------------------------------------------------------------------
 
-""""for each element in generator a, repeat generator b and return both states
+""""For each element in generator a, repeat generator b and return both states.
 inline span (a b)
     let start-a valid-a at-a next-a = ((a as Generator))
     let start-b valid-b at-b next-b = ((b as Generator))
@@ -60,7 +60,7 @@ spice unpack-bitdim (n size...)
         _ `(expr >> S)
     sc_argument_list_new acount values
 
-""""a branchless generator that iterates multidimensional coordinates
+""""A branchless generator that iterates multidimensional coordinates.
 @@ spice-quote
 inline dim (x n...)
     let T = (typeof x)
@@ -73,8 +73,8 @@ inline dim (x n...)
         inline (n) (unpack-dim n x n...)
         inline (n) (n + _1)
 
-""""a variant of dim optimized for power of two sizes; the dimensions are
-    specified as exponents of 2
+""""A variant of dim optimized for power of two sizes; the dimensions are
+    specified as exponents of 2.
 @@ spice-quote
 inline bitdim (x n...)
     let T = (typeof x)
@@ -95,7 +95,7 @@ inline imap (gen f)
         next
 
 inline ipair (gen N)
-    """"generate one variadic argument from N generated arguments
+    """"Generate one variadic argument from N generated arguments.
     let N =
         static-if (none? N) 2
         else N
@@ -144,8 +144,8 @@ inline ipair (gen N)
                         inline () (next it...)
                     range...
 
-""""when generator a is exhausted, continue with generator b
-    both generators must yield the same value type
+""""When generator a is exhausted, continue with generator b;
+    both generators must yield the same value type.
 inline join (a b)
     let start-a valid-a at-a next-a = ((a as Generator))
     let start-b valid-b at-b next-b = ((b as Generator))
@@ -182,12 +182,14 @@ define span (spice-macro (fn (args) (rtl-multiop args `span 2)))
 define join (spice-macro (fn (args) (rtl-multiop args `join 2)))
 
 # based on https://en.wikipedia.org/wiki/Heap%27s_algorithm
-""""Return a generator that iterates all permutations of the range from 0
-    to `n`, where `n` must be smaller than 256, and returns a vector of
-    `element-type` for each iteration. If `element-type` is omitted, the
-    default element type will be i32.
+""""*inline*{.property} `permutate-range`{.descname} (*&ensp;n element-type&ensp;*)[](#scopes.inline.permutate-range "Permalink to this definition"){.headerlink} {#scopes.inline.permutate-range}
 
-    The generator will perform `n!` iterations to complete.
+    :   Return a generator that iterates all permutations of the range from 0
+        to `n`, where `n` must be smaller than 256, and returns a vector of
+        `element-type` for each iteration. If `element-type` is omitted, the
+        default element type will be i32.
+
+        The generator will perform `n!` iterations to complete.
 @@ memo
 inline permutate-range (n element-type)
     static-assert (n < 256) "permutation vector too large"
@@ -236,7 +238,7 @@ inline permutate-range (n element-type)
 #---------------------------------------------------------------------------
 
 inline collect (coll)
-    """"run collector until full and return the result
+    """"Run collector until full and return the result.
     let start valid? at collect = ((coll as Collector))
     let start... = (start)
     loop (state... = start...)
@@ -246,7 +248,7 @@ inline collect (coll)
             break (at state...)
 
 inline each (generator collector)
-    """"fold output from generator into collector
+    """"Fold output from generator into collector.
     inline _each (collector)
         let c-init c-valid? c-at c-collect = ((collector as Collector))
         let g-start g-valid? g-at g-next = ((generator as Generator))
@@ -303,7 +305,7 @@ spice compose (collector...)
             collector...
 
 inline cat (coll)
-    """"treat input as a generator and forward its arguments individually
+    """"Treat input as a generator and forward its arguments individually.
     inline _cat (coll)
         let init valid? at collect = ((coll as Collector))
         Collector init valid? at
@@ -327,7 +329,7 @@ inline ->> (generator collector...)
                 collector...
 
 inline flatten (coll)
-    """"collect variadic input as individual single items
+    """"Collect variadic input as individual single items.
     inline _flatten (coll)
         let init valid? at collect = ((coll as Collector))
         Collector init valid? at
@@ -384,9 +386,9 @@ inline limit (f coll)
     else (_limit coll)
 
 inline gate (f a b)
-    """"if f is true, collect input in a, otherwise collect in b
-        when both are full, output both
-        until then, new input for full containers is discarded
+    """"If f is true, collect input in a, otherwise collect in b. When both are
+        full, output both. Until both are full, new input for full containers
+        is discarded.
     inline _gate (b)
         let a-init a-valid? a-at a-collect = ((a as Collector))
         let b-init b-valid? b-at b-collect = ((b as Collector))
@@ -438,7 +440,7 @@ inline filter (f coll)
     else (_filter coll)
 
 inline take (n coll)
-    """"limit collector to output n items
+    """"Limit collector to output n items.
     inline _take (coll)
         let init valid? at collect = ((coll as Collector))
         Collector
@@ -488,9 +490,10 @@ inline cascade1 (a b)
     else (_cascade b)
 
 inline cascade (collector...)
-    """"two collectors:
-        every time a is full, b collects a and a is reset
-        when b ends, the remainder of a is collected
+    """"Two collectors:
+
+        - Every time a is full, b collects a and a is reset.
+        - When b ends, the remainder of a is collected.
     inline (coll)
         cascade1
             va-rfold none
@@ -502,7 +505,7 @@ inline cascade (collector...)
             coll
 
 inline mux1 (c1 c2 coll)
-    """"send input into two collectors which fork the target collector
+    """"Send input into two collectors which fork the target collector.
     inline _mux (coll)
         let c1 = (c1 coll)
         let c2 = (c2 coll)
@@ -534,7 +537,7 @@ inline mux1 (c1 c2 coll)
     else (_mux coll)
 
 inline mux (collector...)
-    """"send input into multiple collectors which each fork the target collector
+    """"Send input into multiple collectors which each fork the target collector.
     let c1 c2 c... = collector...
     static-if (none? c2) c1
     else
@@ -544,8 +547,8 @@ inline mux (collector...)
             c...
 
 inline demux (init-value f collector...)
+    """"A reducing sink for mux streams.
     let muxed = (mux collector...)
-    """"a reducing sink for mux streams
     inline _demux (coll)
         local reduced = init-value
         let sink =
@@ -586,7 +589,7 @@ inline retain1 (mapl child coll)
     let mapl =
         static-if (none? mapl) (inline (...) ...)
         else mapl
-    """"output both child input and child output
+    """"Output both child input and child output.
     inline _retain1 (coll)
         let ch = (child coll)
         let init1 valid1? at1 collect1 = ((ch as Collector))
@@ -606,10 +609,10 @@ inline retain1 (mapl child coll)
     static-if (none? coll) _retain1
     else (_retain1 coll)
 
-""""feeds the input through a composition of collectors and feeds the
-    input along with the composition output to the next collector.
-    if mapl is not none, it allows to specify the portion of the input that
-    will be passed to the end point.
+""""Feeds the input through a composition of collectors and feeds the input
+    along with the composition output to the next collector. If mapl is not
+    none, it allows specifying the portion of the input that will be passed
+    to the end point.
 @@ spice-quote
 inline retain (mapl ...)
     retain1 mapl (compose ...)

@@ -6,27 +6,38 @@ echo "generating core..." \
     && ./build_reference.sc Box 8 > ./docs/module-Box.md \
     && echo "generating Capture..." \
     && ./build_reference.sc Capture 9 > ./docs/module-Capture.md \
+    && echo "generating Chaining..." \
+    && ./build_reference.sc chaining 10 > ./docs/module-Chaining.md \
     && echo "generating console..." \
-    && ./build_reference.sc console 10 > ./docs/module-console.md \
+    && ./build_reference.sc console 11 > ./docs/module-console.md \
     && echo "generating enum..." \
-    && ./build_reference.sc enum 11 > ./docs/module-enum.md \
+    && ./build_reference.sc enum 12 > ./docs/module-enum.md \
     && echo "generating FunctionChain..." \
-    && ./build_reference.sc FunctionChain 12 > ./docs/module-FunctionChain.md \
+    && ./build_reference.sc FunctionChain 13 > ./docs/module-FunctionChain.md \
     && echo "generating glm..." \
-    && ./build_reference.sc glm 13 > ./docs/module-glm.md \
+    && ./build_reference.sc glm 14 > ./docs/module-glm.md \
     && echo "generating glsl..." \
-    && ./build_reference.sc glsl 14 > ./docs/module-glsl.md \
+    && ./build_reference.sc glsl 15 > ./docs/module-glsl.md \
     && echo "generating itertools..." \
-    && ./build_reference.sc itertools 15 > ./docs/module-itertools.md \
+    && ./build_reference.sc itertools 16 > ./docs/module-itertools.md \
     && echo "generating Map..." \
-    && ./build_reference.sc Map 16 > ./docs/module-Map.md \
+    && ./build_reference.sc Map 17 > ./docs/module-Map.md \
+    && echo "generating Option..." \
+    && ./build_reference.sc Option 18 > ./docs/module-Option.md \
+    && echo "generating property..." \
+    && ./build_reference.sc property 19 > ./docs/module-property.md \
+    && echo "generating Rc..." \
+    && ./build_reference.sc Rc 20 > ./docs/module-Rc.md \
+    && echo "generating Set..." \
+    && ./build_reference.sc Set 21 > ./docs/module-Set.md \
     && echo "generating spicetools..." \
-    && ./build_reference.sc spicetools 17 > ./docs/module-spicetools.md \
+    && ./build_reference.sc spicetools 22 > ./docs/module-spicetools.md \
+    && echo "generating String..." \
+    && ./build_reference.sc String 23 > ./docs/module-String.md \
     && echo "generating struct..." \
-    && ./build_reference.sc struct 18 > ./docs/module-struct.md \
+    && ./build_reference.sc struct 24 > ./docs/module-struct.md \
     && echo "generating testing..." \
-    && ./build_reference.sc testing 19 > ./docs/module-testing.md \
+    && ./build_reference.sc testing 25 > ./docs/module-testing.md \
     && echo "generating UTF-8..." \
-    && ./build_reference.sc UTF-8 20 > ./docs/module-UTF-8.md \
+    && ./build_reference.sc UTF-8 26 > ./docs/module-UTF-8.md \
     && make clean && make html
-

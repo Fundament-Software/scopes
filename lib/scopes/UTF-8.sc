@@ -7,7 +7,7 @@
     =====
 
     This module provides UTF-8 encoder and decoder collectors, as well as
-    an UTF-8 aware `char` function.
+    a UTF-8 aware `char` function.
 
 using import enum
 
@@ -26,7 +26,7 @@ inline ctlz-u32 (c)
     llvm.ctlz.u32 c false
 
 inline encoder (coll)
-    """"convert an integer codepoint to i8 bytes.
+    """"Convert an integer codepoint to i8 bytes;
         the collector forwards a byte at a time.
     inline _encoder (coll)
         let init full? done push = ((coll as Collector))
@@ -71,8 +71,8 @@ inline encoder (coll)
 let BYTE_STEP = (1:u32 << 30:u32)
 let BYTE_MASK = (BYTE_STEP | (BYTE_STEP << 1:u32))
 inline decoder (coll)
-    """"convert a i8 character stream as UTF-8 codepoints of type i32.
-        invalid bytes are forwarded as negative numbers; negating the number
+    """"Convert an i8 character stream as UTF-8 codepoints of type i32.
+        Invalid bytes are forwarded as negative numbers; negating the number
         yields the offending byte character.
     inline _decoder (coll)
         let init full? done push = ((coll as Collector))

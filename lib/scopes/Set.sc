@@ -83,7 +83,7 @@ typedef Set < Struct
         ((self._valid @ ofs) & flag) == flag
 
     fn terseness (self)
-        """"computes the hashmap load as a normal between 0.0 and 1.0
+        """"Computes the hashmap load as a normal between 0.0 and 1.0.
         self._count / (self._mask + 1:u64)
 
     fn... insert_entry (self, key, keyhash, mask = none)
@@ -148,8 +148,8 @@ typedef Set < Struct
         result
 
     inline lookup (self key keyhash successf failf mask)
-        """"finds the index and address of an entry associated with key or
-            invokes label failf on failure
+        """"Finds the index and address of an entry associated with key or
+            invokes label failf on failure.
         let hash = ((typeof self) . HashFunction)
         let mask =
             static-if (none? mask) (deref self._mask)
@@ -239,7 +239,7 @@ typedef Set < Struct
         return;
 
     fn insert (self key)
-        """"inserts a new key into set
+        """"Inserts a new key into set.
         let hash = ((typeof self) . HashFunction)
         let keyhash = ((hash key) as u64)
         lookup self key keyhash
@@ -272,7 +272,8 @@ typedef Set < Struct
                 in? self (imply key KeyType)
 
     fn getdefault (self key value)
-        """"returns the value associated with key or raises an error
+        """"Returns the value associated with key or value if the map does not
+            contain the key.
         let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx)
@@ -281,7 +282,7 @@ typedef Set < Struct
                 return (view value)
 
     fn get (self key)
-        """"returns the value associated with key or raises an error
+        """"Returns the value associated with key or raises an error.
         let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx)
@@ -290,8 +291,8 @@ typedef Set < Struct
                 raise (MapError.KeyNotFound)
 
     fn discard (self key)
-        """"erases a key -> value association from the map; if the map
-            does not contain this key, nothing happens.
+        """"Erases a key -> value association from the map; if the map does not
+            contain this key, nothing happens.
         let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx)
@@ -320,7 +321,7 @@ typedef Set < Struct
             next
 
     fn pop (self)
-        """"discards an arbitrary key from the set and returns the discarded key
+        """"Discards an arbitrary key from the set and returns the discarded key.
         let init valid? at next = ((set-generator self))
         let it = (init)
         assert (valid? it)

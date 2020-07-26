@@ -1,4 +1,4 @@
-<style type="text/css" rel="stylesheet">body { counter-reset: chapter 15; }</style>
+<style type="text/css" rel="stylesheet">body { counter-reset: chapter 16; }</style>
 
 itertools
 =========
@@ -16,34 +16,35 @@ generators and collectors.
 
 *inline*{.property} `bitdim`{.descname} (*&ensp;x n...&ensp;*)[](#scopes.inline.bitdim "Permalink to this definition"){.headerlink} {#scopes.inline.bitdim}
 
-:   a variant of dim optimized for power of two sizes; the dimensions are
-    specified as exponents of 2
+:   A variant of dim optimized for power of two sizes; the dimensions are
+    specified as exponents of 2.
 
 *inline*{.property} `cascade`{.descname} (*&ensp;collector...&ensp;*)[](#scopes.inline.cascade "Permalink to this definition"){.headerlink} {#scopes.inline.cascade}
 
-:   two collectors:
-    every time a is full, b collects a and a is reset
-    when b ends, the remainder of a is collected
+:   Two collectors:
+    
+    - Every time a is full, b collects a and a is reset.
+    - When b ends, the remainder of a is collected.
 
 *inline*{.property} `cat`{.descname} (*&ensp;coll&ensp;*)[](#scopes.inline.cat "Permalink to this definition"){.headerlink} {#scopes.inline.cat}
 
-:   treat input as a generator and forward its arguments individually
+:   Treat input as a generator and forward its arguments individually.
 
 *inline*{.property} `collect`{.descname} (*&ensp;coll&ensp;*)[](#scopes.inline.collect "Permalink to this definition"){.headerlink} {#scopes.inline.collect}
 
-:   run collector until full and return the result
+:   Run collector until full and return the result.
 
 *inline*{.property} `demux`{.descname} (*&ensp;init-value f collector...&ensp;*)[](#scopes.inline.demux "Permalink to this definition"){.headerlink} {#scopes.inline.demux}
 
-:   
+:   A reducing sink for mux streams.
 
 *inline*{.property} `dim`{.descname} (*&ensp;x n...&ensp;*)[](#scopes.inline.dim "Permalink to this definition"){.headerlink} {#scopes.inline.dim}
 
-:   a branchless generator that iterates multidimensional coordinates
+:   A branchless generator that iterates multidimensional coordinates.
 
 *inline*{.property} `each`{.descname} (*&ensp;generator collector&ensp;*)[](#scopes.inline.each "Permalink to this definition"){.headerlink} {#scopes.inline.each}
 
-:   fold output from generator into collector
+:   Fold output from generator into collector.
 
 *inline*{.property} `filter`{.descname} (*&ensp;f coll&ensp;*)[](#scopes.inline.filter "Permalink to this definition"){.headerlink} {#scopes.inline.filter}
 
@@ -51,13 +52,13 @@ generators and collectors.
 
 *inline*{.property} `flatten`{.descname} (*&ensp;coll&ensp;*)[](#scopes.inline.flatten "Permalink to this definition"){.headerlink} {#scopes.inline.flatten}
 
-:   collect variadic input as individual single items
+:   Collect variadic input as individual single items.
 
 *inline*{.property} `gate`{.descname} (*&ensp;f a b&ensp;*)[](#scopes.inline.gate "Permalink to this definition"){.headerlink} {#scopes.inline.gate}
 
-:   if f is true, collect input in a, otherwise collect in b
-    when both are full, output both
-    until then, new input for full containers is discarded
+:   If f is true, collect input in a, otherwise collect in b. When both are
+    full, output both. Until both are full, new input for full containers
+    is discarded.
 
 *inline*{.property} `imap`{.descname} (*&ensp;gen f&ensp;*)[](#scopes.inline.imap "Permalink to this definition"){.headerlink} {#scopes.inline.imap}
 
@@ -65,7 +66,7 @@ generators and collectors.
 
 *inline*{.property} `ipair`{.descname} (*&ensp;gen N&ensp;*)[](#scopes.inline.ipair "Permalink to this definition"){.headerlink} {#scopes.inline.ipair}
 
-:   generate one variadic argument from N generated arguments
+:   Generate one variadic argument from N generated arguments.
 
 *inline*{.property} `limit`{.descname} (*&ensp;f coll&ensp;*)[](#scopes.inline.limit "Permalink to this definition"){.headerlink} {#scopes.inline.limit}
 
@@ -77,15 +78,15 @@ generators and collectors.
 
 *inline*{.property} `mux`{.descname} (*&ensp;collector...&ensp;*)[](#scopes.inline.mux "Permalink to this definition"){.headerlink} {#scopes.inline.mux}
 
-:   send input into multiple collectors which each fork the target collector
+:   Send input into multiple collectors which each fork the target collector.
 
-*inline*{.property} `permutate-range`{.descname} (*&ensp;...&ensp;*)[](#scopes.inline.permutate-range "Permalink to this definition"){.headerlink} {#scopes.inline.permutate-range}
+*inline*{.property} `permutate-range`{.descname} (*&ensp;n element-type&ensp;*)[](#scopes.inline.permutate-range "Permalink to this definition"){.headerlink} {#scopes.inline.permutate-range}
 
 :   Return a generator that iterates all permutations of the range from 0
     to `n`, where `n` must be smaller than 256, and returns a vector of
     `element-type` for each iteration. If `element-type` is omitted, the
     default element type will be i32.
-    
+
     The generator will perform `n!` iterations to complete.
 
 *inline*{.property} `reduce`{.descname} (*&ensp;init f&ensp;*)[](#scopes.inline.reduce "Permalink to this definition"){.headerlink} {#scopes.inline.reduce}
@@ -94,14 +95,14 @@ generators and collectors.
 
 *inline*{.property} `retain`{.descname} (*&ensp;mapl ...&ensp;*)[](#scopes.inline.retain "Permalink to this definition"){.headerlink} {#scopes.inline.retain}
 
-:   feeds the input through a composition of collectors and feeds the
-    input along with the composition output to the next collector.
-    if mapl is not none, it allows to specify the portion of the input that
-    will be passed to the end point.
+:   Feeds the input through a composition of collectors and feeds the input
+    along with the composition output to the next collector. If mapl is not
+    none, it allows specifying the portion of the input that will be passed
+    to the end point.
 
 *inline*{.property} `take`{.descname} (*&ensp;n coll&ensp;*)[](#scopes.inline.take "Permalink to this definition"){.headerlink} {#scopes.inline.take}
 
-:   limit collector to output n items
+:   Limit collector to output n items.
 
 *spice*{.property} `compose`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.compose "Permalink to this definition"){.headerlink} {#scopes.spice.compose}
 

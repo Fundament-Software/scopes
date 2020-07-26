@@ -12,6 +12,7 @@ nav:
         - "Array": module-Array.md
         - "Box": module-Box.md
         - "Capture": module-Capture.md
+        - "chaining": module-chaining.md
         - "console": module-console.md
         - "enum": module-enum.md
         - "FunctionChain": module-FunctionChain.md
@@ -19,7 +20,12 @@ nav:
         - "glsl": module-glsl.md
         - "itertools": module-itertools.md
         - "Map": module-Map.md
+        - "Option": module-Option.md
+        - "property": module-property.md
+        - "Rc": module-Rc.md
+        - "Set": module-Set.md
         - "spicetools": module-spicetools.md
+        - "String": module-String.md
         - "struct": module-struct.md
         - "testing": module-testing.md
         - "UTF-8": module-UTF-8.md

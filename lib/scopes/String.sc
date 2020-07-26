@@ -6,8 +6,8 @@
 """"String
     ======
 
-    Provides a string type that manages a mutable byte buffer of
-    varying size on the heap. Strings are guaranteed to be zero-terminated.
+    Provides a string type that manages a mutable byte buffer of varying size
+    on the heap. Strings are guaranteed to be zero-terminated.
 
 using import struct
 
@@ -415,7 +415,7 @@ typedef+ FixedString
 let DEFAULT_CAPACITY = (1:usize << 2:usize)
 
 """"The supertype and constructor for strings of growing size. New instances
-    have a default capacity of 4, and grow by factor 2.7 each time their
+    have a default capacity of 4, and grow by a factor of 2.7 each time their
     capacity is exceeded.
 
     To construct a new growing string type:

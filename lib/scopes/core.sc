@@ -24,7 +24,7 @@ let compiler-timestamp
 """"A boolean constant indicating if the compiler was built in debug mode.
 let debug-build?
 """"A string constant indicating the operating system the compiler was built
-    for. It equals to `"linux"` for Linux builds, `"windows"` for Windows
+    for. It is equal to `"linux"` for Linux builds, `"windows"` for Windows
     builds, `"macos"` for macOS builds and `"unknown"` otherwise.
 let operating-system
 """"A constant of type `i32` indicating the maximum number of recursions
@@ -43,7 +43,7 @@ let square-list = spice-unquote-arguments
 let intptr = u64
 
 inline swap (a b)
-    """"safely exchanges the contents of two references
+    """"Safely exchanges the contents of two references.
     let tmp = (deref (dupe b))
     assign (dupe a) b
     assign tmp a
@@ -79,7 +79,7 @@ fn error (msg)
     raise (sc_error_new msg)
 
 fn error@ (anchor traceback-msg error-msg)
-    """"usage example:
+    """"Usage example:
 
             :::scopes
             error@ ('anchor value) "while checking parameter" "error in value"
@@ -89,7 +89,7 @@ fn error@ (anchor traceback-msg error-msg)
     raise err
 
 fn error@+ (error anchor traceback-msg)
-    """"usage example:
+    """"Usage example:
 
             :::scopes
             except (err)
@@ -870,6 +870,7 @@ let
     type< = (spice-macro (type-comparison-func type<))
     type> = (spice-macro (type-comparison-func type>))
 
+""""The type of the `null` constant. This type is uninstantiable.
 let NullType = (sc_typename_type "NullType" typename)
 let Accessor = (sc_typename_type "Accessor" typename)
 sc_typename_type_set_storage Accessor (sc_type_storage Closure) typename-flag-plain
@@ -1230,11 +1231,10 @@ sc_typename_type_set_opaque Struct
       previous state. The function may not be called for a state for which
       `valid?` has reported to be depleted.
 
-    It is allowed to call any of these functions multiple times with any valid
-    state, effectively restarting the Generator at an arbitrary point, as
-    Generators are not expected to have side effects. In controlled
-    circumstances a Generator may choose to be impure, but should be documented
-    accordingly.
+    Any of these functions may be called multiple times with any valid state,
+    effectively restarting the Generator at an arbitrary point, as Generators
+    are not expected to have side effects. In controlled circumstances a
+    Generator may choose to be impure, but should be documented accordingly.
 
     Here is a typical pattern for constructing a generator:
 
@@ -1311,7 +1311,7 @@ fn value-as (vT T expr)
             inline "Value-rimply" (self) `self
 
 inline spice-cast-macro (f)
-    """"to be used for __as, __ras, __imply and __rimply
+    """"To be used for __as, __ras, __imply and __rimply
         returns a callable converter (f value) that performs the cast or
         no arguments if the cast can not be performed.
     spice-macro
@@ -1324,9 +1324,9 @@ inline spice-cast-macro (f)
             f source-type target-type
 
 inline spice-converter-macro (f)
-    """"to be used for converter that need to do additional
-        dispatch, e.g. do something else when the value is a constant
-        returns a quote that performs the cast (f value T)
+    """"To be used for a converter that needs to do additional
+        dispatch (i.e. do something else when the value is a constant).
+        Returns a quote that performs the cast (f value T).
     spice-macro
         fn (args)
             raising Error
@@ -1575,8 +1575,8 @@ fn operator-valid? (value)
     ptrcmp!= ('typeof value) void
 
 fn cast-converter (symbol rsymbol vQT T)
-    """"for two given types, find a matching conversion function
-        this function only works inside a spice macro
+    """"For two given types, find a matching conversion function.
+        This function only works inside a spice macro.
     let vT = ('strip-qualifiers vQT)
     label next
         let f =
@@ -1654,7 +1654,7 @@ let as = (gen-cast-op as-converter "can't cast value of type ")
 #------------------------------------------------------------------------------
 
 fn unary-operator (symbol T)
-    """"for an operation performed on one variable argument type, find a
+    """"For an operation performed on one variable argument type, find a
         matching operator function. This function only works inside a spice
         macro.
     label next
@@ -1666,7 +1666,7 @@ fn unary-operator (symbol T)
     return (sc_empty_argument_list)
 
 fn binary-operator (symbol lhsT rhsT)
-    """"for an operation performed on two argument types, of which only
+    """"For an operation performed on two argument types, of which only
         the left type can provide a suitable candidate, find a matching
         operator function. This function only works inside a spice macro.
     label next
@@ -1678,7 +1678,7 @@ fn binary-operator (symbol lhsT rhsT)
     return (sc_empty_argument_list)
 
 fn binary-operator-r (rsymbol lhsT rhsT)
-    """"for an operation performed on two argument types, of which only
+    """"For an operation performed on two argument types, of which only
         the right type can provide a suitable candidate, find a matching
         operator function. This function only works inside a spice macro.
     label next
@@ -1690,7 +1690,7 @@ fn binary-operator-r (rsymbol lhsT rhsT)
     return (sc_empty_argument_list)
 
 fn balanced-binary-operator (symbol rsymbol lhsT rhsT lhs-static? rhs-static?)
-    """"for an operation performed on two argument types, of which either
+    """"For an operation performed on two argument types, of which either
         type can provide a suitable candidate, return a matching operator.
         This function only works inside a spice macro.
     # try the left type
@@ -1722,7 +1722,7 @@ fn balanced-binary-operator (symbol rsymbol lhsT rhsT lhs-static? rhs-static?)
 
 # right hand has same type as left hand
 fn balanced-lvalue-binary-operator (symbol lhsT rhsT rhs-static?)
-    """"for an operation performed on two argument types, of which only the
+    """"For an operation performed on two argument types, of which only the
         left type type can provide a suitable candidate, return a matching operator.
         This function only works inside a spice macro.
     # try the left type
@@ -1866,10 +1866,9 @@ inline unbalanced-binary-op-dispatch (symbol rtype friendly-op-name)
             unbalanced-binary-operation args symbol rtype friendly-op-name
 
 inline spice-binary-op-macro (f)
-    """"to be used for binary operators of which either type can
-        provide an operation. returns a callable operator (f lhs rhs) that
-        performs the operation or no arguments if the operation can not be
-        performed.
+    """"To be used for binary operators of which either type can provide an
+        operation. Returns a callable operator `(f lhs rhs)` that performs the
+        operation or no arguments if the operation can not be performed.
     spice-macro
         fn (args)
             raising Error
@@ -1880,7 +1879,7 @@ inline spice-binary-op-macro (f)
             f lhs-type rhs-type
 
 inline simple-binary-op (f)
-    """"for cases where the type only interacts with itself
+    """"For cases where the type only interacts with itself.
     spice-binary-op-macro
         inline (lhsT rhsT)
             if (ptrcmp== lhsT rhsT)
@@ -2261,7 +2260,6 @@ inline intdiv (a b)
 # null type
 #---------------------------------------------------------------------------
 
-""""The type of the `null` constant. This type is uninstantiable.
 'set-plain-storage NullType (pointer void)
 do
     inline null== (lhs rhs) (icmp== (ptrtoint rhs usize) 0:usize)
@@ -3684,11 +3682,12 @@ fn next-head? (next)
         to abort the loop early or skip ahead to the next element. The loop
         will always evaluate to no arguments.
 
-        For a loop form that permits you to maintain additional state and break
+        For a loop form that allows maintaining additional state and break
         with a value, see `fold`.
 
         Usage example:
 
+            :::scopes
             # print numbers from 0 to 9, skipping number 5
             for i in (range 100)
                 if (i == 10)
@@ -4530,8 +4529,9 @@ inline range (a b c)
         inline (x) (x + step)
 
 inline rrange (a b c)
-    """"same as range, but iterates range in reverse; arguments are passed
-        in the same format, so rrange can act as a drop-in replacement for range.
+    """"Same as `range`, but iterates range in reverse; arguments are passed
+        in the same format, so `rrange` can act as a drop-in replacement for
+        `range`.
     let num-type = (typeof a)
     let step =
         static-branch (none? c)
@@ -5524,8 +5524,9 @@ define sugar
 #-------------------------------------------------------------------------------
 
 fn uncomma (l)
-    """"uncomma list l, wrapping all comma separated symbols as new lists
-        example:
+    """"uncomma list l, wrapping all comma separated symbols as new lists.
+
+        Usage example:
 
             :::scopes
             (uncomma '(a , b c d , e f , g h)) -> '(a (b c d) (e f) (g h))
@@ -5811,7 +5812,7 @@ define va-split
                         'getarg args i
             `(_ (inline () largs) (inline () rargs))
 
-"""" filter all keyed values
+""""Filter all keyed values.
 define va-unnamed
     spice-macro
         fn "va-unnamed" (args)
@@ -5830,10 +5831,9 @@ inline va-join (a...)
     inline (b...)
         va-append-va (inline () b...) a...
 
-""""A `Generator` that iterates through all integer values starting
-    at 0. This generator does never terminate; when it exceeds the maximum
-    integer value, it overflows and continues with the minimum integer value
-    of that type.
+""""A `Generator` that iterates through all integer values starting at 0. This
+    generator never terminates; when it exceeds the maximum integer value, it
+    overflows and continues with the minimum integer value of that type.
 inline infinite-range (T)
     let T =
         static-branch (none? T)
@@ -6991,7 +6991,7 @@ sugar typedef+ (T body...)
         [('tag `body anchor)]
         this-type
 
-""""a type declaration syntax; when the name is a string, the type is declared
+""""A type declaration syntax; when the name is a string, the type is declared
     at runtime.
 sugar typedef (name body...)
     let declaration? = (('typeof name) == Symbol)
@@ -7891,7 +7891,7 @@ typedef MethodsAccessor
         :::scopes
         from (methodsof <object>) let method1 method2
 
-    now the imported methods are implicitly bound to `<object>` and can be
+    Now the imported methods are implicitly bound to `<object>` and can be
     called directly.
 spice methodsof (context)
     typedef BoundMethodsAccessor < MethodsAccessor

@@ -6,7 +6,7 @@
 """"Option
     ======
 
-    Provides a value type that can be undefined
+    Provides a value type that can be undefined.
 
 using import .enum
 

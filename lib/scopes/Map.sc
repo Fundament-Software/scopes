@@ -84,7 +84,7 @@ typedef Map < Struct
         ((self._valid @ ofs) & flag) == flag
 
     fn terseness (self)
-        """"computes the hashmap load as a normal between 0.0 and 1.0
+        """"Computes the hashmap load as a normal between 0.0 and 1.0.
         self._count / (self._mask + 1:u64)
 
     inline insert_entry (self key keyhash value mask)
@@ -153,8 +153,8 @@ typedef Map < Struct
         ;
 
     inline lookup (self key keyhash successf failf mask)
-        """"finds the index and address of an entry associated with key or
-            invokes label failf on failure
+        """"Finds the index and address of an entry associated with key or
+            invokes label failf on failure.
         let hash = ((typeof self) . HashFunction)
         let mask =
             static-if (none? mask) (deref self._mask)
@@ -254,7 +254,7 @@ typedef Map < Struct
         return;
 
     fn set (self key value)
-        """"inserts a new key -> value association into map; key can be the
+        """"Inserts a new key -> value association into map; key can be the
             output of any custom hash function. If the key already exists,
             it will be updated.
         let hash = ((typeof self) . HashFunction)
@@ -315,7 +315,7 @@ typedef Map < Struct
                 in? self (imply key KeyType)
 
     fn getdefault (self key value)
-        """"returns the value associated with key or raises an error
+        """"Returns the value associated with key or raises an error.
         let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx)
@@ -324,7 +324,7 @@ typedef Map < Struct
                 return (view value)
 
     fn get (self key)
-        """"returns the value associated with key or raises an error
+        """"Returns the value associated with key or raises an error.
         let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx)
@@ -333,8 +333,8 @@ typedef Map < Struct
                 raise (MapError.KeyNotFound)
 
     fn discard (self key)
-        """"erases a key -> value association from the map; if the map
-            does not contain this key, nothing happens.
+        """"Erases a key -> value association from the map; if the map does not
+            contain this key, nothing happens.
         let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx)

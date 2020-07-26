@@ -6,7 +6,7 @@
 """"property
     ========
 
-    Provides a property accessor for types
+    Provides a property accessor for types.
 
 typedef Property
 

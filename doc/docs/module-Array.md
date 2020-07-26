@@ -91,7 +91,7 @@ than in registers or the stack.
 
     *fn*{.property} `resize`{.descname} (*&ensp;self count args...&ensp;*)[](#scopes.Array.fn.resize "Permalink to this definition"){.headerlink} {#scopes.Array.fn.resize}
 
-    :   Resize the array to the specified count. Items are apppend or removed
+    :   Resize the array to the specified count. Items are appended or removed
         to meet the desired count.
 
     *inline*{.property} `reverse`{.descname} (*&ensp;self&ensp;*)[](#scopes.Array.inline.reverse "Permalink to this definition"){.headerlink} {#scopes.Array.inline.reverse}

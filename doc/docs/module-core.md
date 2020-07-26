@@ -180,7 +180,7 @@ parses the command-line and optionally enters the REPL.
 *define*{.property} `operating-system`{.descname} [](#scopes.define.operating-system "Permalink to this definition"){.headerlink} {#scopes.define.operating-system}
 
 :   A string constant indicating the operating system the compiler was built
-    for. It equals to `"linux"` for Linux builds, `"windows"` for Windows
+    for. It is equal to `"linux"` for Linux builds, `"windows"` for Windows
     builds, `"macos"` for macOS builds and `"unknown"` otherwise.
 
 *define*{.property} `pi`{.descname} [](#scopes.define.pi "Permalink to this definition"){.headerlink} {#scopes.define.pi}
@@ -880,11 +880,10 @@ parses the command-line and optionally enters the REPL.
       previous state. The function may not be called for a state for which
       `valid?` has reported to be depleted.
     
-    It is allowed to call any of these functions multiple times with any valid
-    state, effectively restarting the Generator at an arbitrary point, as
-    Generators are not expected to have side effects. In controlled
-    circumstances a Generator may choose to be impure, but should be documented
-    accordingly.
+    Any of these functions may be called multiple times with any valid state,
+    effectively restarting the Generator at an arbitrary point, as Generators
+    are not expected to have side effects. In controlled circumstances a
+    Generator may choose to be impure, but should be documented accordingly.
     
     Here is a typical pattern for constructing a generator:
     
@@ -974,7 +973,7 @@ parses the command-line and optionally enters the REPL.
 
 *type*{.property} `NullType`{.descname} [](#scopes.type.NullType "Permalink to this definition"){.headerlink} {#scopes.type.NullType}
 
-:   A plain type of storage type `(opaque@ void)`.
+:   The type of the `null` constant. This type is uninstantiable.
 
     *spice*{.property} `__==`{.descname} (*&ensp;...&ensp;*)[](#scopes.NullType.spice.__== "Permalink to this definition"){.headerlink} {#scopes.NullType.spice.__==}
 
@@ -2616,7 +2615,7 @@ parses the command-line and optionally enters the REPL.
 
 *fn*{.property} `balanced-binary-operator`{.descname} (*&ensp;symbol rsymbol lhsT rhsT lhs-static? rhs-static?&ensp;*)[](#scopes.fn.balanced-binary-operator "Permalink to this definition"){.headerlink} {#scopes.fn.balanced-binary-operator}
 
-:   for an operation performed on two argument types, of which either
+:   For an operation performed on two argument types, of which either
     type can provide a suitable candidate, return a matching operator.
     This function only works inside a spice macro.
 
@@ -2630,7 +2629,7 @@ parses the command-line and optionally enters the REPL.
 
 *fn*{.property} `balanced-lvalue-binary-operator`{.descname} (*&ensp;symbol lhsT rhsT rhs-static?&ensp;*)[](#scopes.fn.balanced-lvalue-binary-operator "Permalink to this definition"){.headerlink} {#scopes.fn.balanced-lvalue-binary-operator}
 
-:   for an operation performed on two argument types, of which only the
+:   For an operation performed on two argument types, of which only the
     left type type can provide a suitable candidate, return a matching operator.
     This function only works inside a spice macro.
 
@@ -2644,13 +2643,13 @@ parses the command-line and optionally enters the REPL.
 
 *fn*{.property} `binary-operator`{.descname} (*&ensp;symbol lhsT rhsT&ensp;*)[](#scopes.fn.binary-operator "Permalink to this definition"){.headerlink} {#scopes.fn.binary-operator}
 
-:   for an operation performed on two argument types, of which only
+:   For an operation performed on two argument types, of which only
     the left type can provide a suitable candidate, find a matching
     operator function. This function only works inside a spice macro.
 
 *fn*{.property} `binary-operator-r`{.descname} (*&ensp;rsymbol lhsT rhsT&ensp;*)[](#scopes.fn.binary-operator-r "Permalink to this definition"){.headerlink} {#scopes.fn.binary-operator-r}
 
-:   for an operation performed on two argument types, of which only
+:   For an operation performed on two argument types, of which only
     the right type can provide a suitable candidate, find a matching
     operator function. This function only works inside a spice macro.
 
@@ -2676,8 +2675,8 @@ parses the command-line and optionally enters the REPL.
 
 *fn*{.property} `cast-converter`{.descname} (*&ensp;symbol rsymbol vQT T&ensp;*)[](#scopes.fn.cast-converter "Permalink to this definition"){.headerlink} {#scopes.fn.cast-converter}
 
-:   for two given types, find a matching conversion function
-    this function only works inside a spice macro
+:   For two given types, find a matching conversion function.
+    This function only works inside a spice macro.
 
 *inline*{.property} `cast-error`{.descname} (*&ensp;intro-string vT T&ensp;*)[](#scopes.inline.cast-error "Permalink to this definition"){.headerlink} {#scopes.inline.cast-error}
 
@@ -2762,14 +2761,14 @@ parses the command-line and optionally enters the REPL.
 
 *fn*{.property} `error@`{.descname} (*&ensp;anchor traceback-msg error-msg&ensp;*)[](#scopes.fn.error@ "Permalink to this definition"){.headerlink} {#scopes.fn.error@}
 
-:   usage example:
+:   Usage example:
     
         :::scopes
         error@ ('anchor value) "while checking parameter" "error in value"
 
 *fn*{.property} `error@+`{.descname} (*&ensp;error anchor traceback-msg&ensp;*)[](#scopes.fn.error@+ "Permalink to this definition"){.headerlink} {#scopes.fn.error@+}
 
-:   usage example:
+:   Usage example:
     
         :::scopes
         except (err)
@@ -2891,10 +2890,9 @@ parses the command-line and optionally enters the REPL.
 
 *inline*{.property} `infinite-range`{.descname} (*&ensp;T&ensp;*)[](#scopes.inline.infinite-range "Permalink to this definition"){.headerlink} {#scopes.inline.infinite-range}
 
-:   A `Generator` that iterates through all integer values starting
-    at 0. This generator does never terminate; when it exceeds the maximum
-    integer value, it overflows and continues with the minimum integer value
-    of that type.
+:   A `Generator` that iterates through all integer values starting at 0. This
+    generator never terminates; when it exceeds the maximum integer value, it
+    overflows and continues with the minimum integer value of that type.
 
 *inline*{.property} `infix-op`{.descname} (*&ensp;pred&ensp;*)[](#scopes.inline.infix-op "Permalink to this definition"){.headerlink} {#scopes.inline.infix-op}
 
@@ -3070,8 +3068,9 @@ parses the command-line and optionally enters the REPL.
 
 *inline*{.property} `rrange`{.descname} (*&ensp;a b c&ensp;*)[](#scopes.inline.rrange "Permalink to this definition"){.headerlink} {#scopes.inline.rrange}
 
-:   same as range, but iterates range in reverse; arguments are passed
-    in the same format, so rrange can act as a drop-in replacement for range.
+:   Same as `range`, but iterates range in reverse; arguments are passed
+    in the same format, so `rrange` can act as a drop-in replacement for
+    `range`.
 
 *fn*{.property} `rtl-infix-op-eq`{.descname} (*&ensp;infix-table token prec&ensp;*)[](#scopes.fn.rtl-infix-op-eq "Permalink to this definition"){.headerlink} {#scopes.fn.rtl-infix-op-eq}
 
@@ -3115,7 +3114,7 @@ parses the command-line and optionally enters the REPL.
 
 *inline*{.property} `simple-binary-op`{.descname} (*&ensp;f&ensp;*)[](#scopes.inline.simple-binary-op "Permalink to this definition"){.headerlink} {#scopes.inline.simple-binary-op}
 
-:   for cases where the type only interacts with itself
+:   For cases where the type only interacts with itself.
 
 *inline*{.property} `simple-folding-autotype-binary-op`{.descname} (*&ensp;f unboxer&ensp;*)[](#scopes.inline.simple-folding-autotype-binary-op "Permalink to this definition"){.headerlink} {#scopes.inline.simple-folding-autotype-binary-op}
 
@@ -3143,22 +3142,21 @@ parses the command-line and optionally enters the REPL.
 
 *inline*{.property} `spice-binary-op-macro`{.descname} (*&ensp;f&ensp;*)[](#scopes.inline.spice-binary-op-macro "Permalink to this definition"){.headerlink} {#scopes.inline.spice-binary-op-macro}
 
-:   to be used for binary operators of which either type can
-    provide an operation. returns a callable operator (f lhs rhs) that
-    performs the operation or no arguments if the operation can not be
-    performed.
+:   To be used for binary operators of which either type can provide an
+    operation. Returns a callable operator `(f lhs rhs)` that performs the
+    operation or no arguments if the operation can not be performed.
 
 *inline*{.property} `spice-cast-macro`{.descname} (*&ensp;f&ensp;*)[](#scopes.inline.spice-cast-macro "Permalink to this definition"){.headerlink} {#scopes.inline.spice-cast-macro}
 
-:   to be used for __as, __ras, __imply and __rimply
+:   To be used for __as, __ras, __imply and __rimply
     returns a callable converter (f value) that performs the cast or
     no arguments if the cast can not be performed.
 
 *inline*{.property} `spice-converter-macro`{.descname} (*&ensp;f&ensp;*)[](#scopes.inline.spice-converter-macro "Permalink to this definition"){.headerlink} {#scopes.inline.spice-converter-macro}
 
-:   to be used for converter that need to do additional
-    dispatch, e.g. do something else when the value is a constant
-    returns a quote that performs the cast (f value T)
+:   To be used for a converter that needs to do additional
+    dispatch (i.e. do something else when the value is a constant).
+    Returns a quote that performs the cast (f value T).
 
 *inline*{.property} `spice-macro`{.descname} (*&ensp;l&ensp;*)[](#scopes.inline.spice-macro "Permalink to this definition"){.headerlink} {#scopes.inline.spice-macro}
 
@@ -3198,7 +3196,7 @@ parses the command-line and optionally enters the REPL.
 
 *inline*{.property} `swap`{.descname} (*&ensp;a b&ensp;*)[](#scopes.inline.swap "Permalink to this definition"){.headerlink} {#scopes.inline.swap}
 
-:   safely exchanges the contents of two references
+:   Safely exchanges the contents of two references.
 
 *inline*{.property} `type-comparison-func`{.descname} (*&ensp;f&ensp;*)[](#scopes.inline.type-comparison-func "Permalink to this definition"){.headerlink} {#scopes.inline.type-comparison-func}
 
@@ -3230,7 +3228,7 @@ parses the command-line and optionally enters the REPL.
 
 *fn*{.property} `unary-operator`{.descname} (*&ensp;symbol T&ensp;*)[](#scopes.fn.unary-operator "Permalink to this definition"){.headerlink} {#scopes.fn.unary-operator}
 
-:   for an operation performed on one variable argument type, find a
+:   For an operation performed on one variable argument type, find a
     matching operator function. This function only works inside a spice
     macro.
 
@@ -3280,8 +3278,9 @@ parses the command-line and optionally enters the REPL.
 
 *fn*{.property} `uncomma`{.descname} (*&ensp;l&ensp;*)[](#scopes.fn.uncomma "Permalink to this definition"){.headerlink} {#scopes.fn.uncomma}
 
-:   uncomma list l, wrapping all comma separated symbols as new lists
-    example:
+:   uncomma list l, wrapping all comma separated symbols as new lists.
+    
+    Usage example:
     
         :::scopes
         (uncomma '(a , b c d , e f , g h)) -> '(a (b c d) (e f) (g h))
@@ -3460,11 +3459,12 @@ parses the command-line and optionally enters the REPL.
     to abort the loop early or skip ahead to the next element. The loop
     will always evaluate to no arguments.
 
-    For a loop form that permits you to maintain additional state and break
+    For a loop form that allows maintaining additional state and break
     with a value, see `fold`.
 
     Usage example:
 
+        :::scopes
         # print numbers from 0 to 9, skipping number 5
         for i in (range 100)
             if (i == 10)
@@ -3564,7 +3564,7 @@ parses the command-line and optionally enters the REPL.
 
 *sugar*{.property} (`typedef`{.descname} *&ensp;...&ensp;*) [](#scopes.sugar.typedef "Permalink to this definition"){.headerlink} {#scopes.sugar.typedef}
 
-:   a type declaration syntax; when the name is a string, the type is declared
+:   A type declaration syntax; when the name is a string, the type is declared
     at runtime.
 
 *sugar*{.property} (`typedef+`{.descname} *&ensp;...&ensp;*) [](#scopes.sugar.typedef+ "Permalink to this definition"){.headerlink} {#scopes.sugar.typedef+}
@@ -4493,7 +4493,7 @@ parses the command-line and optionally enters the REPL.
 
 *spice*{.property} `and-branch`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.and-branch "Permalink to this definition"){.headerlink} {#scopes.spice.and-branch}
 
-:   The type of the `null` constant. This type is uninstantiable.
+:   
 
 *spice*{.property} `append-to-scope`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.append-to-scope "Permalink to this definition"){.headerlink} {#scopes.spice.append-to-scope}
 
@@ -4650,7 +4650,7 @@ parses the command-line and optionally enters the REPL.
         :::scopes
         from (methodsof <object>) let method1 method2
     
-    now the imported methods are implicitly bound to `<object>` and can be
+    Now the imported methods are implicitly bound to `<object>` and can be
     called directly.
 
 *spice*{.property} `min`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.min "Permalink to this definition"){.headerlink} {#scopes.spice.min}
@@ -4902,7 +4902,7 @@ parses the command-line and optionally enters the REPL.
 
 *spice*{.property} `va-unnamed`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.va-unnamed "Permalink to this definition"){.headerlink} {#scopes.spice.va-unnamed}
 
-:    filter all keyed values
+:   Filter all keyed values.
 
 *spice*{.property} `va@`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.va@ "Permalink to this definition"){.headerlink} {#scopes.spice.va@}
 

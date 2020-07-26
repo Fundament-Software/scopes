@@ -240,7 +240,7 @@ typedef+ Array
         self._count = 0:usize
         return;
 
-    """"Resize the array to the specified count. Items are apppend or removed
+    """"Resize the array to the specified count. Items are appended or removed
         to meet the desired count.
     fn resize (self count args...)
         let count = (count as usize)
@@ -271,10 +271,12 @@ typedef+ Array
 
     To construct a new fixed array type:
 
+        :::scopes
         FixedArray element-type capacity
 
     Instantiate a new array with mutable memory:
 
+        :::scopes
         local new-array : (FixedArray element-type capacity)
 typedef+ FixedArray
     let parent-type = this-type
@@ -336,7 +338,7 @@ typedef+ FixedArray
 let DEFAULT_CAPACITY = (1:usize << 2:usize)
 
 """"The supertype and constructor for arrays of growing size. New instances
-    have a default capacity of 4, and grow by factor 2.7 each time their
+    have a default capacity of 4, and grow by a factor of 2.7 each time their
     capacity is exceeded.
 
     To construct a new growing array type:

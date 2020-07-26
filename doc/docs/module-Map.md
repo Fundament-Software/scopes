@@ -1,4 +1,4 @@
-<style type="text/css" rel="stylesheet">body { counter-reset: chapter 16; }</style>
+<style type="text/css" rel="stylesheet">body { counter-reset: chapter 17; }</style>
 
 Map
 ===
@@ -39,8 +39,8 @@ This module implements a key -> value store using hashtables.
 
     *fn*{.property} `discard`{.descname} (*&ensp;self key&ensp;*)[](#scopes.Map.fn.discard "Permalink to this definition"){.headerlink} {#scopes.Map.fn.discard}
 
-    :   erases a key -> value association from the map; if the map
-        does not contain this key, nothing happens.
+    :   Erases a key -> value association from the map; if the map does not
+        contain this key, nothing happens.
 
     *fn*{.property} `dump`{.descname} (*&ensp;self&ensp;*)[](#scopes.Map.fn.dump "Permalink to this definition"){.headerlink} {#scopes.Map.fn.dump}
 
@@ -48,11 +48,11 @@ This module implements a key -> value store using hashtables.
 
     *fn*{.property} `get`{.descname} (*&ensp;self key&ensp;*)[](#scopes.Map.fn.get "Permalink to this definition"){.headerlink} {#scopes.Map.fn.get}
 
-    :   returns the value associated with key or raises an error
+    :   Returns the value associated with key or raises an error.
 
     *fn*{.property} `getdefault`{.descname} (*&ensp;self key value&ensp;*)[](#scopes.Map.fn.getdefault "Permalink to this definition"){.headerlink} {#scopes.Map.fn.getdefault}
 
-    :   returns the value associated with key or raises an error
+    :   Returns the value associated with key or raises an error.
 
     *fn*{.property} `in?`{.descname} (*&ensp;self key&ensp;*)[](#scopes.Map.fn.in? "Permalink to this definition"){.headerlink} {#scopes.Map.fn.in?}
 
@@ -60,13 +60,13 @@ This module implements a key -> value store using hashtables.
 
     *fn*{.property} `set`{.descname} (*&ensp;self key value&ensp;*)[](#scopes.Map.fn.set "Permalink to this definition"){.headerlink} {#scopes.Map.fn.set}
 
-    :   inserts a new key -> value association into map; key can be the
+    :   Inserts a new key -> value association into map; key can be the
         output of any custom hash function. If the key already exists,
         it will be updated.
 
     *fn*{.property} `terseness`{.descname} (*&ensp;self&ensp;*)[](#scopes.Map.fn.terseness "Permalink to this definition"){.headerlink} {#scopes.Map.fn.terseness}
 
-    :   computes the hashmap load as a normal between 0.0 and 1.0
+    :   Computes the hashmap load as a normal between 0.0 and 1.0.
 
 *type*{.property} `MapError`{.descname} [](#scopes.type.MapError "Permalink to this definition"){.headerlink} {#scopes.type.MapError}
 

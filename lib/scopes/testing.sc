@@ -167,7 +167,7 @@ sugar test-compiler-error (args...)
 
 """"A feature matrix that tests 2-d permutations
 
-    usage:
+    Usage:
 
         :::scopes
         features    B1  B2  B3 ...
@@ -176,7 +176,7 @@ sugar test-compiler-error (args...)
             A2      N   Y   N
             A3      Y   N   Q
 
-    will expand to:
+    Will expand to:
 
         :::scopes
         do
@@ -208,12 +208,13 @@ sugar features (args...)
 
 run-stage;
 
-""""this type is used for discovering leaks and double frees. It holds an integer
-    value as well as a pointer to a single reference on the heap which is 1 as
-    long as the object exists, otherwise 0. The refcount is leaked in
+""""This type is used for discovering leaks and double frees. It holds an
+    integer value as well as a pointer to a single reference on the heap which
+    is 1 as long as the object exists, otherwise 0. The refcount is leaked in
     order to not cause segfaults when a double free occurs.
 
-    In addition, a global refcounter is updated which can be checked for balance.
+    In addition, a global refcounter is updated which can be checked for
+    balance.
 typedef One :: (tuple i32 (mutable pointer i32))
     global _refcount = 0
 

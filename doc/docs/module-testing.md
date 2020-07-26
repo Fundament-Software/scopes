@@ -1,4 +1,4 @@
-<style type="text/css" rel="stylesheet">body { counter-reset: chapter 19; }</style>
+<style type="text/css" rel="stylesheet">body { counter-reset: chapter 25; }</style>
 
 testing
 =======
@@ -8,12 +8,13 @@ fashion.
 
 *type*{.property} `One`{.descname} [](#scopes.type.One "Permalink to this definition"){.headerlink} {#scopes.type.One}
 
-:   this type is used for discovering leaks and double frees. It holds an integer
-    value as well as a pointer to a single reference on the heap which is 1 as
-    long as the object exists, otherwise 0. The refcount is leaked in
+:   This type is used for discovering leaks and double frees. It holds an
+    integer value as well as a pointer to a single reference on the heap which
+    is 1 as long as the object exists, otherwise 0. The refcount is leaked in
     order to not cause segfaults when a double free occurs.
     
-    In addition, a global refcounter is updated which can be checked for balance.
+    In addition, a global refcounter is updated which can be checked for
+    balance.
 
     *inline*{.property} `__!=`{.descname} (*&ensp;cls T&ensp;*)[](#scopes.One.inline.__!= "Permalink to this definition"){.headerlink} {#scopes.One.inline.__!=}
 
@@ -75,7 +76,7 @@ fashion.
 
 :   A feature matrix that tests 2-d permutations
     
-    usage:
+    Usage:
     
         :::scopes
         features    B1  B2  B3 ...
@@ -84,7 +85,7 @@ fashion.
             A2      N   Y   N
             A3      Y   N   Q
     
-    will expand to:
+    Will expand to:
     
         :::scopes
         do

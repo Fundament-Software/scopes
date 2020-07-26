@@ -6,24 +6,26 @@
 """"chaining
     ========
 
-    chaining provides the `-->` operator, which allows to nest expressions
-    by chaining them in a sequence.
+    chaining provides the `-->` operator, which allows the nesting of
+    expressions by chaining them in a sequence.
 
 """"Expands a processing chain into nested expressions so that each expression
-    is passed as tailing argument to the following expression.
+    is passed as a tailing argument to the following expression.
 
     `__` can be used as a placeholder token to position the previous expression.
 
-    example:
+    Example:
 
+        :::scopes
         --> x
             f
             g
             h 2 __
             k
 
-    expands to:
+    Expands to:
 
+        :::scopes
         k
             h 2
                 g
