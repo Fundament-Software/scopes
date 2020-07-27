@@ -11,7 +11,7 @@ Features
 --------
 
 * A performant systems programming language that feels like a scripting language.
-* Aims to combine the **expressivity** of Scheme with the **convenience** of Python, Lua or Javascript and the **performance** of C.
+* Aims to combine the **expressiveness** of Scheme with the **convenience** of Python, Lua or Javascript and the **performance** of C.
 * Compile-time **resource management** using view propagation, an annotation-free variation of **borrow checking**.
 * A single codebase targets native 64-bit **Linux**, **Windows** and **macOS** as well as **SPIR-V** and **GLSL** shaders. Your math functions run on CPU and GPU without modification.
 * **Fully interoperable** with C libraries. Import and use C include files directly.
