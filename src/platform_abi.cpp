@@ -84,9 +84,12 @@ size_t abi_classify(const Type *T, ABIClass *classes) {
     sz = abi_windows_x64::classify(T, classes);
 #elif defined(__amd64__)
     sz = abi_x86_64::classify(T, classes);
+#elif defined(__aarch64__)
+    sz = abi_aarch64::classify(T, classes);
 #else
 #error unsupported platform ABI
 #endif
+
 #if 0
     if (sz) {
         StyledStream ss(std::cout);

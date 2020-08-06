@@ -285,6 +285,7 @@ struct LLVMIRGenerator {
     static LLVMTypeRef i16T;
     static LLVMTypeRef i32T;
     static LLVMTypeRef i64T;
+    static LLVMTypeRef i128T;
     static LLVMTypeRef f32T;
     static LLVMTypeRef f32x2T;
     static LLVMTypeRef f64T;
@@ -318,6 +319,7 @@ struct LLVMIRGenerator {
     LLVMMetadataRef debug_i16T;
     LLVMMetadataRef debug_i32T;
     LLVMMetadataRef debug_i64T;
+    LLVMMetadataRef debug_i128T;
     LLVMMetadataRef debug_f32T;
     LLVMMetadataRef debug_f32x2T;
     LLVMMetadataRef debug_f64T;
@@ -667,6 +669,7 @@ struct LLVMIRGenerator {
         i16T = LLVMInt16Type();
         i32T = LLVMInt32Type();
         i64T = LLVMInt64Type();
+        i128T = LLVMInt128Type();
         f32T = LLVMFloatType();
         f32x2T = LLVMVectorType(f32T, 2);
         f64T = LLVMDoubleType();
@@ -713,6 +716,9 @@ struct LLVMIRGenerator {
             } break;
             case ABI_CLASS_INTEGERSI8: {
                 types[i] = i8T; k++;
+            } break;
+            case ABI_CLASS_INTEGER128: {
+                types[i] = i128T; k++;
             } break;
             default: {
                 // do nothing
@@ -2900,6 +2906,7 @@ struct LLVMIRGenerator {
         debug_i16T = LLVMDIBuilderCreateBasicType(di_builder, "i16", 3, 16, DW_ATE_signed, LLVMDIFlagZero);
         debug_i32T = LLVMDIBuilderCreateBasicType(di_builder, "i32", 3, 32, DW_ATE_signed, LLVMDIFlagZero);
         debug_i64T = LLVMDIBuilderCreateBasicType(di_builder, "i64", 3, 64, DW_ATE_signed, LLVMDIFlagZero);
+        debug_i128T = LLVMDIBuilderCreateBasicType(di_builder, "i128", 4, 128, DW_ATE_signed, LLVMDIFlagZero);
         debug_f32T = LLVMDIBuilderCreateBasicType(di_builder, "f32", 3, 32, DW_ATE_float, LLVMDIFlagZero);
         debug_f32x2T = LLVMDIBuilderCreateVectorType(di_builder, 2, 0, debug_f32T, nullptr, 0); // FIXME: No idea how subscript works
         debug_f64T = LLVMDIBuilderCreateBasicType(di_builder, "f64", 3, 32, DW_ATE_float, LLVMDIFlagZero);
@@ -3108,6 +3115,7 @@ LLVMTypeRef LLVMIRGenerator::i8T = nullptr;
 LLVMTypeRef LLVMIRGenerator::i16T = nullptr;
 LLVMTypeRef LLVMIRGenerator::i32T = nullptr;
 LLVMTypeRef LLVMIRGenerator::i64T = nullptr;
+LLVMTypeRef LLVMIRGenerator::i128T = nullptr;
 LLVMTypeRef LLVMIRGenerator::f32T = nullptr;
 LLVMTypeRef LLVMIRGenerator::f32x2T = nullptr;
 LLVMTypeRef LLVMIRGenerator::f64T = nullptr;

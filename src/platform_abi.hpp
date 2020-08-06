@@ -23,9 +23,10 @@ struct Type;
     /* purpose registers. */ \
     T(INTEGER) \
     T(INTEGERSI) \
-    /* special types for windows, not used anywhere else */ \
+    /* extra types not used by x86-64 PS */ \
     T(INTEGERSI16) \
     T(INTEGERSI8) \
+    T(INTEGER128) \
     /* The class consists of types that fit into a vector register. */ \
     T(SSE) \
     T(SSESF) \
