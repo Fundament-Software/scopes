@@ -16,57 +16,6 @@
 
 namespace scopes { namespace abi_aarch64 {
 
-enum {
-    AARCH64_RET_VOID	= 0,
-    AARCH64_RET_INT64	= 1,
-    AARCH64_RET_INT128	= 2,
-
-    AARCH64_RET_UNUSED3	= 3,
-    AARCH64_RET_UNUSED4	= 4,
-    AARCH64_RET_UNUSED5	= 5,
-    AARCH64_RET_UNUSED6	= 6,
-    AARCH64_RET_UNUSED7	= 7,
-
-    // Note that FFI_TYPE_FLOAT == 2, _DOUBLE == 3, _LONGDOUBLE == 4,
-    // so _S4 through _Q1 are layed out as (TYPE * 4) + (4 - COUNT).
-    AARCH64_RET_S4		= 8,
-    AARCH64_RET_S3		= 9,
-    AARCH64_RET_S2		= 10,
-    AARCH64_RET_S1		= 11,
-
-    AARCH64_RET_D4		= 12,
-    AARCH64_RET_D3		= 13,
-    AARCH64_RET_D2		= 14,
-    AARCH64_RET_D1		= 15,
-
-    AARCH64_RET_Q4		= 16,
-    AARCH64_RET_Q3		= 17,
-    AARCH64_RET_Q2		= 18,
-    AARCH64_RET_Q1		= 19,
-
-    // Note that each of the sub-64-bit integers gets two entries.
-    AARCH64_RET_UINT8	= 20,
-    AARCH64_RET_UINT16	= 22,
-    AARCH64_RET_UINT32	= 24,
-
-    AARCH64_RET_SINT8	= 26,
-    AARCH64_RET_SINT16	= 28,
-    AARCH64_RET_SINT32	= 30,
-
-    AARCH64_RET_MASK	= 31,
-
-    AARCH64_RET_IN_MEM	= (1 << 5),
-    AARCH64_RET_NEED_COPY = (1 << 6),
-
-    AARCH64_FLAG_ARG_V_BIT	= 7,
-    AARCH64_FLAG_ARG_V	= (1 << AARCH64_FLAG_ARG_V_BIT),
-
-    N_X_ARG_REG		= 8,
-    N_V_ARG_REG		= 8,
-    CALL_CONTEXT_SIZE	= (N_V_ARG_REG * 16 + N_X_ARG_REG * 8),
-};
-
-#if 0
 // A subroutine of is_vfp_type.  Given a structure type, return the type
 // of the first non-structure element.  Recurse for structure elements.
 // Return NULL if the structure is in fact empty, i.e. no nested elements.
@@ -169,63 +118,54 @@ static int is_vfp_type (const Type *ty, const Type *&candidate) {
 
     return ele_count;
 }
-#endif
 
 size_t classify(const Type *T, ABIClass *classes) {
+    classes[0] = ABI_CLASS_NO_CLASS;
+    if (is_opaque(T))
+        return 1;
+    size_t sz = size_of(T).assert_ok();
+    if (sz > 16)
+        return 0;
     switch(T->kind()) {
     case TK_Integer:
-    case TK_Pointer: {
-        size_t size = size_of(T).assert_ok();
-        if (size <= 1) {
-            classes[0] = ABI_CLASS_INTEGERSI8;
-            return 1;
-        } else if (size <= 2) {
-            classes[0] = ABI_CLASS_INTEGERSI16;
-            return 1;
-        } else if (size <= 4) {
-            classes[0] = ABI_CLASS_INTEGERSI;
-            return 1;
-        } else if (size <= 8) {
-            classes[0] = ABI_CLASS_INTEGER;
-            return 1;
-        } else if (size <= 16) {
-            classes[0] = ABI_CLASS_INTEGER128;
-            return 1;
-        } else {
-            return 0;
-        }
-    } break;
-    case TK_Typename: {
-        if (is_opaque(T)) {
-            classes[0] = ABI_CLASS_NO_CLASS;
-            return 1;
-        } else {
-            return classify(storage_type(T).assert_ok(), classes);
-        }
-    } break;
+    case TK_Pointer:
     case TK_Real:
+    case TK_Typename:
     case TK_Vector:
+        return 1;
     case TK_Array:
     case TK_Matrix:
     case TK_Tuple: {
-        //const Type *ET = nullptr;
-        //int count = is_vfp_type(T, ET);
-        //if (!count) {
+        const Type *ET = nullptr;
+        int count = is_vfp_type(T, ET);
+        if (count) {
+            assert(ET->kind() == TK_Real);
+            assert((count >= 1) && (count <= 4));
+            if (ET == TYPE_F32) {
+                switch (count) {
+                case 1: classes[0] = ABI_CLASS_SSESF; return 1;
+                case 2: classes[0] = ABI_CLASS_FLOATx2; return 1;
+                case 3: classes[0] = ABI_CLASS_FLOATx3; return 1;
+                case 4: classes[0] = ABI_CLASS_FLOATx4; return 1;
+                default: break;
+                }
+            } else if (ET == TYPE_F64) {
+                switch (count) {
+                case 1: classes[0] = ABI_CLASS_SSEDF; return 1;
+                case 2: classes[0] = ABI_CLASS_DOUBLEx2; return 1;
+                default: break;
+                }
+            }
+        } else {
             size_t s = size_of(T).assert_ok();
-            if (s > 16) {
-                classes[0] = ABI_CLASS_NO_CLASS;
-                return 1;
-            } else if (s == 16) {
-                classes[0] = ABI_CLASS_INTEGER128;
-                return 1;
-            } else if (s == 8) {
-                classes[0] = ABI_CLASS_INTEGER;
+            if (s > 8) {
+                classes[0] = ABI_CLASS_INTEGERx2;
                 return 1;
             } else {
-                classes[0] = ABI_CLASS_INTEGER128;
+                classes[0] = ABI_CLASS_INTEGER;
                 return 1;
             }
-        //}
+        }
     } break;
     default: {
         StyledStream ss;

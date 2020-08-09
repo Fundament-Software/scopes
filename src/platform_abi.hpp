@@ -27,6 +27,11 @@ struct Type;
     T(INTEGERSI16) \
     T(INTEGERSI8) \
     T(INTEGER128) \
+    T(FLOATx2) \
+    T(FLOATx3) \
+    T(FLOATx4) \
+    T(DOUBLEx2) \
+    T(INTEGERx2) \
     /* The class consists of types that fit into a vector register. */ \
     T(SSE) \
     T(SSESF) \
