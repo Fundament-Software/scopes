@@ -361,8 +361,8 @@ typedef Map < Struct
 
     inline __typecall (cls opts...)
         static-if (cls == this-type)
-            let key-type value-type = opts...
-            gen-type key-type value-type
+            let key-type value-type function-type = opts...
+            gen-type key-type value-type function-type
         else
             let numsets = ((MinCapacity + 63:u64) // 64:u64)
             let validset = (malloc-array BitfieldType numsets)
