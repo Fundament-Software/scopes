@@ -6649,6 +6649,11 @@ let
     load-library = sc_load_library
     load-object = sc_load_object
 
+spice static-library (path)
+    path as:= string
+    sc_load_library path
+    ;
+
 sugar fold-locals (args...)
     fn stage-constant? (value)
         ('pure? value) and (('typeof value) != SpiceMacro)
