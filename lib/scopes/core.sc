@@ -7907,6 +7907,7 @@ spice methodsof (context)
 #-------------------------------------------------------------------------------
 
 fn integer->string (value base)
+    let value base = (deref value) (deref base)
     let N = 65
     let T = (typeof value)
     let digits = (alloca-array i8 N)
