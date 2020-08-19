@@ -416,8 +416,13 @@ formatters:
         "codegen: unsupported execution mode: %0", \
         Symbol) \
     T(CGenUnsupportedPointerStorageClass, \
-        "codegen: unsupported pointer storage class: %0", \
+        "codegen: unsupported pointer or reference storage class: %0", \
         Symbol) \
+    T(CGenUnsupportedArgumentPointerStorageClass, \
+        "codegen: unsupported storage class for reference or pointer: %0. Try dereferencing the argument before passing it.", \
+        Symbol) \
+    T(CGenUnsupportedReturnArgument, \
+        "codegen: Attempting to return a reference or pointer. Try dereferencing the return argument.") \
     T(CGenUnsupportedIntrinsic, \
         "codegen: unspported intrinsic function: '%0'", \
         Symbol) \

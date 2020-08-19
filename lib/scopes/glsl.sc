@@ -285,7 +285,8 @@ inline gen-xvar-sugar (name f)
             let expr = (qq [local-new] '[name] [T]
                 (unquote-splice (parse-layout layout...)))
             let expr = ('tag `expr ('anchor expression))
-            qq [let] [name] = [expr]
+            let _let = ('tag `let ('anchor expression))
+            qq [_let] [name] = [expr]
         default
             error
                 .. "syntax: " name " <name> [: <type>] [location = i] [binding = j]"

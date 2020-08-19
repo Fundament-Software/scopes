@@ -890,8 +890,27 @@ static SCOPES_RESULT(TypedValueRef) make_return1(
     for (size_t i = 0; i < values.size(); ++i) {
         auto T = values[i]->get_type();
         auto rq = try_qualifier<ReferQualifier>(T);
-        if (rq && (rq->storage_class == SYM_SPIRV_StorageClassFunction)) {
-            SCOPES_CHECK_RESULT(build_deref_automove(ctx, mover, values[i]));
+        if (rq) {
+            switch(rq->storage_class.value()) {
+            case SYM_SPIRV_StorageClassUniformConstant:
+            case SYM_SPIRV_StorageClassUniform:
+            case SYM_SPIRV_StorageClassInput:
+            case SYM_SPIRV_StorageClassFunction:
+            //case SYM_SPIRV_StorageClassWorkgroup:
+            //case SYM_SPIRV_StorageClassCrossWorkgroup:
+            //case SYM_SPIRV_StorageClassPushConstant:
+            //case SYM_SPIRV_StorageClassAtomicCounter:
+            //case SYM_SPIRV_StorageClassStorageBuffer:
+            {
+                SCOPES_CHECK_RESULT(build_deref_automove(ctx, mover, values[i]));
+            } break;
+            //case SYM_SPIRV_StorageClassImage: break;
+            //case SYM_SPIRV_StorageClassPrivate: break;
+            //case SYM_SPIRV_StorageClassFunction: break;
+            //case SYM_SPIRV_StorageClassGeneric: break;
+            default: break;
+            }
+
         }
     }
 
@@ -2064,7 +2083,27 @@ repeat:
                     SCOPES_TRACE_PROVE_ARG(arg);
                     SCOPES_ERROR(OpaqueType, AT);
                 }
-                types.push_back(arg->get_type());
+                // FIX: auto-dereference certain arguments that can not be
+                // passed as pointers.
+                switch(refer_storage_class(AT).value()) {
+                case SYM_SPIRV_StorageClassUniformConstant:
+                case SYM_SPIRV_StorageClassUniform:
+                case SYM_SPIRV_StorageClassInput:
+                //case SYM_SPIRV_StorageClassWorkgroup:
+                //case SYM_SPIRV_StorageClassCrossWorkgroup:
+                //case SYM_SPIRV_StorageClassPushConstant:
+                //case SYM_SPIRV_StorageClassAtomicCounter:
+                //case SYM_SPIRV_StorageClassStorageBuffer:
+                {
+                    AT = strip_qualifier<ReferQualifier>(AT);
+                } break;
+                //case SYM_SPIRV_StorageClassImage: break;
+                //case SYM_SPIRV_StorageClassPrivate: break;
+                //case SYM_SPIRV_StorageClassFunction: break;
+                //case SYM_SPIRV_StorageClassGeneric: break;
+                default: break;
+                }
+                types.push_back(AT);
             }
             callee = SCOPES_GET_RESULT(prove(
                 ref(callee.anchor(), cl->frame),

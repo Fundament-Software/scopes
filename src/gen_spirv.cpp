@@ -717,6 +717,11 @@ struct SPIRVGenerator {
         SCOPES_RESULT_TYPE(void);
         Ids refs;
         for (auto val : values) {
+            auto rq = try_qualifier<ReferQualifier>(val->get_type());
+            if (rq) {
+                SCOPES_TRACE_CODEGEN(val);
+                SCOPES_ERROR(CGenUnsupportedReturnArgument);
+            }
             refs.push_back(SCOPES_GET_RESULT(ref_to_value(val)));
         }
         return write_return(refs, is_except);
@@ -2195,6 +2200,19 @@ struct SPIRVGenerator {
         //auto retT = SCOPES_GET_RESULT(type_to_spirv_type(rtype));
 
         for (size_t i = 0; i < argcount; ++i) {
+            auto AT = args[i]->get_type();
+            auto rq = try_qualifier<ReferQualifier>(AT);
+            if (rq) {
+                auto sc = rq->storage_class;
+                switch(sc.value()) {
+                case SYM_SPIRV_StorageClassFunction: break;
+                //case SYM_SPIRV_StorageClassImage: break;
+                default: {
+                    SCOPES_TRACE_CODEGEN(args[i]);
+                    SCOPES_ERROR(CGenUnsupportedArgumentPointerStorageClass, sc);
+                } break;
+                }
+            }
             values.push_back(SCOPES_GET_RESULT(ref_to_value(args[i])));
         }
 

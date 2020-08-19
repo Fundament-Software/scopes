@@ -204,6 +204,44 @@ do
     #test ((cttz 6) == 1)
     #test ((bitreverse 0b10010110:i8) == 0b01101001:i8)
 
+# passing pointers to shader functions
+do
+    using import struct
+    using import glm
+    using import glsl
 
+    fn t (v)
+        v
+
+    fn vertex ()
+        in x : i32
+        buffer v1 :
+            struct T
+                member : vec4
+        uniform v2 : vec4
+
+        fn t1 () v1
+        fn t2 () v2
+
+        switch x
+        case 0
+            gl_Position = (t v1.member)
+        case 1
+            gl_Position = (t v2)
+        #case 2
+            gl_Position = (t1)
+        case 3
+            gl_Position = (t2)
+        case 4
+            # this works:
+            gl_Position = (t (deref v1.member))
+        case 5
+            # or
+            gl_Position = (t (deref v2))
+        default
+            ;
+
+    print (compile-glsl 450 'vertex (static-typify vertex))
+    none
 
 ;
