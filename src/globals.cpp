@@ -281,11 +281,11 @@ sc_valueref_raises_t sc_compile(sc_valueref_t srcl, uint64_t flags) {
     return convert_result(compile(result, flags));
 }
 
-sc_string_raises_t sc_compile_spirv(sc_symbol_t target, sc_valueref_t srcl, uint64_t flags) {
+sc_string_raises_t sc_compile_spirv(int version, sc_symbol_t target, sc_valueref_t srcl, uint64_t flags) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(const String *);
     auto result = SCOPES_C_GET_RESULT(extract_function_constant(srcl));
-    return convert_result(compile_spirv(target, result, flags));
+    return convert_result(compile_spirv(version, target, result, flags));
 }
 
 sc_string_raises_t sc_compile_glsl(int version, sc_symbol_t target, sc_valueref_t srcl, uint64_t flags) {
@@ -2325,7 +2325,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify_template, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typify, TYPE_ValueRef, TYPE_Closure, TYPE_I32, native_ro_pointer_type(TYPE_Type));
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile, TYPE_ValueRef, TYPE_ValueRef, TYPE_U64);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_spirv, TYPE_String, TYPE_Symbol, TYPE_ValueRef, TYPE_U64);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_spirv, TYPE_String, TYPE_I32, TYPE_Symbol, TYPE_ValueRef, TYPE_U64);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_glsl, TYPE_String, TYPE_I32, TYPE_Symbol, TYPE_ValueRef, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_spirv_to_glsl, TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_default_target_triple, TYPE_String);

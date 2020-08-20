@@ -4593,8 +4593,8 @@ spice-quote
     inline compile-glsl (version target func flags...)
         sc_compile_glsl version target func (parse-compile-flags flags...)
 
-    inline compile-spirv (target func flags...)
-        sc_compile_spirv target func (parse-compile-flags flags...)
+    inline compile-spirv (version target func flags...)
+        sc_compile_spirv version target func (parse-compile-flags flags...)
 
     inline compile-object (target file-kind path table flags...)
         sc_compile_object target file-kind path table (parse-compile-flags flags...)
@@ -5923,11 +5923,12 @@ spice _static-compile-glsl (version target func flags)
     hide-traceback;
     'tag `[(sc_compile_glsl version target func flags)] ('anchor args)
 
-spice _static-compile-spirv (target func flags)
+spice _static-compile-spirv (version target func flags)
+    version as:= i32
     target as:= Symbol
     flags as:= u64
     hide-traceback;
-    'tag `[(sc_compile_spirv target func flags)] ('anchor args)
+    'tag `[(sc_compile_spirv version target func flags)] ('anchor args)
 
 spice-quote
     inline static-compile (func flags...)

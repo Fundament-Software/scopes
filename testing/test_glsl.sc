@@ -163,7 +163,7 @@ do
                 v_tex_coords
 
     let bin =
-        compile-spirv 'fragment
+        compile-spirv 0 'fragment
             typify main
             'dump-disassembly
             #'no-opts

@@ -20,7 +20,7 @@ fn main ()
     return;
 
 let s =
-    compile-spirv 'fragment
+    compile-spirv 0 'fragment
         typify main
         'O2
         'dump-disassembly

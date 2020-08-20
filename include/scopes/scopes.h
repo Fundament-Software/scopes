@@ -168,7 +168,7 @@ SCOPES_LIBEXPORT sc_valueref_raises_t sc_prove(sc_valueref_t expr);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_typify(const sc_closure_t *f, int numtypes, const sc_type_t **typeargs);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_typify_template(sc_valueref_t f, int numtypes, const sc_type_t **typeargs);
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_compile(sc_valueref_t srcl, uint64_t flags);
-SCOPES_LIBEXPORT sc_string_raises_t sc_compile_spirv(sc_symbol_t target, sc_valueref_t srcl, uint64_t flags);
+SCOPES_LIBEXPORT sc_string_raises_t sc_compile_spirv(int version, sc_symbol_t target, sc_valueref_t srcl, uint64_t flags);
 SCOPES_LIBEXPORT sc_string_raises_t sc_compile_glsl(int version, sc_symbol_t target, sc_valueref_t srcl, uint64_t flags);
 SCOPES_LIBEXPORT const sc_string_t *sc_spirv_to_glsl(const sc_string_t *binary);
 SCOPES_LIBEXPORT const sc_string_t *sc_default_target_triple();

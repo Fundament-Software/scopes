@@ -250,6 +250,7 @@ struct SPIRVGenerator {
     FunctionRef active_function;
     int functions_generated;
     spv_target_env env;
+    int version;
     bool use_combined_image_samplers = false;
 
     spv::Id get_op_ex(Symbol name) {
@@ -370,13 +371,14 @@ struct SPIRVGenerator {
     }
 #endif
 
-    SPIRVGenerator(spv_target_env _env) :
+    SPIRVGenerator(spv_target_env _env, int _version) :
         builder('S' << 24 | 'C' << 16 | 'O' << 8 | 'P', &logger),
         entry_point(nullptr),
         glsl_ext_inst(0),
         use_debug_info(true),
         functions_generated(0),
-        env(_env) {
+        env(_env),
+        version(_version) {
         static_init();
         #if 0
         for (int i = 0; i < NumIntrinsics; ++i) {
@@ -2342,8 +2344,15 @@ struct SPIRVGenerator {
             }
         }
 
-        // fixed: Invalid SPIR-V binary version 1.3 for target environment SPIR-V 1.0 (under OpenGL 4.5 semantics).
-        builder.dump((env == SPV_ENV_OPENGL_4_5)?0x10000:spv::Version, result);
+        int version = spv::Version;
+        if (env == SPV_ENV_OPENGL_4_5) {
+            // fixed: Invalid SPIR-V binary version 1.3 for target environment SPIR-V 1.0 (under OpenGL 4.5 semantics).
+            version = 0x10000; // SPIR-V 1.0
+        }
+        if (this->version != 0) {
+            version = this->version;
+        }
+        builder.dump(version, result);
 
         SCOPES_CHECK_RESULT(verify_spirv(env, result));
 
@@ -2425,14 +2434,14 @@ SCOPES_RESULT(void) optimize_spirv(spv_target_env env, std::vector<unsigned int>
     return {};
 }
 
-SCOPES_RESULT(const String *) compile_spirv(Symbol target, const FunctionRef &fn, uint64_t flags) {
+SCOPES_RESULT(const String *) compile_spirv(int version, Symbol target, const FunctionRef &fn, uint64_t flags) {
     SCOPES_RESULT_TYPE(const String *);
     Timer sum_compile_time(TIMER_CompileSPIRV);
 
     //SCOPES_CHECK_RESULT(fn->verify_compilable());
 
     const spv_target_env env = SPV_ENV_VULKAN_1_1_SPIRV_1_4;
-    SPIRVGenerator ctx(env);
+    SPIRVGenerator ctx(env, version);
     if (flags & CF_NoDebugInfo) {
         ctx.use_debug_info = false;
     }
@@ -2497,7 +2506,7 @@ SCOPES_RESULT(const String *) compile_glsl(int version, Symbol target, const Fun
 
     const spv_target_env env = SPV_ENV_OPENGL_4_5;
 
-    SPIRVGenerator ctx(env);
+    SPIRVGenerator ctx(env, 0);
     if (flags & CF_NoDebugInfo) {
         ctx.use_debug_info = false;
     }
