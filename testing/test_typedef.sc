@@ -17,6 +17,11 @@ typedef MyIntType < integer : i32
 test (('storageof MyIntType) == i32)
 test (MyIntType < integer)
 
+# define MyIntCopy as 32-bit integer type with the same supertype
+typedef MyIntCopy <:: i32
+test (('storageof MyIntCopy) == i32)
+test (MyIntCopy < integer)
+
 let name = "RuntimeType"
 let RuntimeType =
     @@ spice-quote

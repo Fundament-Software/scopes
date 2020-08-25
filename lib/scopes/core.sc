@@ -6572,6 +6572,7 @@ define-sugar-macro decorate-fn
 let
     decorate-inline = decorate-fn
     decorate-typedef = decorate-fn
+    decorate-type = decorate-fn
     decorate-struct = decorate-fn
 
 define-sugar-macro decorate-let
@@ -7014,12 +7015,27 @@ sugar typedef (name body...)
             error@ ('anchor name) "while defining type"
                 .. "symbol '" (name as Symbol as string) "' already defined in scope"
 
-    let expr supertype has-supertype-def? =
+    spice set-storage (T ST flags)
+        let T = (T as type)
+        let ST = (ST as type)
+        let flags = (flags as u32)
+        sc_typename_type_set_storage T ST flags
+        `()
+
+    let expr supertype has-supertype-def? has-storagetype-def? outp =
         sugar-match body...
         case ('< supertype rest...)
-            _ rest... supertype true
+            _ rest... supertype true false '()
+        case ('<: storagetype rest...)
+            _ rest... `[(list superof storagetype)] true true
+                list
+                    list set-storage 'this-type storagetype typename-flag-plain
+        case ('<:: storagetype rest...)
+            _ rest... `[(list superof storagetype)] true true
+                list
+                    list set-storage 'this-type storagetype 0:u32
         default
-            _ body... `typename false
+            _ body... `typename false false '()
 
     let typedecl =
         qq [typename]
@@ -7034,13 +7050,6 @@ sugar typedef (name body...)
         sc_typename_type_set_opaque (T as type)
         `()
 
-    spice set-storage (T ST flags)
-        let T = (T as type)
-        let ST = (ST as type)
-        let flags = (flags as u32)
-        sc_typename_type_set_storage T ST flags
-        `()
-
     fn check-no-storage (storage? storagetype)
         if storage?
             error@ ('anchor storagetype) "while matching pattern" "storage type already defined"
@@ -7051,21 +7060,25 @@ sugar typedef (name body...)
             cons (list set-opaque 'this-type) outp
 
     let expr =
-        loop (inp outp storage? = expr '() false)
+        loop (inp outp storage? = expr outp has-storagetype-def?)
             sugar-match inp
             case ('< supertype rest...)
                 error@ ('anchor supertype) "while matching pattern" "supertype must be in first place"
+            case ('<: storagetype rest...)
+                error@ ('anchor storagetype) "while matching pattern" "supertype must be in first place"
             case (': storagetype rest...)
                 check-no-storage storage? storagetype
                 repeat rest...
-                    cons (list set-storage 'this-type
-                        storagetype typename-flag-plain) outp
+                    cons
+                        list set-storage 'this-type storagetype typename-flag-plain
+                        outp
                     true
             case (':: storagetype rest...)
                 check-no-storage storage? storagetype
                 repeat rest...
-                    cons (list set-storage 'this-type
-                        storagetype 0:u32) outp
+                    cons
+                        list set-storage 'this-type storagetype 0:u32
+                        outp
                     true
             case ('do rest...)
                 break
