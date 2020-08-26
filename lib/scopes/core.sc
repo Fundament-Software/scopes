@@ -6563,7 +6563,7 @@ define-sugar-macro decorate-fn
                 break out
             let decorator in = (decons in)
             repeat (_ in)
-                `[(cons decorator (list out))]
+                'tag `[(cons decorator (list out))] ('anchor decorator)
     if name-is-symbol?
         `[(list let name '= result)]
     else
