@@ -7996,7 +7996,6 @@ inline distance (a b)
 inline floorf (T)
     let ST = (storageof T)
     inline identity (x) x
-    dump ST
     static-if (ST < integer) identity
     elseif (ST < vector)
         static-if ((storageof (elementof ST)) < integer) identity
