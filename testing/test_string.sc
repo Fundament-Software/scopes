@@ -89,6 +89,11 @@ do
     local q : String = "init"
     test (q == "init")
     test ((String "test") == "test")
+    'append q "tini"
+    test (q == "inittini")
+    'append q (String "init")
+    test (q == "inittiniinit")
+    ;
 
 # testing proper globalization
 local s = (String "test")

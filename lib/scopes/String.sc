@@ -239,7 +239,31 @@ typedef+ StringBase
     fn append (self value)
         let dest = (append-slots self 1:usize)
         assign (imply value ((typeof self) . ElementType)) dest
-        dest
+        ;
+
+    inline... append (self, value : (typematch T < StringBase))
+        let cls = (typeof self)
+        static-assert (cls == (typeof value))
+        let count = (countof value)
+        let ptr = (append-slots self (countof value))
+        llvm.memcpy.p0i8.p0i8.i64
+            bitcast (& ptr) (mutable rawstring)
+            & (value @ 0)
+            (count * (sizeof cls.ElementType)) as i64
+            false
+        ;
+    case (self, value : string)
+        let cls = (typeof self)
+        static-assert (cls.ElementType == i8)
+        let count = (countof value)
+        let ptr = (append-slots self (countof value))
+        llvm.memcpy.p0i8.p0i8.i64
+            bitcast (& ptr) (mutable rawstring)
+            value as rawstring
+            (count * (sizeof cls.ElementType)) as i64
+            false
+        ;
+    case using append
 
     """"Construct a new element with arguments `args...` directly in a newly
         assigned slot of string `self`. When the string is of `GrowingString`
