@@ -5935,8 +5935,8 @@ spice-quote
         _static-compile func (parse-compile-flags flags...)
     inline static-compile-glsl (version target func flags...)
         _static-compile-glsl version target func (parse-compile-flags flags...)
-    inline static-compile-spirv (target func flags...)
-        _static-compile-spirv target func (parse-compile-flags flags...)
+    inline static-compile-spirv (version target func flags...)
+        _static-compile-spirv version target func (parse-compile-flags flags...)
 
 #-------------------------------------------------------------------------------
 # function overloading
