@@ -6253,14 +6253,37 @@ sugar fn... (name...)
                         break
                             sc_argument_list_join_values outargs
                                 \ tmpl atypes `(make-defaults atypes defaults)
-                    case ((arg as Symbol) ': rest...)
-                        hide-traceback;
-                        error@ ('anchor condv) "while parsing pattern"
-                            "single typed parameter definition is missing trailing comma or semicolon"
-                    case ((arg as Symbol) '= rest...)
-                        hide-traceback;
-                        error@ ('anchor condv) "while parsing pattern"
-                            "single default parameter definition is missing trailing comma or semicolon"
+                    case ((arg as Symbol) '= def)
+                        if ('variadic? arg)
+                            error "variadic parameter can not have default value"
+                        let param = (sc_parameter_new arg)
+                        sc_template_append_parameter tmpl param
+                        let def = (sc_expand def '() sugar-scope)
+                        repeat '()
+                            sc_argument_list_join_values types Unknown
+                            sc_argument_list_join_values defaults def
+                            'bind scope arg param
+                    case ((arg as Symbol) ': T '= def)
+                        if ('variadic? arg)
+                            error "a typed parameter can't be variadic"
+                        let T = (sc_expand T '() sugar-scope)
+                        let param = (sc_parameter_new arg)
+                        sc_template_append_parameter tmpl param
+                        let def = (sc_expand def '() sugar-scope)
+                        repeat '()
+                            sc_argument_list_join_values types T
+                            sc_argument_list_join_values defaults def
+                            'bind scope arg param
+                    case ((arg as Symbol) ': T)
+                        if ('variadic? arg)
+                            error "a typed parameter can't be variadic"
+                        let T = (sc_expand T '() sugar-scope)
+                        let param = (sc_parameter_new arg)
+                        sc_template_append_parameter tmpl param
+                        repeat '()
+                            sc_argument_list_join_values types T
+                            sc_argument_list_join_values defaults nodefault
+                            'bind scope arg param
                     case ((arg as Symbol) rest...)
                         if ('variadic? arg)
                             if (not (empty? rest...))

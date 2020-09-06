@@ -8,7 +8,7 @@ let testf = (static-typify testf i32 i32)
 
 # define overloaded function and expand existing testf
 fn... testf
-case (a : i32,)
+case (a : i32)
     testf a a
 # try the template last
 case using testf
@@ -87,12 +87,12 @@ inline ArrayPattern (element-type)
             inline (self) self
 
 fn... test5
-case (a : (ArrayPattern i32),) 3
-case (a : (ArrayPattern f32),) 4
-case (a : &i32,) true
-case (a : i32,) false
-case (a : &real,) 1
-case (a : real,) 2
+case (a : (ArrayPattern i32)) 3
+case (a : (ArrayPattern f32)) 4
+case (a : &i32) true
+case (a : i32) false
+case (a : &real) 1
+case (a : real) 2
 
 test ((test5 1) == false)
 local y = 2
@@ -118,9 +118,9 @@ do
 
     # typematcher
     fn... test7
-    case (a : (typematch T < integer),) 1
-    case (a : (typematch T < real),) 2
-    case (a : (typematch (storageof T) < real),) 3
+    case (a : (typematch T < integer)) 1
+    case (a : (typematch T < real)) 2
+    case (a : (typematch (storageof T) < real)) 3
     #case (a : (typematch T in (tupleof M L)),) 3
 
     test ((test7 1) == 1)
