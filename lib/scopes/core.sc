@@ -6231,24 +6231,6 @@ sugar fn... (name...)
             if inline?
                 sc_template_set_inline tmpl
             let scope = (Scope bodyscope)
-            #
-                    fn gen-argument-matcher (failfunc expr scope params)
-                        let outexpr = (sc_expression_new)
-                        local outargs = (sc_argument_list_new 0 null)
-                        let header scope =
-                            parse-argument-matcher failfunc expr scope params
-                                inline (param arg scope)
-                                    sc_expression_append outexpr arg
-                                    outargs =
-                                        sc_argument_list_join_values outargs arg
-                                    'bind scope param arg
-                        let scope =
-                            'bind scope '*... (deref outargs)
-                        _
-                            spice-quote
-                                header
-                                outexpr
-                            scope
             repeat rest...
                 loop
                     expr types defaults starargs scope =
