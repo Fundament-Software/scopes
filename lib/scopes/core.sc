@@ -6231,16 +6231,51 @@ sugar fn... (name...)
             if inline?
                 sc_template_set_inline tmpl
             let scope = (Scope bodyscope)
+            #
+                    fn gen-argument-matcher (failfunc expr scope params)
+                        let outexpr = (sc_expression_new)
+                        local outargs = (sc_argument_list_new 0 null)
+                        let header scope =
+                            parse-argument-matcher failfunc expr scope params
+                                inline (param arg scope)
+                                    sc_expression_append outexpr arg
+                                    outargs =
+                                        sc_argument_list_join_values outargs arg
+                                    'bind scope param arg
+                        let scope =
+                            'bind scope '*... (deref outargs)
+                        _
+                            spice-quote
+                                header
+                                outexpr
+                            scope
             repeat rest...
                 loop
-                    expr types defaults scope =
+                    expr types defaults starargs scope =
                         uncomma (condv as list)
                         sc_argument_list_new 0 null
                         sc_argument_list_new 0 null
+                        sc_argument_list_new 0 null
                         scope
+                    inline append-parameter (rest arg T def)
+                        let T = (sc_expand T '() sugar-scope)
+                        let param = (sc_parameter_new arg)
+                        sc_template_append_parameter tmpl param
+                        let def =
+                            static-branch (none? def)
+                                inline () nodefault
+                                inline ()
+                                    sc_expand def '() sugar-scope
+                        repeat rest
+                            sc_argument_list_join_values types T
+                            sc_argument_list_join_values defaults def
+                            sc_argument_list_join_values starargs param
+                            'bind scope arg param
                     sugar-match expr
                     case ()
                         #hide-traceback;
+                        let scope =
+                            'bind scope '*... starargs
                         let body =
                             try
                                 hide-traceback;
@@ -6256,34 +6291,15 @@ sugar fn... (name...)
                     case ((arg as Symbol) '= def)
                         if ('variadic? arg)
                             error "variadic parameter can not have default value"
-                        let param = (sc_parameter_new arg)
-                        sc_template_append_parameter tmpl param
-                        let def = (sc_expand def '() sugar-scope)
-                        repeat '()
-                            sc_argument_list_join_values types Unknown
-                            sc_argument_list_join_values defaults def
-                            'bind scope arg param
+                        append-parameter '() arg Unknown def
                     case ((arg as Symbol) ': T '= def)
                         if ('variadic? arg)
                             error "a typed parameter can't be variadic"
-                        let T = (sc_expand T '() sugar-scope)
-                        let param = (sc_parameter_new arg)
-                        sc_template_append_parameter tmpl param
-                        let def = (sc_expand def '() sugar-scope)
-                        repeat '()
-                            sc_argument_list_join_values types T
-                            sc_argument_list_join_values defaults def
-                            'bind scope arg param
+                        append-parameter '() arg T def
                     case ((arg as Symbol) ': T)
                         if ('variadic? arg)
                             error "a typed parameter can't be variadic"
-                        let T = (sc_expand T '() sugar-scope)
-                        let param = (sc_parameter_new arg)
-                        sc_template_append_parameter tmpl param
-                        repeat '()
-                            sc_argument_list_join_values types T
-                            sc_argument_list_join_values defaults nodefault
-                            'bind scope arg param
+                        append-parameter '() arg T
                     case ((arg as Symbol) rest...)
                         if ('variadic? arg)
                             if (not (empty? rest...))
@@ -6294,38 +6310,20 @@ sugar fn... (name...)
                             sc_argument_list_join_values types
                                 ? ('variadic? arg) Variadic Unknown
                             sc_argument_list_join_values defaults nodefault
+                            sc_argument_list_join_values starargs param
                             'bind scope arg param
                     case (((arg as Symbol) '= def) rest...)
                         if ('variadic? arg)
                             error "variadic parameter can not have default value"
-                        let param = (sc_parameter_new arg)
-                        sc_template_append_parameter tmpl param
-                        let def = (sc_expand def '() sugar-scope)
-                        repeat rest...
-                            sc_argument_list_join_values types Unknown
-                            sc_argument_list_join_values defaults def
-                            'bind scope arg param
+                        append-parameter rest... arg Unknown def
                     case (((arg as Symbol) ': T '= def) rest...)
                         if ('variadic? arg)
                             error "a typed parameter can't be variadic"
-                        let T = (sc_expand T '() sugar-scope)
-                        let param = (sc_parameter_new arg)
-                        sc_template_append_parameter tmpl param
-                        let def = (sc_expand def '() sugar-scope)
-                        repeat rest...
-                            sc_argument_list_join_values types T
-                            sc_argument_list_join_values defaults def
-                            'bind scope arg param
+                        append-parameter rest... arg T def
                     case (((arg as Symbol) ': T) rest...)
                         if ('variadic? arg)
                             error "a typed parameter can't be variadic"
-                        let T = (sc_expand T '() sugar-scope)
-                        let param = (sc_parameter_new arg)
-                        sc_template_append_parameter tmpl param
-                        repeat rest...
-                            sc_argument_list_join_values types T
-                            sc_argument_list_join_values defaults nodefault
-                            'bind scope arg param
+                        append-parameter rest... arg T
                     default
                         let at = (decons expr)
                         hide-traceback;

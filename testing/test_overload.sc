@@ -17,6 +17,11 @@ do
     # expand overloaded function (in this scope only)
     fn... testf
     case (a : i32, b : i32, c : i32)
+        # read
+        let u v w = *...
+        assert (u == a)
+        assert (v == b)
+        assert (w == c)
         testf a (testf b c)
     # try the previous testf last
     case using testf
