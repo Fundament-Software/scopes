@@ -2750,6 +2750,20 @@ fn pointer-type-imply? (src dest)
         return true
     elseif (type== dest ('strip-pointer-storage-class ('immutable src)))
         return true
+    else
+        let ET = ('element@ src 0)
+        # try dispatch
+        label next
+            let f =
+                try ('@ ET '__pointer-imply?)
+                except (err) (merge next)
+            return (as (sc_prove `(f src dest)) bool)
+        let ET = ('element@ dest 0)
+        label next
+            let f =
+                try ('@ ET '__pointer-rimply?)
+                except (err) (merge next)
+            return (as (sc_prove `(f dest src)) bool)
     return false
 
 fn pointer-imply (vT T)
