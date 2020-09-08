@@ -1819,6 +1819,7 @@ fn unary-operation (args symbol friendly-op-name)
     let f =
         try ('@ T symbol)
         except (err)
+            hide-traceback;
             unary-op-error friendly-op-name T
     'tag `(f u) ('anchor args)
 
@@ -6407,6 +6408,13 @@ inline memo (f) (memocall _memo f)
                 if (at == token)
                     break params it
                 _ it (cons sxat params)
+    first-anchor =
+        fn "anchor" (self)
+            loop (it = self)
+                if (empty? it)
+                    break unknown-anchor
+                let sxat it = (decons it)
+                break ('anchor sxat)
 
 define-sugar-block-scope-macro static-if
     fn process (anchor body next-expr)
@@ -6857,7 +6865,10 @@ sugar fold ((binding...) 'for expr...)
         spice-quote
             let init... =
                 spice-unquote
-                    let expr = (sc_expand (cons _ init) '() subscope)
+                    let expr =
+                        sc_expand
+                            cons ('tag `_ ('first-anchor init)) init
+                            \ '() subscope
                     expr
             let gen =
                 spice-unquote
