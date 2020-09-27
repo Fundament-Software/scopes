@@ -3919,7 +3919,9 @@ fn exec-module (expr eval-scope)
                 fn "exec-module-stage" ()
                     raising Error
                     hide-traceback;
-                    wrap-if-not-run-stage (f)
+                    wrap-if-not-run-stage
+                        spice-unquote
+                            'tag `(f) expr-anchor
         let path =
             .. ((sc_anchor_path expr-anchor) as string) ":"
                 tostring `[(sc_anchor_lineno expr-anchor)]
