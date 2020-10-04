@@ -514,7 +514,7 @@ public:
         case clang::Type::TemplateSpecialization: {
             return TranslateStorage(T);
         } break;
-        case clang::Type::Builtin:
+        case clang::Type::Builtin: {
             switch (cast<BuiltinType>(Ty)->getKind()) {
             case clang::BuiltinType::Void:
                 return empty_arguments_type();
@@ -535,7 +535,9 @@ public:
             case clang::BuiltinType::WChar_S:
             case clang::BuiltinType::WChar_U:
             case clang::BuiltinType::Char16:
-            case clang::BuiltinType::Char32: {
+            case clang::BuiltinType::Char32:
+            case clang::BuiltinType::UInt128:
+            case clang::BuiltinType::Int128: {
                 int sz = Context->getTypeSize(T);
                 return integer_type(sz, !Ty->isUnsignedIntegerType());
             } break;
@@ -546,10 +548,10 @@ public:
                 return TYPE_F64;
             case clang::BuiltinType::LongDouble: return TYPE_F80;
             case clang::BuiltinType::NullPtr:
-            case clang::BuiltinType::UInt128:
             default:
                 break;
             }
+        } break;
         case clang::Type::Complex:
         case clang::Type::LValueReference: {
             const clang::LValueReferenceType *PTy =
