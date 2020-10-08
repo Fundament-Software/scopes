@@ -171,8 +171,47 @@ fn shabbysort (buf sz)
                 store b (getelementptr buf i)
                 store a (getelementptr buf j)
 
-fn build-repr-switch-case (litT self field-types allow-dupes?)
-    let sw = (sc_switch_new self)
+spice static-repr-switch-case (litT self allow-dupes? style? field-types...)
+    litT as:= type
+    allow-dupes? as:= bool
+    style? as:= bool
+    let value = (sc_const_int_extract self)
+    let numfields = ('argcount field-types...)
+    let sorted = (alloca-array (tuple u64 type) numfields)
+    for i in (range numfields)
+        let field = (('getarg field-types... i) as type)
+        let field = (field as type)
+        let index = (('@ field 'Index) as u64)
+        store (tupleof index field) (getelementptr sorted i)
+    # sort array so duplicates are next to each other and merge names
+    shabbysort sorted numfields    
+    loop (i = 0)
+        if (i == numfields)
+            break `"?invalid?"        
+        let index field = (unpack (load (getelementptr sorted i)))
+        if (index == value)
+            let name = (('@ field 'Name) as Symbol as string)
+            # accumulate all fields with the same index
+            let name =
+                loop (i name = (i + 1) name)
+                    if (i == numfields)
+                        break name
+                    let index2 field2 = (unpack (load (getelementptr sorted i)))
+                    if (index2 == index)
+                        if (not allow-dupes?)
+                            error "duplicate tags not permitted for tagged unions"
+                        let name2 = (('@ field2 'Name) as Symbol as string)
+                        repeat (i + 1) (.. name "|" name2)
+                    else
+                        break name
+            let name =
+                if style?
+                    sc_default_styler style-number name
+                else name
+            break `name    
+        i + 1
+
+fn build-repr-switch-case (litT self allow-dupes? style? field-types)
     let numfields = ('argcount field-types)
     let sorted = (alloca-array (tuple u64 type) numfields)
     for i in (range numfields)
@@ -182,6 +221,7 @@ fn build-repr-switch-case (litT self field-types allow-dupes?)
         store (tupleof index field) (getelementptr sorted i)
     # sort array so duplicates are next to each other and merge names
     shabbysort sorted numfields
+    let sw = (sc_switch_new self)
     loop (i = 0)
         if (i == numfields)
             break;
@@ -202,7 +242,9 @@ fn build-repr-switch-case (litT self field-types allow-dupes?)
                 else
                     break i name
         let name =
-            sc_default_styler style-number name
+            if style?
+                sc_default_styler style-number name
+            else name
         sc_switch_append_case sw lit name
         i
     sc_switch_append_default sw "?invalid?"
@@ -297,10 +339,24 @@ fn finalize-enum-runtime (T storage)
                 'bind using-scope name value
         # build repr function
         spice-quote
-            inline __repr (self)
+            fn repr (self)
                 spice-unquote
-                    build-repr-switch-case T self field-types true
+                    build-repr-switch-case T self true true field-types
+            fn tostring (self)
+                spice-unquote
+                    build-repr-switch-case T self true false field-types
+            inline __repr (self)
+                static-if (constant? self)
+                    static-repr-switch-case T self true true field-types
+                else
+                    repr self
+            inline __tostring (self)
+                static-if (constant? self)
+                    static-repr-switch-case T self true false field-types
+                else
+                    tostring self
         'set-symbol T '__repr __repr
+        'set-symbol T '__tostring __tostring
     else
         let index-type = (sc_integer_type width signed)
         let numfields = ('argcount field-types)
@@ -314,10 +370,26 @@ fn finalize-enum-runtime (T storage)
         inline hash-default () (nullof hash)
         # build repr function
         spice-quote
-            fn __repr (self)
+            fn repr (self)
                 let val = (extractvalue self 0)
                 spice-unquote
-                    build-repr-switch-case index-type val field-types false
+                    build-repr-switch-case index-type val false true field-types
+            fn tostring (self)
+                let val = (extractvalue self 0)
+                spice-unquote
+                    build-repr-switch-case index-type val false false field-types
+            inline __repr (self)
+                let val = (extractvalue self 0)
+                static-if (constant? val)
+                    static-repr-switch-case index-type val false true field-types
+                else
+                    repr self
+            inline __tostring (self)
+                let val = (extractvalue self 0)
+                static-if (constant? val)
+                    static-repr-switch-case index-type val false false field-types
+                else
+                    tostring self
             fn __drop (self)
                 #print "dropping option" self
                 '__dispatch self
@@ -378,6 +450,7 @@ fn finalize-enum-runtime (T storage)
             else
                 'set-symbol T key value
         set-symbol T '__repr __repr
+        set-symbol T '__tostring __tostring
         set-symbol T '__drop __drop
         set-symbol T '__== __==
         set-symbol T '__hash __hash

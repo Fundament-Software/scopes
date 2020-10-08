@@ -20,7 +20,8 @@ do
 
     print Mode.Notch
     print Mode.Low
-    print Mode.Band
+    print (tostring Mode.Band)
+    test (constant? (tostring Mode.Band))
 
 do
     enum test-enum plain
