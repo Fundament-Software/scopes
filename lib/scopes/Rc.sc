@@ -11,25 +11,38 @@
     type `Weak`.
 
 let
-    PAYLOAD_INDEX = 0
-    METADATA_INDEX = 1
     STRONGRC_INDEX = 0
     WEAKRC_INDEX = 1
 
+let RefType = i32
+let MetaDataType =
+    tuple RefType RefType
+
+let HEADERSIZE = 16:usize
+
 typedef ReferenceCounted
-    let RefType = i32
-    let MetaDataType =
-        tuple RefType RefType
+    let RefType = RefType
+    let MetaDataType = MetaDataType
+
+inline _mdptr (self)
+    inttoptr (sub (ptrtoint (view self) usize) (sizeof MetaDataType)) (mutable @MetaDataType)
+inline _baseptr (self)
+    let T = (elementof (typeof self))
+    let ptr =
+        inttoptr (sub (ptrtoint (view self) usize) HEADERSIZE) (mutable @u8)
+    ptr
 
 typedef Weak < ReferenceCounted
 typedef Rc < ReferenceCounted
 
+inline free-rc (self)
+    viewing self
+    free (_baseptr self)
+
 @@ memo
 inline gen-type (T)
     let storage-type =
-        tuple
-            mutable pointer T
-            mutable pointer Weak.MetaDataType
+        mutable pointer T
     let WeakType =
         typedef (.. "<Weak " (tostring T) ">") < Weak
             \ :: storage-type
@@ -43,18 +56,15 @@ inline gen-type (T)
 
         inline... __typecall
         case (cls, value : RcType)
-            let md = (extractvalue value METADATA_INDEX)
+            let md = (_mdptr value)
             let refcount =
-                getelementptr
-                    extractvalue value METADATA_INDEX
-                    \ 0 WEAKRC_INDEX
+                getelementptr md 0 WEAKRC_INDEX
             let rc = (add (load refcount) 1)
             store rc refcount
             bitcast (dupe (view value)) this-type
         case (cls)
             # null-weak that will never upgrade
-            let self = (nullof storage-type)
-            bitcast self this-type
+            inttoptr 0:usize this-type
 
     typedef+ RcType
         let Type = T
@@ -62,13 +72,15 @@ inline gen-type (T)
 
         fn wrap (value)
             let self = (nullof storage-type)
-            let ptr = (malloc T)
-            store value ptr
-            let self = (insertvalue self ptr PAYLOAD_INDEX)
-            let mdptr = (malloc super-type.MetaDataType)
+            let MDT = super-type.MetaDataType
+            let mdsize = (sizeof MDT)
+            let fullsize = (HEADERSIZE + (sizeof T))
+            let ptr = (malloc-array u8 fullsize)
+            let self = (inttoptr (add (ptrtoint ptr usize) HEADERSIZE) storage-type)
+            store value self
+            let mdptr = (_mdptr self)
             store 1 (getelementptr mdptr 0 STRONGRC_INDEX)
             store 0 (getelementptr mdptr 0 WEAKRC_INDEX)
-            let self = (insertvalue self mdptr METADATA_INDEX)
             bitcast self this-type
 
         inline __typecall (cls args...)
@@ -82,16 +94,16 @@ typedef UpgradeError : (tuple)
 typedef+ ReferenceCounted
     fn strong-count (value)
         viewing value
-        let md = (extractvalue value METADATA_INDEX)
-        if (not (ptrtoint md usize))
+        if (not (ptrtoint value usize))
             return 0
+        let md = (_mdptr value)
         dupe (load (getelementptr md 0 STRONGRC_INDEX))
 
     fn weak-count (value)
         viewing value
-        let md = (extractvalue value METADATA_INDEX)
-        if (not (ptrtoint md usize))
+        if (not (ptrtoint value usize))
             return 1
+        let md = (_mdptr value)
         dupe (load (getelementptr md 0 WEAKRC_INDEX))
 
 typedef+ Weak
@@ -100,9 +112,9 @@ typedef+ Weak
         (gen-type T) . WeakType
 
     fn _drop (self)
-        let md = (extractvalue self METADATA_INDEX)
-        if (not (ptrtoint md usize))
+        if (not (ptrtoint (view self) usize))
             return;
+        let md = (_mdptr self)
         let refcount = (getelementptr md 0 WEAKRC_INDEX)
         let rc = (sub (load refcount) 1)
         assert (rc >= 0) "corrupt refcount encountered"
@@ -110,7 +122,7 @@ typedef+ Weak
         if (rc == 0)
             let strongrefcount = (getelementptr md 0 STRONGRC_INDEX)
             if ((load strongrefcount) == 0)
-                free md
+                free-rc self
             # otherwise last strong reference will clean this up
 
     inline __rimply (T cls)
@@ -124,12 +136,12 @@ typedef+ Weak
     inline __== (cls other-cls)
         static-if (cls == other-cls)
             fn (self other)
-                == (extractvalue self METADATA_INDEX) (extractvalue other METADATA_INDEX)
+                == (storagecast (view self)) (storagecast (view other))
 
     fn... __copy (self : Weak,)
         viewing self
-        let md = (extractvalue self METADATA_INDEX)
-        if (ptrtoint md usize)
+        if (ptrtoint self usize)
+            let md = (_mdptr self)
             let refcount =
                 getelementptr md 0 WEAKRC_INDEX
             let rc = (add (load refcount) 1)
@@ -138,9 +150,9 @@ typedef+ Weak
 
     fn upgrade (self)
         viewing self
-        let md = (extractvalue self METADATA_INDEX)
-        if (not (ptrtoint md usize))
+        if (not (ptrtoint self usize))
             raise (UpgradeError)
+        let md = (_mdptr self)
         let refcount = (getelementptr md 0 STRONGRC_INDEX)
         let rc = (load refcount)
         assert (rc >= 0) "corrupt refcount encountered"
@@ -153,8 +165,8 @@ typedef+ Weak
 
     fn force-upgrade (self)
         viewing self
-        let md = (extractvalue self METADATA_INDEX)
-        assert (ptrtoint md usize) "upgrading Weak failed"
+        assert (ptrtoint self usize) "upgrading Weak failed"
+        let md = (_mdptr self)
         let refcount = (getelementptr md 0 STRONGRC_INDEX)
         let rc = (load refcount)
         assert (rc >= 0) "corrupt refcount encountered"
@@ -175,10 +187,9 @@ typedef+ Rc
 
     fn... __copy (value : Rc,)
         viewing value
+        let md = (_mdptr value)
         let refcount =
-            getelementptr
-                extractvalue value METADATA_INDEX
-                \ 0 STRONGRC_INDEX
+            getelementptr md 0 STRONGRC_INDEX
         let rc = (load refcount)
         assert (rc >= 0) "corrupt refcount encountered"
         let rc = (add rc 1)
@@ -190,7 +201,7 @@ typedef+ Rc
 
     let _view = view
     inline... view (self : Rc,)
-        ptrtoref (deref (extractvalue self PAYLOAD_INDEX))
+        ptrtoref (_view self)
 
     inline __countof (self)
         countof (view self)
@@ -221,10 +232,10 @@ typedef+ Rc
     inline __== (cls other-cls)
         static-if (cls == other-cls)
             inline (self other)
-                == (extractvalue self PAYLOAD_INDEX) (extractvalue other PAYLOAD_INDEX)
+                == (storagecast (_view self)) (storagecast (_view other))
 
     inline __hash (self)
-        hash (extractvalue self PAYLOAD_INDEX)
+        hash (storagecast (_view self))
 
     inline make-cast-op (f const?)
         spice "box-cast" (selfT otherT)
@@ -245,20 +256,22 @@ typedef+ Rc
     let __as = (make-cast-op as-converter false)
 
     fn _drop (self)
+        viewing self
         returning void
-        let md = (extractvalue self METADATA_INDEX)
+        let md = (_mdptr self)
         let refcount = (getelementptr md 0 STRONGRC_INDEX)
         let rc = (sub (load refcount) 1)
         assert (rc >= 0) "corrupt refcount encountered"
         if (rc == 0)
             let payload = (view self)
             __drop payload
-            free (reftoptr payload)
+            # update refcount after drop so weak pointers don't attempt to
+                delete this pointer prematurely
             store 0 refcount
             let weakrefcount = (getelementptr md 0 WEAKRC_INDEX)
             if ((load weakrefcount) == 0)
-                free md
-            # otherwise last weak reference will clean this up
+                free-rc self
+            # otherwise the last weak reference will free this value
         else
             store rc refcount
 

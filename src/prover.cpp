@@ -2562,7 +2562,6 @@ repeat:
                 if (rq) {
                     DestT = qualify(DestT, { rq });
                 }
-                //_DestT = ref(_DestT.anchor(), ConstPointer::type_from(DestT));
                 if (_SrcT.isa<Pure>() && target_is_plain) {
                     return TypedValueRef(ref(call.anchor(),
                         PureCast::from(DestT, _SrcT.cast<Pure>())));
@@ -2575,11 +2574,28 @@ repeat:
         } break;
         case FN_IntToPtr: {
             CHECKARGS(2, 2);
-            READ_STORAGETYPEOF(T);
+            READ_TYPEOF(SrcT);
             READ_TYPE_CONST(DestT);
-            SCOPES_CHECK_RESULT(verify_integer(T));
+            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(SrcT))));
             SCOPES_CHECK_RESULT((verify_kind<TK_Pointer>(SCOPES_GET_RESULT(storage_type(DestT)))));
-            return TypedValueRef(call.anchor(), Cast::from(CastIntToPtr, _T, VIEWTYPE1(DestT, _T)));
+
+            DestT = strip_qualifiers(DestT);
+            bool target_is_plain = is_plain(DestT);
+
+            if (is_view(SrcT)) {
+                DestT = view_result_type(ctx, DestT, _SrcT);
+            } else if (!target_is_plain) {
+                DestT = unique_result_type(ctx, DestT);
+            }
+
+            auto uq = try_unique(SrcT);
+            if (uq) {
+                ctx.move(uq->id, call);
+            }
+
+            // DestT is already converted
+            return TypedValueRef(ref(call.anchor(),
+                Cast::from(CastIntToPtr, _SrcT, DestT)));
         } break;
         case FN_PtrToInt: {
             CHECKARGS(2, 2);

@@ -13,7 +13,7 @@ do
 
     let k = ((Rc i32) 3)
     report k
-    dump k
+    dump (qualifiersof k)
 
     do
         # Rc comparisons are object comparisons
@@ -35,7 +35,7 @@ do
     let q = ((Rc.view k) * 2)
     test (q == 24)
 
-    dump a b
+    dump (qualifiersof a) (qualifiersof b)
 
     let c = ((Rc vec3) 1 2 3)
 
@@ -307,6 +307,7 @@ do
     let k = (copy (singleton))
     local example : RcT = k
     # error: value of type %1000:<Rc T> must be unique
+    ;
 
 do
     using import struct
@@ -321,5 +322,6 @@ do
     local container : RcT
     dump (typeof container) (typeof k)
     container = k
+    ;
 
 ;
