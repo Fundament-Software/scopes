@@ -8071,6 +8071,15 @@ let pi:f64 = 3.141592653589793:f64
     and `pi:f64`.
 let pi = pi:f32
 
+""""See `tau`.
+let tau:f32 = 6.283185307179586:f32
+""""See `tau`.
+let tau:f64 = 6.283185307179586:f64
+""""The number τ, the ratio of a circle's circumference C to its radius r.
+    Explicitly type-annotated versions of the constant are available as `tau:f32`
+    and `tau:f64`.
+let tau = tau:f32
+
 """"See `e`.
 let e:f32 = 2.718281828459045:f32
 """"See `e`.
