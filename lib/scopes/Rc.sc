@@ -10,6 +10,8 @@
     module provides a strong reference type `Rc`, as well as a weak reference
     type `Weak`.
 
+define DEBUG_DOUBLE_FREES false
+
 let
     STRONGRC_INDEX = 0
     WEAKRC_INDEX = 1
@@ -35,9 +37,26 @@ inline _baseptr (self)
 typedef Weak < ReferenceCounted
 typedef Rc < ReferenceCounted
 
-inline free-rc (self)
-    viewing self
-    free (_baseptr self)
+let use-rc free-rc =
+    static-if DEBUG_DOUBLE_FREES
+        using import Set
+        global used-pointers : (Set (mutable @u8))
+
+        inline use-rc (ptr)
+            'insert used-pointers ptr
+
+        inline free-rc (self)
+            let ptr = (_baseptr self)
+            if ('in? used-pointers ptr)
+                'discard used-pointers ptr
+            else
+                assert false "Rc: double free detected"
+                unreachable;
+            free ptr
+
+        _ use-rc free-rc
+    else
+        _ (inline ()) (inline ())
 
 @@ memo
 inline gen-type (T)
@@ -76,6 +95,7 @@ inline gen-type (T)
             let mdsize = (sizeof MDT)
             let fullsize = (HEADERSIZE + (sizeof T))
             let ptr = (malloc-array u8 fullsize)
+            use-rc ptr
             let self = (inttoptr (add (ptrtoint ptr usize) HEADERSIZE) storage-type)
             store value self
             let mdptr = (_mdptr self)
@@ -175,7 +195,6 @@ typedef+ Weak
         let rc = (add rc 1)
         store rc refcount
         deref (bitcast (dupe self) RcType)
-
 
 typedef+ Rc
     inline... __typecall

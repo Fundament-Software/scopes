@@ -322,7 +322,7 @@ public:
                 return it->second;
         }
 
-        Symbol name(String::from_stdstring(ed->getName()));
+        Symbol name(String::from_stdstring(ed->getName().data()));
         Symbol typedefname = SYM_Unnamed;
         if (name == SYM_Unnamed) {
             auto tdn = ed->getTypedefNameForAnonDecl();
@@ -764,7 +764,7 @@ public:
         std::string InternalName = FuncName;
         clang::AsmLabelAttr * asmlabel = f->getAttr<clang::AsmLabelAttr>();
         if(asmlabel) {
-            InternalName = asmlabel->getLabel();
+            InternalName = asmlabel->getLabel().data();
             #ifndef __linux__
                 //In OSX and Windows LLVM mangles assembler labels by adding a '\01' prefix
                 InternalName.insert(InternalName.begin(), '\01');
@@ -871,7 +871,7 @@ static void add_c_macro(clang::Preprocessor & PP,
         clang::Token tokens[] = { *Tok };
         clang::StringLiteralParser Literal(tokens, PP, false);
         const String *name = String::from_cstr(II->getName().str().c_str());
-        std::string svalue = Literal.GetString();
+        std::string svalue = Literal.GetString().data();
         const String *value = String::from(svalue.c_str(), svalue.size());
         const Anchor *anchor = anchor_from_location(PP.getSourceManager(),
             MI->getDefinitionLoc());
@@ -886,13 +886,16 @@ static void add_c_macro(clang::Preprocessor & PP,
     clang::SmallString<64> IntegerBuffer;
     bool NumberInvalid = false;
     clang::StringRef Spelling = PP.getSpelling(*Tok, IntegerBuffer, &NumberInvalid);
-    clang::NumericLiteralParser Literal(Spelling, Tok->getLocation(), PP);
+    clang::NumericLiteralParser Literal(Spelling, Tok->getLocation(), PP
+        /*
+        PP.getSourceManager(), PP.getLangOpts(), PP.getTargetInfo(),
+        PP.getDiagnostics()*/);
     if(Literal.hadError)
         return;
     const String *name = String::from_cstr(II->getName().str().c_str());
     std::string suffix;
     if (Literal.hasUDSuffix()) {
-        suffix = Literal.getUDSuffix();
+        suffix = Literal.getUDSuffix().data();
         std::cout << "TODO: macro literal suffix: " << suffix << std::endl;
     }
     const Anchor *anchor = anchor_from_location(PP.getSourceManager(),

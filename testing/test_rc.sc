@@ -324,4 +324,56 @@ do
     container = k
     ;
 
+
+# TODO: uncomment and fix
+#do
+    # from https://todo.sr.ht/~duangle/scopes/11
+
+    using import Array
+    using import Rc
+    using import enum
+
+    enum StorageKind
+        Pointer : (Rc this-type)
+        Function : (Rc (Array this-type))
+        TypeReference : Symbol
+
+        inline __copy (self)
+            'apply self
+                inline (T ...)
+                    # uncomment next line to see corruption
+                    # print ...
+                    T
+                        va-map
+                            inline (arg)
+                                copy arg
+                            ...
+
+    fn myfn (n)
+        returning (uniqueof StorageKind -1)
+
+        label done
+            if (n == 0)
+                merge done
+                    do
+                        let newST =
+                            copy
+                                this-function (n + 1)
+                        StorageKind.Pointer (Rc.wrap newST)
+            if (n == 1)
+                merge done
+                    do
+                        local args : (Array StorageKind)
+                        'append args
+                            copy
+                                this-function (n + 1)
+                        # doesn't happen without this return.
+                        return
+                            StorageKind.Function (Rc.wrap (deref args))
+            StorageKind.TypeReference 'unknown
+
+    myfn 0
+    print "done"
+    none
+
 ;

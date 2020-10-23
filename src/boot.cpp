@@ -40,6 +40,7 @@
 #endif
 
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/Support/FileSystem.h"
 
 namespace scopes {
 

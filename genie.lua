@@ -24,6 +24,13 @@ end
 local BINDIR = THISDIR .. "/bin"
 
 local USE_ASAN_UBSAN = false
+local ASAN_USAN_OPTS = {
+    "-fsanitize=address",
+    "-fsanitize-address-use-after-scope",
+    "-fno-omit-frame-pointer",
+    "-fsanitize=undefined",
+    "-fno-common",
+}
 
 local function flatten(t)
     local result = {}
@@ -112,6 +119,10 @@ if not os.is("windows") then
     premake.gcc.cxx = CLANG_CXX
     premake.gcc.cc = CLANG_CC
     premake.gcc.llvm = true
+    if USE_ASAN_UBSAN then
+        premake.gcc.ld = CLANG_CXX
+    end
+
 end
 
 solution "scopes"
@@ -261,16 +272,9 @@ project "scopesrt"
         }
 
         if USE_ASAN_UBSAN then
-            local opts = {
-                "-fsanitize=address",
-                "-fsanitize-address-use-after-scope",
-                "-fno-omit-frame-pointer",
-                "-fsanitize=undefined",
-                "-fno-common",
-            }
-            buildoptions_cpp(opts)
-            buildoptions_c(opts)
-            linkoptions(opts)
+            buildoptions_cpp(ASAN_USAN_OPTS)
+            buildoptions_c(ASAN_USAN_OPTS)
+            linkoptions(ASAN_USAN_OPTS)
         end
 
         defines {
@@ -282,8 +286,9 @@ project "scopesrt"
         }
 
         linkoptions {
-            --"-Wl,--stack,8388608"
-            --"-Wl,--stack,16777216"
+            --"-Wl,--stack,8388608",
+            --"-Wl,--stack,16777216",
+            --"-Wl,--stack,67108864", -- 64 GB
             "-Wl,-soname,libscopesrt.so",
             "-Wl,--version-script=" .. THISDIR .. "/src/libscopesrt.map",
         }
@@ -422,16 +427,9 @@ project "scopesrt"
         }
 
         if USE_ASAN_UBSAN then
-            local opts = {
-                "-fsanitize=address",
-                "-fsanitize-address-use-after-scope",
-                "-fno-omit-frame-pointer",
-                "-fsanitize=undefined",
-                "-fno-common",
-            }
-            buildoptions_cpp(opts)
-            buildoptions_c(opts)
-            linkoptions(opts)
+            buildoptions_cpp(ASAN_USAN_OPTS)
+            buildoptions_c(ASAN_USAN_OPTS)
+            linkoptions(ASAN_USAN_OPTS)
         end
 
         links {
@@ -511,6 +509,12 @@ project "scopes"
             --"-Wl,--stack,16777216"
             "-Wl,-rpath=\\$$ORIGIN"
         }
+
+        if USE_ASAN_UBSAN then
+            buildoptions_cpp(ASAN_USAN_OPTS)
+            buildoptions_c(ASAN_USAN_OPTS)
+            linkoptions(ASAN_USAN_OPTS)
+        end
 
         postbuildcommands {
         }

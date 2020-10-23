@@ -29,6 +29,8 @@
 #endif
 #include <libgen.h>
 
+#include <deque>
+
 #include <llvm-c/Core.h>
 //#include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Analysis.h>
@@ -60,6 +62,8 @@ namespace scopes {
 #define SCOPES_GEN_TARGET "IR"
 
 #define SCOPES_LLVM_SUPPORT_DISASSEMBLY 1
+
+#define SCOPES_LLVM_EXTENDED_DEBUG_INFO 0
 
 //------------------------------------------------------------------------------
 // IL->LLVM IR GENERATOR
@@ -318,6 +322,7 @@ struct LLVMIRGenerator {
 
     std::unordered_map< PMIntrinsicKey, LLVMValueRef, HashPMIntrinsicKey > pm_intrinsics;
 
+#if SCOPES_LLVM_EXTENDED_DEBUG_INFO
     LLVMMetadataRef debug_voidT;
     LLVMMetadataRef debug_i1T;
     LLVMMetadataRef debug_i8T;
@@ -336,6 +341,7 @@ struct LLVMIRGenerator {
     std::vector<const Type *> debug_type_todo;
     std::vector<std::pair<LLVMMetadataRef, LLVMMetadataRef>> debug_type_to_replace;
     LLVMMetadataRef current_debug_block = nullptr;
+#endif
 
     bool use_debug_info = true;
     bool generate_object = false;
@@ -1058,6 +1064,7 @@ struct LLVMIRGenerator {
         return typeref;
     }
 
+#if SCOPES_LLVM_EXTENDED_DEBUG_INFO
     SCOPES_RESULT(LLVMMetadataRef) create_llvm_debug_type(const Type *type) {
         SCOPES_RESULT_TYPE(LLVMMetadataRef);
         using namespace llvm::dwarf;
@@ -1238,6 +1245,7 @@ struct LLVMIRGenerator {
         }
         debug_type_to_replace.clear();
     }
+#endif
 
     static Error *last_llvm_error;
     static void fatal_error_handler(const char *Reason) {
@@ -1384,6 +1392,7 @@ struct LLVMIRGenerator {
         for (size_t i = 0; i < paramcount; ++i) {
             ParameterRef param = params[i];
             LLVMValueRef val = SCOPES_GET_RESULT(abi_import_argument(param->get_type(), func, k));
+#if SCOPES_LLVM_EXTENDED_DEBUG_INFO
             if (use_debug_info) {
                 auto subprogram = LLVMGetSubprogram(func);
                 current_debug_block = subprogram;
@@ -1399,14 +1408,17 @@ struct LLVMIRGenerator {
                 auto expr = LLVMDIBuilderCreateExpression(di_builder, 0, 0);
                 LLVMDIBuilderInsertDeclareAtEnd(di_builder, alloc, divar, expr, anchor_to_location(anchor), LLVMGetInsertBlock(builder));
             }
+#endif
 
             assert(val);
             bind(ValueIndex(param), val);
         }
         SCOPES_CHECK_RESULT(translate_block(node->body));
+#if SCOPES_LLVM_EXTENDED_DEBUG_INFO
         if (use_debug_info) {
             current_debug_block = nullptr;
         }
+#endif
         return {};
     }
 
@@ -1497,6 +1509,7 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(void) translate_block(const Block &node) {
         SCOPES_RESULT_TYPE(void);
+#if SCOPES_LLVM_EXTENDED_DEBUG_INFO
         LLVMMetadataRef parent_block = nullptr;
         if (use_debug_info) {
             parent_block = current_debug_block;
@@ -1506,15 +1519,18 @@ struct LLVMIRGenerator {
                 current_debug_block = LLVMDIBuilderCreateLexicalBlock(di_builder, current_debug_block, difile, anchor->lineno, anchor->column);
             }
         }
+#endif
         for (auto entry : node.body) {
             SCOPES_CHECK_RESULT(translate_instruction(entry));
         }
         if (node.terminator) {
             SCOPES_CHECK_RESULT(translate_instruction(node.terminator));
         }
+#if SCOPES_LLVM_EXTENDED_DEBUG_INFO
         if (use_debug_info) {
             current_debug_block = parent_block;
         }
+#endif
         return {};
     }
 
@@ -1865,6 +1881,7 @@ struct LLVMIRGenerator {
         } else {
             val = safe_alloca(ty);
         }
+#if SCOPES_LLVM_EXTENDED_DEBUG_INFO
         if (use_debug_info) {
             LLVMBasicBlockRef bb = LLVMGetInsertBlock(builder);
             LLVMValueRef func = LLVMGetBasicBlockParent(bb);
@@ -1878,6 +1895,7 @@ struct LLVMIRGenerator {
             auto expr = LLVMDIBuilderCreateExpression(di_builder, 0, 0);
             LLVMDIBuilderInsertDeclareAtEnd(di_builder, val, divar, expr, anchor_to_location(anchor), LLVMGetInsertBlock(builder));
         }
+#endif
         map_phi({ val }, node);
         return {};
     }
@@ -2923,6 +2941,7 @@ struct LLVMIRGenerator {
         }
     }
 
+#if SCOPES_LLVM_EXTENDED_DEBUG_INFO
     void init_debug_types() {
         using namespace llvm::dwarf;
         debug_voidT = LLVMDIBuilderCreateBasicType(di_builder, "void", 4, 0, DW_ATE_unsigned, LLVMDIFlagZero);
@@ -2940,6 +2959,7 @@ struct LLVMIRGenerator {
         debug_noneT = LLVMDIBuilderCreateBasicType(di_builder, "none", 4, 0, DW_ATE_unsigned, LLVMDIFlagZero); // TODO: Not sure
         debug_rawstringT = LLVMDIBuilderCreatePointerType(di_builder, debug_i8T, PointerType::size() * 8, 0, 0, "", 0);
     }
+#endif
 
     void setup_generate(const char *module_name) {
         module = LLVMModuleCreateWithName(module_name);
@@ -2973,11 +2993,17 @@ struct LLVMIRGenerator {
                 /*Kind*/ LLVMDWARFEmissionFull,
                 /*DWOId*/ 0,
                 /*SplitDebugInlining*/ true,
-                /*DebugInfoForProfiling*/ false);
+                /*DebugInfoForProfiling*/ false
+                // /*SysRoot*/ "", 0,
+                // /*SDK*/ "", 0
+                );
+
 
             //LLVMAddNamedMetadataOperand(module, "llvm.dbg.cu", dicu);
 
+#if SCOPES_LLVM_EXTENDED_DEBUG_INFO
             init_debug_types();
+#endif
         }
     }
 
@@ -2995,10 +3021,12 @@ struct LLVMIRGenerator {
         SCOPES_RESULT_TYPE(void);
         size_t k = SCOPES_GET_RESULT(finalize_types());
         assert(!k);
+#if SCOPES_LLVM_EXTENDED_DEBUG_INFO
         size_t kd = SCOPES_GET_RESULT(finalize_debug_types());
         assert(!kd);
 
         replace_debug_types();
+#endif
 
         LLVMDisposeBuilder(builder);
         LLVMDIBuilderFinalize(di_builder);
@@ -3007,6 +3035,7 @@ struct LLVMIRGenerator {
 #if SCOPES_DEBUG_CODEGEN
         LLVMDumpModule(module);
 #endif
+        /*
         char *errmsg = NULL;
         if (LLVMVerifyModule(module, LLVMReturnStatusAction, &errmsg)) {
             StyledStream ss(SCOPES_CERR);
@@ -3017,6 +3046,7 @@ struct LLVMIRGenerator {
             SCOPES_ERROR(CGenBackendFailed, errmsg);
         }
         LLVMDisposeMessage(errmsg);
+        */
         return {};
     }
 
