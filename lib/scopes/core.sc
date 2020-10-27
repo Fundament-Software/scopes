@@ -3313,7 +3313,19 @@ let
                     else
                         hide-traceback;
                         error "function type expected"
-                'return-type T
+                let RT ET = ('return-type T)
+                RT
+    raiseof =
+        make-const-type-property-function
+            fn (T)
+                let T =
+                    if ('function-pointer? T) ('element@ T 0)
+                    elseif ('function? T) T
+                    else
+                        hide-traceback;
+                        error "function type expected"
+                let RT ET = ('return-type T)
+                ET
     offsetof =
         spice-macro
             fn (args)
