@@ -150,6 +150,9 @@ typedef+ StringBase
         `Generator`, or directly passed to `for`.
     inline __as (cls T)
         static-if (T == Generator) string-generator
+        elseif ((cls.ElementType == i8) and (T == string))
+            inline (self)
+                string self._items self._count
 
     inline reverse (self)
         Generator
