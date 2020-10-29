@@ -559,4 +559,21 @@ do
     parse (nullof M)
     parse2 (nullof M)
 
+# regression: return in a do-block or label causes double free
+     produces: assertion failed: (_refcount >= 0)
+fn testfunc ()
+    label ok
+        label ok2
+            merge ok (One 303)
+    fn testf ()
+        do
+
+            return (One 304)
+                do
+                    return (One 303)
+    testf;
+    ;
+testfunc;
+One.test-refcount-balanced;
+
 ;
