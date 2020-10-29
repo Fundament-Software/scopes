@@ -256,7 +256,7 @@ typedef+ Array
 
     """"Implements support for freeing the array's memory when it goes out
         of scope.
-    inline __drop (self)
+    fn __drop (self)
         for idx in (range (deref self._count))
             __drop (self._items @ idx)
         free self._items
