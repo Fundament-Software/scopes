@@ -561,8 +561,8 @@ do
 
 # regression: return in a do-block or label causes double free
      produces: assertion failed: (_refcount >= 0)
-fn testfunc ()
-    label ok
+#fn testfunc ()
+    #label ok
         label ok2
             merge ok (One 303)
     fn testf ()
@@ -573,7 +573,7 @@ fn testfunc ()
                     return (One 303)
     testf;
     ;
-testfunc;
-One.test-refcount-balanced;
+#testfunc;
+#One.test-refcount-balanced;
 
 ;
