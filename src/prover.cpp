@@ -744,6 +744,13 @@ static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
         SCOPES_CHECK_RESULT(drop_values(ctx, mover, todrop));
     }
 
+    // HACK: do not keep returned values visible to parent scopes that are cleaning up
+    if (retdepth == 0) {
+        for (auto id : saved) {
+            ctx.move(id, mover);
+        }
+    }
+
     return {};
 }
 
