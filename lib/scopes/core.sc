@@ -4788,8 +4788,47 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                             T = (sc_array_type T (size as usize))
                         `T
                 else
-                    verify-count argc 1 1
-                    `(nullof cls)
+                    let count = ('element-count cls)
+                    let argc = ('argcount args)
+                    verify-count argc 1 (count + 1)
+                    let numvals = (sub argc 1)
+                    let ET = ('element@ cls 0)
+                    let values = (alloca-array Value numvals)
+                    # check if all arguments are constant and convert accordingly
+                    let const? =
+                        loop (i const? = 0 (numvals == count))
+                            if (i == numvals)
+                                break const?
+                            let arg = ('getarg args (add i 1))
+                            let arg =
+                                if ((sc_value_type arg) == ET) arg
+                                else
+                                    hide-traceback;
+                                    sc_prove ('tag `(arg as ET) ('anchor arg))
+                            store arg (getelementptr values i)
+                            _ (i + 1) (const? & ('constant? arg))
+
+                    if const?
+                        sc_const_aggregate_new cls numvals values
+                    else
+                        # generate insert instructions
+                        let block = (sc_expression_new)
+                        loop (i result = 0 `(dupe (nullof cls)))
+                            sc_expression_append block result
+                            if (i == count)
+                                break block
+                            let arg =
+                                if (i >= numvals)
+                                    # default initializer
+                                    try
+                                        sc_prove `(ET)
+                                    except (err)
+                                        error
+                                            .. "element type " (repr ET) " has no default initializer"
+                                else
+                                    load (getelementptr values i)
+                            _ (i + 1) `(insertvalue result arg i)
+
     __imply =
         do
             inline arrayref->pointer (T)
@@ -4874,7 +4913,7 @@ inline gen-arrayof (gentypef insertop)
                 sc_const_aggregate_new TT numvals values
             else
                 # generate insert instructions
-                loop (i result = 0 `(nullof TT))
+                loop (i result = 0 `(dupe (nullof TT)))
                     if (i == numvals)
                         break result
                     let arg = (load (getelementptr values i))
@@ -7575,7 +7614,8 @@ fn constructor (cls args...)
         sc_const_aggregate_new cls numfields fields
     else
         let block = (sc_expression_new)
-        loop (i result = 0 `(nullof cls))
+        # nullof cls is a global view and must become a unique
+        loop (i result = 0 `(dupe (nullof cls)))
             sc_expression_append block result
             if (i == numfields)
                 break block
@@ -7664,7 +7704,7 @@ typedef+ tuple
             store v (getelementptr fields k)
             i + 1
         let block = (sc_expression_new)
-        loop (i result = 0 `(nullof cls))
+        loop (i result = 0 `(dupe (nullof cls)))
             sc_expression_append block result
             if (i == numfields)
                 break block

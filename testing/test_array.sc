@@ -114,4 +114,24 @@ do
         # don't forget to free
         free vals
 
+do
+    # array initializer
+    let vals = ((array i32 4) 1 2)
+    test ((vals @ 0) == 1)
+    test ((vals @ 1) == 2)
+    test ((vals @ 2) == 0)
+    test ((vals @ 3) == 0)
+
+    # arrays with unique elements
+    do
+        let k = ((array One 4) (One 1) (One 2) (One 3) (One 4))
+        test ((One.refcount) == 4)
+
+    do
+        let k = (arrayof One (One 1) (One 2) (One 3) (One 4))
+        test ((One.refcount) == 4)
+
+    One.test-refcount-balanced;
+
+
 
