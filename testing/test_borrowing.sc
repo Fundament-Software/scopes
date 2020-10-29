@@ -559,7 +559,7 @@ do
     parse (nullof M)
     parse2 (nullof M)
 
-# regression: return in a do-block or label causes double free
+# regression: return in a do-block or label causes double drop
      produces: assertion failed: (_refcount >= 0)
 fn testfunc ()
     fn testf ()
@@ -571,11 +571,15 @@ testfunc;
 One.test-refcount-balanced;
 
 # error: cannot access value of type (uniqueof One 1000) because it has been moved
-#fn testfunc ()
+     also produces double drops
+fn testfunc ()
     label ok
         label ok2
+            if false
+                merge ok2 (One 305)
             merge ok (One 303)
-#testfunc;
-#One.test-refcount-balanced;
+    ;
+testfunc;
+One.test-refcount-balanced;
 
 ;

@@ -744,13 +744,6 @@ static SCOPES_RESULT(void) move_merge_values(const ASTContext &ctx,
         SCOPES_CHECK_RESULT(drop_values(ctx, mover, todrop));
     }
 
-    // HACK: do not keep returned values visible to parent scopes that are cleaning up
-    if (retdepth == 0) {
-        for (auto id : saved) {
-            ctx.move(id, mover);
-        }
-    }
-
     return {};
 }
 
@@ -758,12 +751,15 @@ static SCOPES_RESULT(TypedValueRef) move_single_merge_value(const ASTContext &ct
     int retdepth, TypedValueRef result, const char *by) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     TypedValues values;
-    if (is_returning_value(result->get_type())
-        && split_return_values(values, result)) {
-        SCOPES_CHECK_RESULT(move_merge_values(ctx, result, retdepth, values, by));
-        result = ref(result.anchor(), ArgumentList::from(values));
-    } else {
-        SCOPES_CHECK_RESULT(move_merge_values(ctx, result, retdepth, values, by));
+    auto RT = result->get_type();
+    if (is_returning(RT)) {
+        if (is_returning_value(RT)
+            && split_return_values(values, result)) {
+            SCOPES_CHECK_RESULT(move_merge_values(ctx, result, retdepth, values, by));
+            result = ref(result.anchor(), ArgumentList::from(values));
+        } else {
+            SCOPES_CHECK_RESULT(move_merge_values(ctx, result, retdepth, values, by));
+        }
     }
     return result;
 }
