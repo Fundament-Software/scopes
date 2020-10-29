@@ -472,6 +472,21 @@ let &? =
             let isref = (sc_type_is_refer selfT)
             `isref
 
+let plain? =
+    box-spice-macro
+        fn "plain?" (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 1
+            let self = (sc_getarg args 0)
+            let selfT =
+                if (band
+                        (ptrcmp== (sc_value_type self) type)
+                        (sc_value_is_constant self))
+                    unbox-pointer self type
+                else (sc_value_qualified_type self)
+            let isplain = (sc_type_is_plain selfT)
+            `isplain
+
 # typecall
 sc_type_set_symbol type '__call
     box-spice-macro
@@ -4820,11 +4835,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                             let arg =
                                 if (i >= numvals)
                                     # default initializer
-                                    try
-                                        sc_prove `(ET)
-                                    except (err)
-                                        error
-                                            .. "element type " (repr ET) " has no default initializer"
+                                    sc_prove `(ET)
                                 else
                                     load (getelementptr values i)
                             _ (i + 1) `(insertvalue result arg i)
@@ -7600,11 +7611,7 @@ fn constructor (cls args...)
                         skip ::
                         # default initializer
                         let ET = (sc_type_element_at cls i)
-                        try
-                            sc_prove `(ET)
-                        except (err)
-                            error
-                                .. "field " (repr ET) " has no default initializer"
+                        sc_prove `(ET)
                         success ::
                     store elem (getelementptr fields i)
                     elem
@@ -7712,11 +7719,7 @@ typedef+ tuple
                 if ((load (getelementptr fields i)) == null)
                     # default initializer
                     let ET = (sc_type_element_at cls i)
-                    try
-                        sc_prove `(ET)
-                    except (err)
-                        error
-                            .. "field " (repr ET) " has no default initializer"
+                    sc_prove `(ET)
                 else
                     load (getelementptr fields i)
             let result = `(insertvalue result elem i)
