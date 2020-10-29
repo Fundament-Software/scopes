@@ -154,6 +154,9 @@ typedef+ StringBase
             inline (self)
                 string self._items self._count
 
+    inline __ras (T cls)
+        static-if ((cls.ElementType == i8) and (T == string)) cls
+
     inline reverse (self)
         Generator
             inline () (deref self._count)
