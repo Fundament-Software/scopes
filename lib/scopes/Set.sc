@@ -351,8 +351,8 @@ typedef Set < Struct
 
     inline __typecall (cls opts...)
         static-if (cls == this-type)
-            let key-type = opts...
-            gen-type key-type
+            let key-type function-type = opts...
+            gen-type key-type function-type
         else
             let numsets = ((MinCapacity + 63:u64) // 64:u64)
             let validset = (malloc-array BitfieldType numsets)
