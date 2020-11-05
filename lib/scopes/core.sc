@@ -2524,6 +2524,8 @@ do
                     let anchor = ('anchor args)
                     'tag `(dupe (deref self)) anchor
 
+    'set-symbols Value
+        __copy = default-copy
     'set-symbols immutable
         __copy = default-copy
     'set-symbols pointer
