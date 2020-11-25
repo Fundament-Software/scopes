@@ -452,12 +452,13 @@ typedef+ vec-type
 
     @@ memoize
     fn construct-getter-type (vecrefT mask)
+        print vecrefT mask
         let storageT = ('storageof vecrefT)
         let ET = ('element@ storageT 0)
         let sz = ('element-count ('typeof mask))
         let lhsz = ('element-count vecrefT)
         @@ spice-quote
-        typedef [(.. ('string vecrefT) (tostring mask))]
+        typedef [(.. ('string vecrefT) "." (tostring mask))]
             \ < vec-type-accessor : storageT
             let
                 RHVectorType = (construct-vec-type ET sz)

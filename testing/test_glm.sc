@@ -213,6 +213,16 @@ do
 test ((floor (ivec2 1 2)) == (ivec2 1 2))
 test ((floor (vec2 1.5 2.5)) == (vec2 1 2))
 
+do
+    # bug #13
+    let v1 = (vec4)
+    test
+        (typeof v1.st) == vec2
+
+    local v2 : vec4
+    test
+        (typeof (v2.st as vec2)) == vec2
+
 #let m = (mat3 m)
 #print m
 
