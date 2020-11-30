@@ -130,6 +130,9 @@ typedef Map < Struct
             static-if (none? mask) self._mask
             else mask
         let capacity = (mask + 1:u64)
+        let key value =
+            dupe (deref (self._keys @ pos))
+            dupe (deref (self._values @ pos))
         label done
             loop (i = 1:u64)
                 if (i == capacity)
@@ -143,14 +146,12 @@ typedef Map < Struct
                 let pd = (keydistance ((hash atkey) as u64) index mask)
                 if ((pd == 0) or (not (valid-slot? self index)))
                     unset-slot self index_prev
-                    drop prev_key
-                    drop prev_value
                     merge done
-                assign atkey prev_key
-                assign atvalue prev_value
+                swap atkey prev_key
+                swap atvalue prev_value
                 i + 1:u64
         self._count = self._count - 1:u32
-        ;
+        _ key value
 
     inline lookup (self key keyhash successf failf mask)
         """"Finds the index and address of an entry associated with key or
@@ -293,14 +294,6 @@ typedef Map < Struct
         else
             ;
 
-    fn dump (self)
-        for i in (range 0:u64 (self._mask + 1:u64))
-            if (valid-slot? self i)
-                print i (self._keys @ i) "=" (self._values @ i)
-            else
-                print i "<empty>"
-        print "terseness" (terseness self) "mask" self._mask "count" self._count
-
     fn in? (self key)
         let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
@@ -377,6 +370,15 @@ typedef Map < Struct
                     _mask = MinMask
                     _capacity = MinCapacity
             self
+
+    fn dump (self)
+        for i in (range 0:u64 (self._mask + 1:u64))
+            if (valid-slot? self i)
+                print i (self._keys @ i) "=" (self._values @ i)
+            else
+                print i "<empty>"
+        print "terseness" (terseness self) "mask" self._mask "count" self._count
+
 
     unlet unset-slot rehash auto-rehash lookup insert_entry reserve
         \ erase_pos key-value-generator gen-type set-slot valid-slot?
