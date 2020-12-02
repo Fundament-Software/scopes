@@ -452,7 +452,6 @@ typedef+ vec-type
 
     @@ memoize
     fn construct-getter-type (vecrefT mask)
-        print vecrefT mask
         let storageT = ('storageof vecrefT)
         let ET = ('element@ storageT 0)
         let sz = ('element-count ('typeof mask))
@@ -482,7 +481,6 @@ typedef+ vec-type
                 elseif (mask == mask_one)
                     '@ ('typeof self) 'One
                 else
-                    print mask mask_zero mask_one
                     error "illegal literal mask"
             else
                 `(extractelement self mask)
