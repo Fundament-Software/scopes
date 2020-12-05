@@ -321,7 +321,7 @@ typedef Map < Struct
         let hash = ((typeof self) . HashFunction)
         lookup self key ((hash key) as u64)
             inline "ok" (idx)
-                return (deref (self._values @ idx))
+                return (self._values @ idx)
             inline "fail" ()
                 raise (MapError.KeyNotFound)
 
