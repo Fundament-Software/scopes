@@ -184,10 +184,10 @@ spice static-repr-switch-case (litT self allow-dupes? style? field-types...)
         let index = (('@ field 'Index) as u64)
         store (tupleof index field) (getelementptr sorted i)
     # sort array so duplicates are next to each other and merge names
-    shabbysort sorted numfields    
+    shabbysort sorted numfields
     loop (i = 0)
         if (i == numfields)
-            break `"?invalid?"        
+            break `"?invalid?"
         let index field = (unpack (load (getelementptr sorted i)))
         if (index == value)
             let name = (('@ field 'Name) as Symbol as string)
@@ -208,7 +208,7 @@ spice static-repr-switch-case (litT self allow-dupes? style? field-types...)
                 if style?
                     sc_default_styler style-number name
                 else name
-            break `name    
+            break `name
         i + 1
 
 fn build-repr-switch-case (litT self allow-dupes? style? field-types)
@@ -366,6 +366,11 @@ fn finalize-enum-runtime (T storage)
         case (args...)
             va-map __drop args...
             ;
+        inline... drop-any
+        case (arg : Nothing,)
+        case (args...)
+            va-map __drop args...
+            ;
         inline cmp-default () false
         inline hash-default () (nullof hash)
         # build repr function
@@ -390,6 +395,22 @@ fn finalize-enum-runtime (T storage)
                     static-repr-switch-case index-type val false false field-types
                 else
                     tostring self
+            fn __copy (self)
+                '__dispatch self
+                    spice-unquote
+                        sc_argument_list_map_new (numfields + 1)
+                            inline (i)
+                                if (i == numfields)
+                                    # default field
+                                    `unreachable
+                                else
+                                    let field = (('getarg field-types i) as type)
+                                    let name = (('@ field 'Name) as Symbol)
+                                    sc_keyed_new name
+                                        spice-quote
+                                            inline (args...)
+                                                field
+                                                    va-map copy args...
             fn __drop (self)
                 #print "dropping option" self
                 '__dispatch self
@@ -452,6 +473,7 @@ fn finalize-enum-runtime (T storage)
         set-symbol T '__repr __repr
         set-symbol T '__tostring __tostring
         set-symbol T '__drop __drop
+        set-symbol T '__copy __copy
         set-symbol T '__== __==
         set-symbol T '__hash __hash
         let fields = (alloca-array type numfields)
