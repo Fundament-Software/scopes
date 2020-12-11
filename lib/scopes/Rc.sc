@@ -252,6 +252,15 @@ typedef+ Rc
         static-if (cls == other-cls)
             inline (self other)
                 == (storagecast (_view self)) (storagecast (_view other))
+        elseif (other-cls == cls.Type)
+            inline (self other)
+                == (@ (storagecast (_view self))) other
+
+    @@ memo
+    inline __r== (other-cls cls)
+        static-if (other-cls == cls.Type)
+            inline (other self)
+                == other (@ (storagecast (_view self)))
 
     inline __hash (self)
         hash (storagecast (_view self))
