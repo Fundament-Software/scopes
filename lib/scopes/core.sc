@@ -7891,6 +7891,9 @@ do
         __| = (simple-binary-storage-op (_ |))
         __& = (simple-binary-storage-op (_ &))
         __^ = (simple-binary-storage-op (_ ^))
+        __hash =
+            inline "CEnum-hash" (self)
+                hash (self as integer)
         __imply =
             spice-cast-macro
                 fn "CEnum-imply" (vT T)
