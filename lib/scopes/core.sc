@@ -2018,7 +2018,6 @@ fn string@ (self i)
 
 'define-symbols string
     buffer = sc_string_buffer
-    __countof = sc_string_count
     __@ = string@
     __lslice = sc_string_lslice
     __rslice = sc_string_rslice
@@ -2032,6 +2031,19 @@ fn string@ (self i)
     __<= = (box-pointer (simple-binary-op (inline (a b) (icmp<=s (sc_string_compare a b) 0))))
     __> = (box-pointer (simple-binary-op (inline (a b) (icmp>s (sc_string_compare a b) 0))))
     __>= = (box-pointer (simple-binary-op (inline (a b) (icmp>=s (sc_string_compare a b) 0))))
+    __countof =
+        box-pointer
+            spice-macro
+                fn (args)
+                    let argc = (sc_argcount args)
+                    verify-count argc 1 1
+                    let self = (sc_getarg args 0)
+                    if ('constant? self)
+                        let count =
+                            sc_string_count (unbox self string)
+                        `count
+                    else
+                        `(sc_string_count self)
 
 'define-symbols list
     __typecall = list-constructor
