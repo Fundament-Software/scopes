@@ -244,4 +244,18 @@ do
     print (compile-glsl 450 'vertex (static-typify vertex))
     none
 
+# #15: When using GLSL version 420, spir-v generator doesn't insert GL_ARB_shader_storage_buffer_object extension
+do
+    fn vertex ()
+        using import glsl
+        using import glm
+        buffer attr :
+            struct Attributes plain
+                data : (array vec2)
+        gl_Position = (vec4 (attr.data @ gl_VertexID) 0 1)
+
+    print
+        static-compile-glsl 420 'vertex (static-typify vertex)
+
+
 ;

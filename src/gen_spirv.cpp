@@ -2300,7 +2300,7 @@ struct SPIRVGenerator {
             SCOPES_ERROR(CGenEntryFunctionSignatureMismatch, needfi, hasfi);
         }
 
-        builder.setSource(spv::SourceLanguageGLSL, 450);
+        builder.setSource(spv::SourceLanguageGLSL, (this->version == 0)?450:this->version);
         glsl_ext_inst = builder.import("GLSL.std.450");
 
         auto func = SCOPES_GET_RESULT(Function_to_function(entry));
@@ -2345,10 +2345,18 @@ struct SPIRVGenerator {
         }
 
         int version = spv::Version;
-        if (env == SPV_ENV_OPENGL_4_5) {
+        switch (env) {
+        case SPV_ENV_OPENGL_4_0:
+        case SPV_ENV_OPENGL_4_1:
+        case SPV_ENV_OPENGL_4_2:
+        case SPV_ENV_OPENGL_4_3:
+        case SPV_ENV_OPENGL_4_5: {
             // fixed: Invalid SPIR-V binary version 1.3 for target environment SPIR-V 1.0 (under OpenGL 4.5 semantics).
             version = 0x10000; // SPIR-V 1.0
+        } break;
+        default: break;
         }
+
         if (this->version != 0) {
             version = this->version;
         }
@@ -2504,7 +2512,15 @@ SCOPES_RESULT(const String *) compile_glsl(int version, Symbol target, const Fun
 
     //SCOPES_CHECK_RESULT(fn->verify_compilable());
 
-    const spv_target_env env = SPV_ENV_OPENGL_4_5;
+    spv_target_env env = SPV_ENV_OPENGL_4_5;
+    switch (version) {
+    case 400: env = SPV_ENV_OPENGL_4_0; break;
+    case 410: env = SPV_ENV_OPENGL_4_1; break;
+    case 420: env = SPV_ENV_OPENGL_4_2; break;
+    case 430: env = SPV_ENV_OPENGL_4_3; break;
+    case 450: env = SPV_ENV_OPENGL_4_5; break;
+    default: break;
+    }
 
     SPIRVGenerator ctx(env, 0);
     if (flags & CF_NoDebugInfo) {
