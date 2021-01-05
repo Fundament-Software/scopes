@@ -886,10 +886,9 @@ static void add_c_macro(clang::Preprocessor & PP,
     clang::SmallString<64> IntegerBuffer;
     bool NumberInvalid = false;
     clang::StringRef Spelling = PP.getSpelling(*Tok, IntegerBuffer, &NumberInvalid);
-    clang::NumericLiteralParser Literal(Spelling, Tok->getLocation(), PP
-        /*
+    clang::NumericLiteralParser Literal(Spelling, Tok->getLocation(),
         PP.getSourceManager(), PP.getLangOpts(), PP.getTargetInfo(),
-        PP.getDiagnostics()*/);
+        PP.getDiagnostics());
     if(Literal.hadError)
         return;
     const String *name = String::from_cstr(II->getName().str().c_str());

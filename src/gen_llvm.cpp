@@ -2993,9 +2993,9 @@ struct LLVMIRGenerator {
                 /*Kind*/ LLVMDWARFEmissionFull,
                 /*DWOId*/ 0,
                 /*SplitDebugInlining*/ true,
-                /*DebugInfoForProfiling*/ false
-                // /*SysRoot*/ "", 0,
-                // /*SDK*/ "", 0
+                /*DebugInfoForProfiling*/ false,
+                /*SysRoot*/ "", 0,
+                /*SDK*/ "", 0
                 );
 
 
