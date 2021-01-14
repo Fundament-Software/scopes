@@ -4377,6 +4377,24 @@ let key =
             let value = ('getarg args 1)
             sc_keyed_new sym value
 
+let verify-stepsize =
+    spice-macro
+        fn (args)
+            let arg = ('getarg args 0)
+            label pass
+                if ('constant? arg)
+                    let val = ((sc_const_int_extract arg) as i64)
+                    if (sc_integer_type_is_signed ('typeof arg))
+                        if (val > 0)
+                            merge pass
+                    else
+                        if (val != 0)
+                            merge pass
+                    hide-traceback;
+                    error@ ('anchor arg) "while checking step size"
+                        "step size must be > 0"
+            `()
+
 run-stage; # 7
 
 # (define-scope-macro name expr ...)
@@ -4582,6 +4600,7 @@ inline range (a b c)
         static-branch (none? c)
             inline () (1 as num-type)
             inline () c
+    verify-stepsize step
     let from =
         static-branch (none? b)
             inline () (0 as num-type)
@@ -4605,6 +4624,7 @@ inline rrange (a b c)
         static-branch (none? c)
             inline () (1 as num-type)
             inline () c
+    verify-stepsize step
     let from =
         static-branch (none? b)
             inline () (0 as num-type)
