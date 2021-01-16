@@ -229,7 +229,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
             if ((key != tmp) and (key != unnamed))
                 if (('argcount vals...) != 1)
                     let block = (sc_expression_new)
-                    let acount = ('args vals...)
+                    let acount = ('argcount vals...)
                     let outargs = `(alloca-array Value acount)
                     sc_expression_append block outargs
                     for i arg in (enumerate ('args vals...))
