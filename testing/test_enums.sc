@@ -255,5 +255,15 @@ do
     test ((hash (Atom.Number 1 2)) != (hash (Atom.Number 2 2)))
     test ((hash (Atom.Number 1 3)) == (hash (Atom.Number 1 3)))
 
+do
+    # copying enums
+    enum Q
+        A
+        B : i32 i32
+        C
+
+    copy (Q.A)
+    ;
+
 ;
 

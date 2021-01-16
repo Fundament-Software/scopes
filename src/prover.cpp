@@ -2240,6 +2240,8 @@ repeat:
             CHECKARGS(1, 1);
             READ_NODEREF_TYPEOF(X);
             const Type *DestT = strip_lifetime(X);
+            if (X == DestT)
+                return _X;
             auto op = Cast::from(CastBitcast, _X, DestT);
             if (is_plain(X)) {
                 return TypedValueRef(call.anchor(), op);

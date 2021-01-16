@@ -55,9 +55,9 @@ do
     # forward label form
 
     :: ok
-    merge ok 1 2 3
-    ok (x y z) ::
-    print x y z
+    merge ok 1 2 3 4 5
+    ok (x y z w...) ::
+    print x "," y "," z "," w...
 
     let select1 = (gen-label-merge-test)
     fn select2 (k str)

@@ -24,5 +24,7 @@ test-compiler-error
         local x = (One 303)
         copy &x
 
+test (constant? (copy none))
+
 
 ;
