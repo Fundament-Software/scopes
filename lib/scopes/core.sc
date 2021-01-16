@@ -2756,6 +2756,7 @@ let coerce-call-arguments =
                             let outarg =
                                 if (sc_type_compatible argT paramT) arg
                                 else
+                                    let paramT = ('strip-qualifiers paramT)
                                     ('tag `(imply arg paramT) ('anchor arg))
                             sc_call_append_argument outargs outarg
                         + i 1
