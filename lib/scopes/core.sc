@@ -5911,6 +5911,7 @@ define va-range
                 hide-traceback;
                 error "too many elements specified for range"
             let count = (b - a)
+            let count = (? (count < 0) 0 count)
             sc_argument_list_map_new count
                 inline (i)
                     let i = (i + a)
