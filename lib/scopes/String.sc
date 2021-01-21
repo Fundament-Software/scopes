@@ -284,10 +284,10 @@ typedef+ StringBase
         assigned slot of string `self`. When the string is of `GrowingString`
         type, this operation will transparently resize the string's storage.
     inline emplace-append-many (self size args...)
-        let dest = (append-slots self size)
+        let dest = (& (append-slots self size))
         for idx in (range size)
             let value = (((typeof self) . ElementType) args...)
-            assign value (self._items @ idx)
+            assign value (dest @ idx)
         dest
 
     """"Insert `value` at `index` into the string `self` and return a reference

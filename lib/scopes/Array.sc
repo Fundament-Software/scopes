@@ -183,10 +183,10 @@ typedef+ Array
         assigned slot of array `self`. When the `array` is of `GrowingArray`
         type, this operation will transparently resize the array's storage.
     inline emplace-append-many (self size args...)
-        let dest = (append-slots self size)
+        let dest = (& (append-slots self size))
         for idx in (range size)
             let value = (((typeof self) . ElementType) args...)
-            assign value (self._items @ idx)
+            assign value (dest @ idx)
         dest
 
     """"Insert `value` at `index` into the array `self` and return a reference

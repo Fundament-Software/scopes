@@ -95,6 +95,12 @@ do
     test (q == "inittiniinit")
     ;
 
+do
+    local s : String "abcd"
+    'emplace-append-many s 4 101:i8
+    test (s == "abcdeeee")
+    ;
+
 # testing proper globalization
 local s = (String "test")
 run-stage;

@@ -231,3 +231,15 @@ fn test-remove ()
 
 test-remove;
 One.test-refcount-balanced;
+
+do
+    local a : (Array i32)
+    for i in (range 3)
+        'append a 10
+    'emplace-append-many a 2 1
+    for i in (range 3)
+        test ((a @ i) == 10)
+    for i in (range 3 5)
+        test ((a @ i) == 1)
+
+;
