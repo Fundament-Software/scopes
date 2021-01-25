@@ -16,6 +16,11 @@ using import struct
 let llvm.memcpy.p0i8.p0i8.i64 =
     extern 'llvm.memcpy.p0i8.p0i8.i64
         function void (mutable rawstring) rawstring i64 bool
+# declare void @llvm.memset.p0i8.i64(i8* <dest>, i8 <val>,
+                                   i64 <len>, i1 <isvolatile>)
+let llvm.memset.p0i8.i64 =
+    extern 'llvm.memset.p0i8.i64
+        function void (mutable rawstring) i8 i64 bool
 
 inline string-generator (self)
     Generator
@@ -318,7 +323,9 @@ typedef+ StringBase
         assert (&count > 0) "can't pop from empty string"
         &count -= 1
         let idx = (deref &count)
-        dupe (deref (self._items @ idx))
+        let result = (dupe (deref (self._items @ idx)))
+        store ((typeof self) . ZeroElement) (getelementptr self._items idx)
+        result
 
     """"Remove element at index from string `self` and return it.
         This operation offsets the index of each following element by -1.
@@ -331,17 +338,27 @@ typedef+ StringBase
             dupe (deref (items @ index))
         for i in (range index &count)
             assign (dupe (items @ (i + 1))) (items @ i)
+        store ((typeof self) . ZeroElement) (getelementptr self._items &count)
         result
 
     """"Clear the string and reset its element count to zero. This will drop
         all elements that have been previously contained by the string.
     fn clear (self)
+        let cls = (typeof self)
+        offset := (deref self._count)
         self._count = 0:usize
+        # null remainder of memory
+        llvm.memset.p0i8.i64
+            bitcast self._items (mutable rawstring)
+            0:i8
+            (offset * (sizeof cls.ElementType)) as i64
+            false
         return;
 
     """"Resize the array to the specified count. Items are apppend or removed
         to meet the desired count.
     fn resize (self count args...)
+        let cls = (typeof self)
         let count = (count as usize)
         if (self._count < count)
             let T = (typeof self)
@@ -350,6 +367,12 @@ typedef+ StringBase
         else
             offset := self._count - count
             self._count = count
+            # null remainder of memory
+            llvm.memset.p0i8.i64
+                bitcast (getelementptr self._items count) (mutable rawstring)
+                0:i8
+                (offset * (sizeof cls.ElementType)) as i64
+                false
 
     fn reserve (self count)
         free ('internal-reserve self count)
@@ -383,6 +406,7 @@ typedef+ FixedString
     inline gen-fixed-string-type (element-type capacity)
         static-assert ((typeof element-type) == type)
         static-assert ((typeof capacity) == i32)
+        static-assert (capacity >= 0)
         let parent-type = this-type
         struct
             .. "<FixedString "
@@ -399,7 +423,7 @@ typedef+ FixedString
                 ElementType = element-type
                 PointerType = (pointer element-type)
                 ZeroElement = (nullof element-type)
-                Capacity = capacity
+                Capacity = (capacity + 1)
 
     inline __typecall (cls opts...)
         static-if (cls == this-type)
@@ -408,7 +432,7 @@ typedef+ FixedString
         else
             let ET = cls.ElementType
             let items = (malloc-array ET cls.Capacity)
-            store (nullof ET) items
+            store cls.ZeroElement items
             Struct.__typecall cls
                 _items = items
                 _count = 0:usize
@@ -435,7 +459,7 @@ typedef+ FixedString
         capacity has been exceeded.
     fn internal-reserve (self count)
         let T = (typeof self)
-        assert (count <= T.Capacity) "capacity exceeded"
+        assert (count < T.Capacity) "capacity exceeded"
         nullof (typeof self._items)
 
     unlet gen-fixed-string-type parent-type
@@ -500,7 +524,12 @@ typedef+ GrowingString
                 bitcast data rawstring
                 (count * (sizeof cls.ElementType)) as i64
                 false
-            store cls.ZeroElement (getelementptr items count)
+            # null remainder of memory
+            llvm.memset.p0i8.i64
+                bitcast (getelementptr (view items) count) (mutable rawstring)
+                0:i8
+                ((capacity - count) * (sizeof ET)) as i64
+                false
             Struct.__typecall cls
                 _items = items
                 _count = count
@@ -509,10 +538,14 @@ typedef+ GrowingString
             this-function data (zero-terminated-length data)
         case (capacity : usize = DEFAULT_CAPACITY,)
             let capacity =
-                nearest-capacity DEFAULT_CAPACITY capacity
+                nearest-capacity DEFAULT_CAPACITY (capacity + 1)
             let ET = cls.ElementType
             let items = (malloc-array ET capacity)
-            store cls.ZeroElement items
+            llvm.memset.p0i8.i64
+                bitcast items (mutable rawstring)
+                0:i8
+                (capacity * (sizeof ET)) as i64
+                false
             Struct.__typecall cls
                 _items = items
                 _count = 0:usize
@@ -541,18 +574,20 @@ typedef+ GrowingString
                 repr self._items
                 "]"
 
-    """"Returns the current maximum capacity of string `self`.
+    """"Returns the current maximum capacity of string `self`, which includes
+        the trailing zero.
     inline capacity (self)
         deref self._capacity
 
     """"Internally used by the type. Ensures that string `self` can hold at least
         `count` elements. A growing string will always attempt to comply.
     fn internal-reserve (self count)
-        if (count > self._capacity)
+        let cls = (typeof self)
+        if (count >= self._capacity)
             # multiply capacity by 2.7 (roughly e) until we can carry the desired
-                count
+                count (plus trailing zero)
             let new-capacity =
-                nearest-capacity (deref self._capacity) count
+                nearest-capacity (deref self._capacity) (count + 1)
             let T = (typeof self)
             let count = (deref self._count)
             let old-items = (deref self._items)
@@ -561,6 +596,12 @@ typedef+ GrowingString
                 bitcast (view new-items) (mutable rawstring)
                 bitcast old-items rawstring
                 (count * (sizeof T.ElementType)) as i64
+                false
+            # null remainder of memory
+            llvm.memset.p0i8.i64
+                bitcast (getelementptr (view new-items) count) (mutable rawstring)
+                0:i8
+                ((new-capacity - count) * (sizeof T.ElementType)) as i64
                 false
             assign new-items self._items
             self._capacity = new-capacity
