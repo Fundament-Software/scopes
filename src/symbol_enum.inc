@@ -359,7 +359,7 @@ namespace scopes {
     T(OP_Tertiary, "?") \
     T(OP_FMix, "fmix") \
     T(OP_Step, "step") \
-    T(OP_SmoothStep, "smoothstep") \
+    /*T(OP_SmoothStep, "smoothstep")*/ \
     T(FN_Round, "round") \
     T(FN_RoundEven, "roundeven") \
     T(OP_Trunc, "trunc") \
@@ -367,8 +367,8 @@ namespace scopes {
     T(OP_FSign, "fsign") \
     T(OP_SSign, "ssign") \
     T(OP_Floor, "floor") \
-    T(FN_Ceil, "ceil") \
-    T(FN_Fract, "fract") \
+    /* T(FN_Ceil, "ceil") */ \
+    /* T(FN_Fract, "fract") */ \
     T(OP_Radians, "radians") \
     T(OP_Degrees, "degrees") \
     T(OP_Sin, "sin") \
