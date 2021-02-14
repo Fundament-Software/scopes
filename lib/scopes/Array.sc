@@ -223,7 +223,7 @@ typedef+ Array
         This operation offsets the index of each following element by -1.
     fn remove (self index)
         let &count = self._count
-        assert (index < &count) "can't pop from empty array"
+        assert (index < &count) "can't remove from empty array"
         &count -= 1
         let items = self._items
         let result =
