@@ -26,11 +26,11 @@ do
 do
     enum test-enum plain
         X
-        Y = 5
+        tag 'Y Nothing 5
         Z
         W = 25
-        Q
-        R
+        tag 'Q
+        tag 'R
 
     test (test-enum.Y | test-enum.W == 29)
 
