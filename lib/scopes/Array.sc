@@ -25,9 +25,9 @@ fn iLeftChild (i)
 fn iRightChild (i)
     2:i64 * i + 2:i64
 
-inline array-generator (self)
+inline... array-generator (self, offset : usize = 0:usize)
     Generator
-        inline () 0:usize
+        inline () offset
         inline (i) (i < self._count)
         inline (i) (self @ i)
         inline (i) (i + 1:usize)
@@ -45,10 +45,12 @@ typedef+ Array
     inline __as (cls T)
         static-if (T == Generator) array-generator
 
-    inline reverse (self)
+    let forward = array-generator
+
+    inline... reverse (self offset : usize = 0:usize)
         Generator
             inline () (deref self._count)
-            inline (i) (i > 0:usize)
+            inline (i) (i > offset)
             inline (i) (self @ (i - 1:usize))
             inline (i) (i - 1:usize)
 
