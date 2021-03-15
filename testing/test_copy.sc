@@ -16,12 +16,13 @@ test (q2 == 0)
 
 test-compiler-error
     do
-        let x = (One 303)
+        let x = (K)
         copy x
 
+# One can be copied now
 test-compiler-error
     do
-        local x = (One 303)
+        local x = (K)
         copy &x
 
 test (constant? (copy none))

@@ -7692,23 +7692,46 @@ fn constructor (cls args...)
 #-------------------------------------------------------------------------------
 
 # comparison
-spice tuple== (self other)
+spice tuple-comparison (self other default-value branch-value op)
     let cls = ('typeof self)
     let numfields = ('element-count cls)
-    let quoted-false = `false
-    loop (i result = numfields `true)
-        if (i == 0)
-            break result
-        let i = (i - 1)
-        _   i
-            sc_cond_new `((self @ i) != (other @ i)) quoted-false result
-
+    let expr = (sc_expression_new)
+    loop (i = 0)
+        if (i == numfields)
+            sc_expression_append expr default-value
+            break expr
+        _   (i + 1)
+            sc_expression_append expr
+                spice-quote
+                    if (op (self @ i) (other @ i))
+                        return branch-value
 
 typedef+ tuple
     spice-quote
+        @@ memo
         inline __== (cls T)
             static-if (cls == T)
-                tuple==
+                fn (self other) (tuple-comparison self other true false !=)
+
+        @@ memo
+        inline __< (cls T)
+            static-if (cls == T)
+                fn (self other) (tuple-comparison self other false true <)
+
+        @@ memo
+        inline __<= (cls T)
+            static-if (cls == T)
+                fn (self other) (tuple-comparison self other true false >)
+
+        @@ memo
+        inline __> (cls T)
+            static-if (cls == T)
+                fn (self other) (tuple-comparison self other false true >)
+
+        @@ memo
+        inline __>= (cls T)
+            static-if (cls == T)
+                fn (self other) (tuple-comparison self other true false <)
 
     # automatic hashing of arguments
     spice __hash (self)
@@ -8214,7 +8237,7 @@ sc_set_typecast_handler
 
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
-    \ tuple== gen-arrayof MethodsAccessor-typeattr floorf
+    \ tuple-comparison gen-arrayof MethodsAccessor-typeattr floorf
 
 run-stage; # 12
 
