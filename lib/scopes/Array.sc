@@ -286,6 +286,18 @@ typedef+ Array
         assign new-items newarr._items
         newarr
 
+    @@ memo
+    inline __== (cls T)
+        static-if (cls == T)
+            fn (self other)
+                and
+                    self._count == other._count
+                    do
+                        for a b in (zip self other)
+                            if (a != b)
+                                break false
+                        else true
+
     unlet gen-sort append-slots
 
 """"The supertype and constructor for arrays of fixed size.
