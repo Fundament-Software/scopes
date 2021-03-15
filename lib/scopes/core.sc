@@ -7692,46 +7692,41 @@ fn constructor (cls args...)
 #-------------------------------------------------------------------------------
 
 # comparison
-spice tuple-comparison (self other default-value branch-value op)
+spice tuple-comparison (self other default-value op)
     let cls = ('typeof self)
     let numfields = ('element-count cls)
-    let expr = (sc_expression_new)
-    loop (i = 0)
-        if (i == numfields)
-            sc_expression_append expr default-value
-            break expr
-        _   (i + 1)
-            sc_expression_append expr
-                spice-quote
-                    if (op (self @ i) (other @ i))
-                        return branch-value
+    fold (result = default-value) for i in (rrange numfields)
+        spice-quote
+            let a b = (self @ i) (other @ i)
+            if (== a b) result
+            else (op a b)
 
 typedef+ tuple
     spice-quote
         @@ memo
         inline __== (cls T)
             static-if (cls == T)
-                fn (self other) (tuple-comparison self other true false !=)
+                fn (self other) (tuple-comparison self other true (inline () false))
 
         @@ memo
         inline __< (cls T)
             static-if (cls == T)
-                fn (self other) (tuple-comparison self other false true <)
+                fn (self other) (tuple-comparison self other false <)
 
         @@ memo
         inline __<= (cls T)
             static-if (cls == T)
-                fn (self other) (tuple-comparison self other true false >)
+                fn (self other) (tuple-comparison self other true <)
 
         @@ memo
         inline __> (cls T)
             static-if (cls == T)
-                fn (self other) (tuple-comparison self other false true >)
+                fn (self other) (tuple-comparison self other false >)
 
         @@ memo
         inline __>= (cls T)
             static-if (cls == T)
-                fn (self other) (tuple-comparison self other true false <)
+                fn (self other) (tuple-comparison self other true >)
 
     # automatic hashing of arguments
     spice __hash (self)
