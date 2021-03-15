@@ -268,6 +268,24 @@ typedef+ Array
     fn swap (self a b)
         swap (self._items @ a) (self._items @ b)
 
+    """"Implements support for the `copy` operation.
+    fn __copy (self)
+        viewing self
+        local newarr = (dupe (deref self))
+        let count = (deref self._count)
+        let old-items = (deref self._items)
+        let T = (typeof self)
+        let capacity = ('capacity self)
+        let new-items = (malloc-array T.ElementType capacity)
+        loop (idx = 0)
+            if (idx < count)
+                assign (copy (old-items @ idx)) (new-items @ idx)
+                repeat (idx + 1)
+            else
+                break;
+        assign new-items newarr._items
+        newarr
+
     unlet gen-sort append-slots
 
 """"The supertype and constructor for arrays of fixed size.
@@ -333,6 +351,7 @@ typedef+ FixedArray
     fn reserve (self count)
         let T = (typeof self)
         assert (count <= T.Capacity) "capacity exceeded"
+
 
     unlet gen-fixed-array-type parent-type
 

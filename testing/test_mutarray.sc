@@ -242,4 +242,31 @@ do
     for i in (range 3 5)
         test ((a @ i) == 1)
 
+# copy operator
+fn test-copy ()
+    One.test-refcount-balanced;
+
+    local a : (Array One)
+    'insert a (One 0)
+    'insert a (One 1)
+    'insert a (One 2)
+    'insert a (One 3)
+    'insert a (One 4)
+    'insert a (One 5)
+    test ((One.refcount) == 6)
+    local b = (copy a)
+    test ((One.refcount) == 12)
+    drop a
+    test ((One.refcount) == 6)
+    test (('value (b @ 0)) == 0)
+    test (('value (b @ 1)) == 1)
+    test (('value (b @ 2)) == 2)
+    test (('value (b @ 3)) == 3)
+    test (('value (b @ 4)) == 4)
+    test (('value (b @ 5)) == 5)
+    ;
+
+test-copy;
+One.test-refcount-balanced;
+
 ;

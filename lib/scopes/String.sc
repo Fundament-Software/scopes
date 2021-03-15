@@ -386,6 +386,30 @@ typedef+ StringBase
     fn swap (self a b)
         swap (self._items @ a) (self._items @ b)
 
+    """"Implements support for the `copy` operation.
+    fn __copy (self)
+        viewing self
+        local newarr = (dupe (deref self))
+        let count = (deref self._count)
+        let old-items = (deref self._items)
+        let cls = (typeof self)
+        let capacity = ('capacity self)
+        let new-items = (malloc-array cls.ElementType capacity)
+        loop (idx = 0)
+            if (idx < count)
+                assign (copy (old-items @ idx)) (new-items @ idx)
+                repeat (idx + 1)
+            else
+                break;
+        # null remainder of memory
+        llvm.memset.p0i8.i64
+            bitcast (getelementptr (view new-items) count) (mutable rawstring)
+            0:i8
+            ((capacity - count) * (sizeof cls.ElementType)) as i64
+            false
+        assign new-items newarr._items
+        newarr
+
     unlet append-slots
 
 """"The supertype and constructor for strings of fixed size.

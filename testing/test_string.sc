@@ -121,6 +121,9 @@ do
     verify-zero-terminated q
     'append q "0123456789"
     verify-zero-terminated q
+    local p = (copy q)
+    test (p == "0123456789")
+    verify-zero-terminated p
     'resize q 4
     verify-zero-terminated q
     'pop q

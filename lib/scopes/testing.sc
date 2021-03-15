@@ -262,6 +262,9 @@ typedef One :: (tuple i32 (mutable pointer i32))
     fn value (self)
         deref (@ (storagecast (view self)) 0)
 
+    fn __copy (self)
+        (typeof self) ('value self)
+
     fn check (self)
         let ref = (@ (@ (storagecast self) 1))
         test (ref == 1)

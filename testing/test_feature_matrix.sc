@@ -3,8 +3,6 @@ using import testing
 
 let i32x4 = (array i32 4)
 
-run-stage;
-
 inline test (f)
     inline (T)
         f (nullof T) 1
