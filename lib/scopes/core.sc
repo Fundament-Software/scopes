@@ -2047,6 +2047,7 @@ fn string@ (self i)
 
 'define-symbols list
     __typecall = list-constructor
+    serialize = sc_list_serialize
     __repr =
         inline "list-repr" (self)
             sc_list_repr self
