@@ -97,11 +97,15 @@ typedef+ Array
         self._items @ (self._count - 1:usize)
 
     @@ memo
-    inline gen-sort (key)
+    inline gen-sort (key predicate)
         let key =
             static-if (none? key)
                 inline (x) x
             else key
+        let pred =
+            static-if (none? predicate)
+                inline (a b) (< a b)
+            else predicate
 
         fn siftDown (items start end ...)
             loop (root = start)
@@ -122,10 +126,10 @@ typedef+ Array
                     if (child1 <= end)
                         let v_child1 = (items @ child1)
                         let k_child1 = (key v_child1 ...)
-                        if (k_swap < k_child1)
+                        if (pred k_swap k_child1 ...)
                             step2 child1 v_child1 k_child1
                     step2 iswap v_swap k_swap
-                if (k_root < k_child)
+                if (pred k_root k_child ...)
                     step1 child v_child k_child
                 else
                     step1 root v_root k_root
@@ -156,6 +160,14 @@ typedef+ Array
         value for each element value supplied.
     inline sort (self key ...)
         (gen-sort key) (deref self._items) ((deref self._count) as i64) ...
+
+    """"Sort elements of array `self` from smallest to largest, either using
+        the `<` operator supplied by the element type, or by using the predicate
+        supplied by the callable `predicate`, which takes two arguments and
+        is expected to return true if the first argument is smaller than the
+        second one.
+    inline predicated-sort (self predicate ...)
+        (gen-sort (predicate = predicate)) (deref self._items) ((deref self._count) as i64) ...
 
     fn append-slots (self n)
         let idx = (deref self._count)
