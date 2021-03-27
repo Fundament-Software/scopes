@@ -4281,13 +4281,11 @@ let __static-assert =
             let expr msg =
                 'getarg args 0
                 'getarg args 1
-            let msg = (msg as string)
             let val = (expr as bool)
             if (not val)
-                hide-traceback;
-                error
-                    .. "assertion failed: " msg
-            `()
+                ('tag `(static-error (msg)) ('anchor args))
+            else
+                `()
 
 let __assert =
     spice-macro
@@ -4295,7 +4293,7 @@ let __assert =
             inline check-assertion (result anchor msg)
                 if (not result)
                     print anchor
-                        .. "assertion failed: " msg
+                        .. "assertion failed: " (msg)
                     sc_set_signal_abort true
                     sc_abort;
 
@@ -4304,8 +4302,6 @@ let __assert =
             let expr msg =
                 'getarg args 0
                 'getarg args 1
-            if (('typeof msg) != string)
-                error "string expected as second argument"
             let anchor = ('anchor args)
             'tag `(check-assertion expr anchor msg) anchor
 
@@ -4703,12 +4699,12 @@ define-sugar-macro static-assert
     let cond msg body = (decons args 2)
     let anchor = ('anchor cond)
     let msg = (convert-assert-args args cond msg)
-    list ('tag `__static-assert anchor) cond msg
+    list ('tag `__static-assert anchor) cond (list inline '() msg)
 
 define-sugar-macro assert
     let cond msg body = (decons args 2)
     let msg = (convert-assert-args args cond msg)
-    list __assert cond msg
+    list __assert cond (list inline '() msg)
 
 define-sugar-macro while
     let cond body = (decons args)
