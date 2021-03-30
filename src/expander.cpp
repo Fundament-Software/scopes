@@ -351,12 +351,25 @@ struct Expander {
         if (endit != EOL)
             values = endit->next;
 
-        it = values;
-
         Values initargs;
-        if (it) {
+        if (values) {
+            it = values;
             Expander subexp(env, astscope, it->next);
             SCOPES_CHECK_RESULT(subexp.expand_arguments(initargs, it));
+        } else {
+            // no assignments, reimport parameter names into loop scope
+            it = params;
+            // read parameter names
+            while (it != endit) {
+                auto paramval = it->at;
+                Symbol name = SCOPES_GET_RESULT(extract_symbol_constant(paramval));
+                ValueRef value;
+                if (!env->lookup(paramval.cast<Const>(), value)) {
+                    SCOPES_ERROR(SyntaxUndeclaredIdentifier, name, env);
+                }
+                initargs.push_back(value);
+                it = it->next;
+            }
         }
 
         LoopRef loop = ref(anchor, Loop::from(ref(param_anchor,

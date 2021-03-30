@@ -12,6 +12,21 @@ let x =
                 break i
 test (x == 64)
 
+# rebinding parent values
+do
+    let i = 0
+    let k = 64
+    let x =
+        do
+            loop (i k) # equivalent to (i k = i k)
+                # last line in loop is fed back into loop
+                # breaks must be explicit
+                if (i < k)
+                    _ (i + 1) k
+                else
+                    break i
+    test (x == 64)
+
 # while loop
 local i = 10
 while (i != 0)
