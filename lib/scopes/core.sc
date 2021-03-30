@@ -6511,7 +6511,8 @@ inline memo (f) (memocall _memo f)
         fn "token-split" (expr token errmsg)
             loop (it params = expr '())
                 if (empty? it)
-                    error errmsg
+                    hide-traceback;
+                    error@ ('first-anchor expr) "while tokenizing expression" errmsg
                 let sxat it = (decons it)
                 let at = (sxat as Symbol)
                 if (at == token)
@@ -6966,7 +6967,13 @@ sugar unlet ((name as Symbol) names...)
                     sum + i
 sugar fold ((binding...) 'for expr...)
     let itparams it = ('token-split expr... 'in "'in' expected")
-    let foldparams init = ('token-split binding... '= "'=' expected")
+    let foldparams init =
+        try ('token-split binding... '= "'=' expected")
+        else
+            # ensure all tokens are symbols
+            for s in binding...
+                s as Symbol
+            (_ ('reverse binding...) binding...)
     let generator-expr body = (decons it)
     let subscope = (Scope sugar-scope)
     let anchor = ('anchor expression)

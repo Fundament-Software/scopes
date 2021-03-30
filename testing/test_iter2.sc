@@ -1,4 +1,5 @@
 
+using import testing
 
 fn do_loop (n)
     #for x y in (zip (range n) (range 0 100 2))
@@ -33,16 +34,24 @@ main;
                 print a b
                 a + b
 
-let q =
-    fold (x = 1) for c in (range 1 10)
-        if (c == 5)
-            # we can also break and repeat with a new value for x
-            # but continue is useful when you just want to skip to the next
-            # generator item without updating x
-            continue;
-        x * c
+do
+    let x = 1
+    let q =
+        fold (x) for c in (range 1 10)
+            if (c == 5)
+                # we can also break and repeat with a new value for x
+                # but continue is useful when you just want to skip to the next
+                # generator item without updating x
+                continue;
+            x * c
 
-assert (q == 72576)
+    assert (q == 72576)
+
+let a b = 2 3
+fold (a b) for i in (range 3)
+    test (a == 2)
+    test (b == 3)
+    _ a b
 
 let x y =
     fold (x y = 0 0) for c in (range 10)
