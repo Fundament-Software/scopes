@@ -2341,6 +2341,7 @@ let
     hash1 = (unary-op-dispatch '__hash "hash")
     copy = (unary-op-dispatch '__copy "copy")
     ~ = (unary-op-dispatch '__~ "bitwise-negate")
+    ln = (unary-op-dispatch '__ln "apply logarithm to")
     == = (balanced-binary-op-dispatch '__== '__r== "compare")
     != = (balanced-binary-op-dispatch '__!= '__r!= "compare")
     < = (balanced-binary-op-dispatch '__< '__r< "compare")
@@ -2502,11 +2503,13 @@ let as? = (gen-cast? as-converter)
     __~ = (box-pointer (inline (self) (^ self (as -1 (typeof self)))))
     __neg = (box-pointer (inline (self) (- (as 0 (typeof self)) self)))
     __rcp = (box-pointer (inline (self) (/ (as 1 (typeof self)) self)))
+    __ln = (box-pointer (inline (self) (log (as self real))))
 
 'set-symbols real
     __neg = (box-pointer (inline (self) (- (as 0 (typeof self)) self)))
     __rcp = (box-pointer (inline (self) (/ (as 1 (typeof self)) self)))
     __tobool = (box-pointer (inline (self) (!= self (as 0 (typeof self)))))
+    __ln = `log
 
 let opaque =
     spice-macro
