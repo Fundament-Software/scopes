@@ -3710,6 +3710,15 @@ let va-option =
                 let self = (bitcast self Closure)
                 `(self)
 
+    __countof =
+        inline (self)
+            let init valid? at next = (self)
+            loop (x stat... = 0:usize (init))
+                if (valid? stat...)
+                    repeat (add x 1:usize) (next stat...)
+                else
+                    break x
+
 'set-docstring Generator '__call
     """"*spice*{.property} `__call`{.descname} (*&ensp;self&ensp;*)[](#scopes.Generator.spice.__call "Permalink to this definition"){.headerlink} {#scopes.Generator.spice.__call}
 

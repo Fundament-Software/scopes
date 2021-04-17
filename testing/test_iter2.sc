@@ -59,3 +59,7 @@ let x y =
 
 assert (x == 45)
 assert (y == -45)
+
+test ((countof (range 3)) == 3)
+
+;
