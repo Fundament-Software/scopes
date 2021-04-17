@@ -18,7 +18,14 @@ compile
     'dump-module
     'no-debug-info
 
-global x : i32x10
+local x : i32x10
+for i in (range (countof x))
+    x @ i = -1
+
+run-stage;
+
+global x = x
+
 # global constructor syntax
 global y : i32 =
     inline ()
