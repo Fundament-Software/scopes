@@ -385,8 +385,8 @@ inline gen-signed-atomic-func (sop uop)
             \ memptr (imply data ET)
 
 let shared =
-    gen-allocator-sugar "shared"
-        spice "shared-copy" (T value)
+    gen-allocator-sugar
+        spice "shared-copy" (expr-head T value)
             if true
                 hide-traceback;
                 error "shared variables can't have initializers"
@@ -394,7 +394,7 @@ let shared =
             spice-quote
                 ptrtoref val
 
-        spice "shared-new" (T args...)
+        spice "shared-new" (expr-head T args...)
             let T = (T as type)
             let val = (extern-new unnamed (T as type) (storage-class = 'Workgroup))
             if ('argcount args...)

@@ -1285,6 +1285,8 @@ struct ConstPointer : Const {
     T(GF_Block, (1 << 6), "global-flag-block") \
     /* if storage class is 'Input or 'Output, the value is not to be interpolated */ \
     T(GF_Flat, (1 << 7), "global-flag-flat") \
+    /* LLVM specific flags */ \
+    T(GF_ThreadLocal, (1 << 8), "global-flag-thread-local")
 
 enum GlobalFlags {
 #define T(NAME, VALUE, SNAME) \

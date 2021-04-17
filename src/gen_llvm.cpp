@@ -2557,6 +2557,9 @@ struct LLVMIRGenerator {
 
                 result = LLVMAddGlobal(module, LLT, name.c_str());
                 global2global.insert({ node.unref(), result });
+                if (node->flags & GF_ThreadLocal) {
+                    LLVMSetThreadLocal(result, true);
+                }
                 if (!is_external) {
 
                     LLVMValueRef init = nullptr;

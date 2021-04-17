@@ -5355,6 +5355,7 @@ let extern =
                             elseif (k == 'coherent) global-flag-coherent
                             elseif (k == 'restrict) global-flag-restrict
                             elseif (k == 'block) global-flag-block
+                            elseif (k == 'thread-local) global-flag-thread-local
                             else
                                 error ("unrecognized flag: " .. (repr k))
                         _ (bor flags newflag) storage-class location binding set
@@ -7259,51 +7260,57 @@ let type+ = typedef+
 # standard allocators
 #-------------------------------------------------------------------------------
 
-inline gen-allocator-sugar (name copyf newf)
+inline gen-allocator-sugar (copyf newf)
     sugar "" (values...)
-        spice copy-by-value (value)
+        let expr-head =
+            list 'sugar-quote expr-head
+        spice copy-by-value (expr-head value)
             let T = ('typeof value)
-            `(copyf T value)
+            `(copyf expr-head T value)
         let anchor = ('anchor expression)
         let _let = ('tag `let anchor)
         let result =
             sugar-match values...
             case (name '= value)
                 let callexpr =
-                    'tag `[(qq ([copy-by-value value]))] anchor
+                    'tag `[(qq ([copy-by-value expr-head value]))] anchor
                 qq [_let name] = [callexpr]
             case (name ': T '= value)
                 let callexpr =
-                    'tag `[(qq ([copyf T value]))] anchor
+                    'tag `[(qq ([copyf expr-head T value]))] anchor
                 qq [_let name] = [callexpr]
             case (name ': T args...)
                 let callexpr =
-                    'tag `[(qq [newf T] (unquote-splice args...))] anchor
+                    'tag `[(qq [newf expr-head T] (unquote-splice args...))] anchor
                 qq [_let name] = [callexpr]
             case (T args...)
-                qq [newf T] (unquote-splice args...)
+                qq [newf expr-head T] (unquote-splice args...)
             default
                 error
-                    .. "syntax: " name " <name> [: <type>] [= <value>]"
+                    .. "syntax: " (tostring expr-head) " <name> [: <type>] [= <value>]"
         'tag `result anchor
 
 let local =
-    gen-allocator-sugar "local"
-        spice "local-copy" (T value)
+    gen-allocator-sugar
+        spice "local-copy" (expr-head T value)
             spice-quote
                 let val = (alloca T)
                 store (imply value T) val
                 ptrtoref val
-        spice "local-new" (T args...)
+        spice "local-new" (expr-head T args...)
             spice-quote
                 let val = (alloca T)
                 store (T args...) val
                 ptrtoref val
 
 let global =
-    gen-allocator-sugar "global"
-        spice "global-copy" (T value)
-            let val = (extern-new unnamed (T as type) (storage-class = 'Private))
+    gen-allocator-sugar
+        spice "global-copy" (expr-head T value)
+            let flags =
+                if (expr-head as Symbol == 'threadlocal) global-flag-thread-local
+                else 0:u32
+            let val = (extern-new unnamed (T as type)
+                (storage-class = 'Private) (flags = flags))
             let qval = `(ptrtoref val)
             if (('constant? value) and (('typeof value) == Closure))
                 # constructor, build function
@@ -7326,9 +7333,13 @@ let global =
                         store init val
                         qval
 
-        spice "global-new" (T args...)
+        spice "global-new" (expr-head T args...)
             let T = (T as type)
-            let val = (extern-new unnamed (T as type) (storage-class = 'Private))
+            let flags =
+                if (expr-head as Symbol == 'threadlocal) global-flag-thread-local
+                else 0:u32
+            let val = (extern-new unnamed T
+                (storage-class = 'Private) (flags = flags))
             let qval = `(ptrtoref val)
             let pure-args? =
                 for arg in ('args args...)
@@ -7354,6 +7365,8 @@ let global =
                     spice-quote
                         store init val
                         qval
+
+#let threadlocal = global
 
 #-------------------------------------------------------------------------------
 # sugared not: single line sugar; this is the last definition of `not`
