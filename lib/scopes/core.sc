@@ -6423,7 +6423,9 @@ sugar fn... (name...)
                         if ('variadic? arg)
                             if (not (empty? rest...))
                                 error "variadic parameter must be in last place"
-                        let param = (sc_parameter_new arg)
+                        let param-anchor =
+                            'anchor (_ (decons expr) ())
+                        let param = ('tag (sc_parameter_new arg) param-anchor)
                         sc_template_append_parameter tmpl param
                         repeat rest...
                             sc_argument_list_join_values types

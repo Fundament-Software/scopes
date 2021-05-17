@@ -1,18 +1,22 @@
 {
     // See https://go.microsoft.com/fwlink/?LinkId=733558
     // for the documentation about the tasks.json format
-    "version": "0.1.0",
+    "version": "2.0.0",
     "tasks": [
         {
-            "taskName": "make scopes",
+            "label": "make scopes",
+            "type": "shell",
             "command": "make",
-            "isShellCommand": true,
-            "isBuildCommand": true,
-            "args": ["-C", "${workspaceRoot}/build"],
-            "showOutput": "always",
+            "args": [
+                "-C",
+                "${workspaceRoot}/build"
+            ],
             "problemMatcher": {
                 "owner": "cpp",
-                "fileLocation": ["relative", "${workspaceRoot}/build"],
+                "fileLocation": [
+                    "relative",
+                    "${workspaceRoot}/build"
+                ],
                 "pattern": {
                     "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error|note|fatal error):\\s+(.*)$",
                     "file": 1,
@@ -21,24 +25,25 @@
                     "severity": 4,
                     "message": 5
                 }
-            }
+            },
+            "group": "build"
         },
         {
-            "taskName": "rebuild makefile",
+            "label": "rebuild makefile",
+            "type": "shell",
             "command": "rm -rf ${workspaceRoot}/build && genie gmake",
-            "isShellCommand": true,
-            "args": [],
-            "showOutput": "always"
+            "problemMatcher": []
         },
         {
-            "taskName": "scopes",
+            "label": "scopes",
+            "type": "shell",
             "command": "${workspaceRoot}/scopes",
-            "isShellCommand": true,
-            "args": [],
-            "showOutput": "always",
             "problemMatcher": {
                 "owner": "scopes",
-                "fileLocation": ["relative", "${workspaceRoot}/build"],
+                "fileLocation": [
+                    "relative",
+                    "${workspaceRoot}/build"
+                ],
                 "pattern": {
                     "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error|note|fatal error):\\s+(.*)$",
                     "file": 1,
@@ -50,11 +55,10 @@
             }
         },
         {
-            "taskName": "makedocs",
+            "label": "makedocs",
+            "type": "shell",
             "command": "cd ${workspaceRoot}/doc && make html",
-            "isShellCommand": true,
-            "args": [],
-            "showOutput": "always"
+            "problemMatcher": []
         }
     ]
 }

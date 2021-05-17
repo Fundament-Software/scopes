@@ -806,6 +806,24 @@ struct LLVMIRGenerator {
 //         return LLVMDIBuilderCreateStructType(di_builder, "", 0, nullptr, 0, LLVMStructType(types, sz, false);
 //     }
 
+    LLVMValueRef build_store(LLVMValueRef Val, LLVMValueRef Ptr) {
+        /*
+        if (LLVMIsConstant(Val)) {
+            auto machine = get_jit_target_machine();
+            if (machine) {
+                assert(machine);
+                auto sz = LLVMStoreSizeOfType(
+                    LLVMCreateTargetDataLayout(machine),
+                    LLVMTypeOf(Val));
+                if (sz > 64) {
+                    printf("big constant store detected: %llu\n", sz);
+                }
+            }
+        }
+        */
+        return LLVMBuildStore(builder, Val, Ptr);
+    }
+
     SCOPES_RESULT(LLVMValueRef) abi_import_argument(const Type *param_type, LLVMValueRef func, size_t &k) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         ABIClass classes[MAX_ABI_CLASSES];
@@ -829,8 +847,7 @@ struct LLVMIRGenerator {
                     };
                     auto dest = LLVMBuildGEP(builder, ptr, indices, 2, "");
                     auto param = LLVMGetParam(func, k++);
-                    //LLVMBuildStore(builder, param, fix_named_struct_store(param, dest));
-                    LLVMBuildStore(builder, param, dest);
+                    build_store(param, dest);
                 }
                 ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(T, 0), "");
                 return LLVMBuildLoad(builder, ptr, "");
@@ -848,8 +865,7 @@ struct LLVMIRGenerator {
         size_t sz = abi_classify(AT, classes);
         if (!sz) {
             LLVMValueRef ptrval = safe_alloca(SCOPES_GET_RESULT(type_to_llvm_type(AT)));
-            LLVMBuildStore(builder, val, fix_named_struct_store(val, ptrval));
-            //LLVMBuildStore(builder, val, ptrval);
+            build_store(val, fix_named_struct_store(val, ptrval));
             val = ptrval;
             memptrs.push_back(values.size());
             values.push_back(val);
@@ -862,7 +878,7 @@ struct LLVMIRGenerator {
                 // break into argument-sized bits
                 auto ptr = safe_alloca(LLVMTypeOf(val));
                 auto zero = LLVMConstInt(i32T,0,false);
-                LLVMBuildStore(builder, val, ptr);
+                build_store(val, ptr);
                 ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ST, 0), "");
                 for (size_t i = 0; i < sz; ++i) {
                     LLVMValueRef indices[] = {
@@ -1305,7 +1321,7 @@ struct LLVMIRGenerator {
         if (use_sret) {
             auto ptr = LLVMGetParam(parentfunc, 0);
             ptr = fix_named_struct_store(value, ptr);
-            LLVMBuildStore(builder, value, ptr);
+            build_store(value, ptr);
             return LLVMBuildRetVoid(builder);
         } else if (rtype == empty_arguments_type()) {
             return LLVMBuildRetVoid(builder);
@@ -1316,7 +1332,7 @@ struct LLVMIRGenerator {
             auto srcT = abiretT;
             if (retT != srcT) {
                 LLVMValueRef dest = safe_alloca(srcT);
-                LLVMBuildStore(builder, value, dest);
+                build_store(value, dest);
                 value = LLVMBuildBitCast(builder, dest, LLVMPointerType(retT, 0), "");
                 value = LLVMBuildLoad(builder, value, "");
             }
@@ -1398,7 +1414,7 @@ struct LLVMIRGenerator {
                 current_debug_block = subprogram;
                 auto ty = LLVMTypeOf(val);
                 auto alloc = LLVMBuildAlloca(builder, ty, ""); // TODO: Should this be safe_alloca(LLVMTypeOf(val), val);
-                LLVMBuildStore(builder, val, alloc);
+                build_store(val, alloc);
                 val = LLVMBuildLoad(builder, alloc, "");
                 auto name = param->name.name();
                 auto anchor = param.anchor();
@@ -1713,7 +1729,7 @@ struct LLVMIRGenerator {
             if (LLVMGetTypeKind(ty) == LLVMStructTypeKind) {
                 // completely braindead, but what can you do
                 LLVMValueRef ptr = safe_alloca(LLVMTypeOf(val));
-                LLVMBuildStore(builder, val, ptr);
+                build_store(val, ptr);
                 ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ty,0), "");
                 return LLVMBuildLoad(builder, ptr, "");
             }
@@ -1936,7 +1952,7 @@ struct LLVMIRGenerator {
         auto value = SCOPES_GET_RESULT(ref_to_value(node->value));
         auto ptr = SCOPES_GET_RESULT(ref_to_value(node->target));
         ptr = fix_named_struct_store(value, ptr);
-        auto val = LLVMBuildStore(builder, value, ptr);
+        auto val = build_store(value, ptr);
         if (node->is_volatile) {
             LLVMSetVolatile(val, true);
         }
@@ -2796,7 +2812,7 @@ struct LLVMIRGenerator {
             auto srcT = LLVMTypeOf(ret);
             if (retT != srcT) {
                 LLVMValueRef dest = safe_alloca(srcT);
-                LLVMBuildStore(builder, ret, dest);
+                build_store(ret, dest);
                 ret = LLVMBuildBitCast(builder, dest, LLVMPointerType(retT, 0), "");
                 ret = LLVMBuildLoad(builder, ret, "");
             }
