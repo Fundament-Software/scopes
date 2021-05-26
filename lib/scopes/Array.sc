@@ -283,6 +283,7 @@ typedef+ Array
     """"Implements support for the `copy` operation.
     fn __copy (self)
         viewing self
+        returning (uniqueof (typeof self) -1)
         local newarr = (dupe (deref self))
         let count = (deref self._count)
         let old-items = (deref self._items)
