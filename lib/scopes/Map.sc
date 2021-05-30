@@ -337,6 +337,17 @@ typedef Map < Struct
             inline "fail" ()
                 return;
 
+    fn pop (self key)
+        """"Erases a key -> value association from the map and pops the old value
+        let hash = ((typeof self) . HashFunction)
+        lookup self key ((hash key) as u64)
+            inline "ok" (idx)
+                let k v = (erase_pos self idx)
+                auto-rehash self
+                return v
+            inline "fail" ()
+                raise (MapError.KeyNotFound)
+
     inline __tobool (self)
         self._count != 0:usize
 
