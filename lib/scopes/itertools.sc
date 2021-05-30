@@ -233,6 +233,20 @@ inline permutate-range (n element-type)
             let A = (insertelement A q2 j1)
             return k1 A
 
+# enumerate the bit indices of integer
+inline... iterbits (value : integer)
+    let zero = (0 as (typeof value))
+    let bit = (1 as (typeof value))
+    let eob = (-1 as (typeof value))
+    Generator
+        inline () (findlsb value)
+        inline (pos) (pos != eob)
+        inline (pos) pos
+        inline (pos)
+            pos := pos + bit
+            ofs := (findlsb (lshr value pos))
+            ? (ofs == eob) ofs (pos + ofs)
+
 #---------------------------------------------------------------------------
 # collectors
 #---------------------------------------------------------------------------
@@ -622,6 +636,6 @@ unlet cascade1 retain1
 do
     let span dim bitdim imap ipair join zip span join collect each compose cat
         \ ->> flatten map reduce drain limit gate filter take cascade mux
-        \ demux retain permutate-range
+        \ demux retain permutate-range iterbits
 
     locals;
