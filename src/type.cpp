@@ -51,21 +51,16 @@ void Type::bind(Symbol name, const ValueRef &value) const {
     bind_with_doc(name, entry);
 }
 
-/*
-void Type::del(Symbol name) const {
-    auto it = symbols.find(name);
-    if (it != symbols.end()) {
-        symbols.erase(it);
-    }
+void Type::unbind(Symbol name) const {
+    symbols.discard(name);
 }
-*/
 
 bool Type::lookup(Symbol name, TypeEntry &dest) const {
     const Type *self = this;
     do {
         auto index = self->symbols.find_index(name);
         if (index >= 0) {
-            dest = self->symbols.values[index];
+            dest = self->symbols.entries[index].second;
             return true;
         }
         if (self == TYPE_Typename)
@@ -87,7 +82,7 @@ bool Type::lookup(Symbol name, ValueRef &dest) const {
 bool Type::lookup_local(Symbol name, TypeEntry &dest) const {
     auto index = symbols.find_index(name);
     if (index >= 0) {
-        dest = symbols.values[index];
+        dest = symbols.entries[index].second;
         return true;
     }
     return false;
@@ -126,11 +121,11 @@ std::vector<Symbol> Type::find_closest_match(Symbol name) const {
     const Type *self = this;
     do {
         auto &&map = self->symbols;
-        int count = map.keys.size();
-        auto &&keys = map.keys;
+        int count = map.entries.size();
+        auto &&keys = map.entries;
         //auto &&values = map.values;
         for (int i = 0; i < count; ++i) {
-            Symbol sym = keys[i];
+            Symbol sym = keys[i].first;
             if (done.count(sym))
                 continue;
             size_t dist = distance(s, sym.name());

@@ -76,7 +76,7 @@ struct Type {
     void bind_with_doc(Symbol name, const TypeEntry &entry) const;
     void bind(Symbol name, const ValueRef &value) const;
 
-    //void del(Symbol name) const;
+    void unbind(Symbol name) const;
 
     bool lookup(Symbol name, TypeEntry &dest) const;
     bool lookup(Symbol name, ValueRef &dest) const;

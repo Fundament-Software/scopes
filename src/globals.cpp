@@ -835,12 +835,13 @@ const sc_scope_t *sc_scope_unbind(const sc_scope_t *scope, sc_valueref_t key) {
 sc_valueref_valueref_i32_tuple_t sc_scope_next(const sc_scope_t *scope, int index) {
     using namespace scopes;
     auto &&map = scope->table();
-    int count = map.keys.size();
+    int count = map.entries.size();
     index++;
     while ((size_t)index < count) {
-        auto &&value = map.values[index];
+        auto &&entry = map.entries[index];
+        auto &&value = entry.second;
         if (value.value) {
-            return { map.keys[index], value.value, index };
+            return { entry.first, value.value, index };
         }
         index++;
     }
@@ -850,12 +851,12 @@ sc_valueref_valueref_i32_tuple_t sc_scope_next(const sc_scope_t *scope, int inde
 sc_valueref_i32_tuple_t sc_scope_next_deleted(const sc_scope_t *scope, int index) {
     using namespace scopes;
     auto &&map = scope->table();
-    int count = map.keys.size();
+    int count = map.entries.size();
     index++;
     while ((size_t)index < count) {
-        auto &&value = map.values[index];
-        if (!value.value) {
-            return { map.keys[index], index };
+        auto &&entry = map.entries[index];
+        if (!entry.second.value) {
+            return { entry.first, index };
         }
         index++;
     }
@@ -1873,7 +1874,7 @@ sc_symbol_valueref_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) 
     type = strip_qualifiers(type);
     auto &&map = type->get_symbols();
     int index;
-    int count = map.keys.size();
+    int count = map.entries.size();
     if (key == SYM_Unnamed) {
         index = 0;
     } else {
@@ -1884,14 +1885,14 @@ sc_symbol_valueref_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) 
             index++;
     }
     while (index != count) {
-        auto &&value = map.values[index];
+        auto &&value = map.entries[index].second;
         if (value.expr) {
-            return { map.keys[index], value.expr };
+            return { map.entries[index].first, value.expr };
         }
         index++;
     }
     if (index != count) {
-        return { map.keys[index], map.values[index].expr };
+        return { map.entries[index].first, map.entries[index].second.expr };
     }
     return { SYM_Unnamed, ValueRef() };
 }
@@ -1900,6 +1901,12 @@ void sc_type_set_symbol(const sc_type_t *T, sc_symbol_t sym, sc_valueref_t value
     using namespace scopes;
     T = strip_qualifiers(T);
     const_cast<Type *>(T)->bind(sym, value);
+}
+
+void sc_type_del_symbol(const sc_type_t *T, sc_symbol_t sym) {
+    using namespace scopes;
+    T = strip_qualifiers(T);
+    const_cast<Type *>(T)->unbind(sym);
 }
 
 // Qualifier
@@ -2519,6 +2526,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_type_string, TYPE_String, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_next, arguments_type({TYPE_Symbol, TYPE_ValueRef}), TYPE_Type, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_type_set_symbol, _void, TYPE_Type, TYPE_Symbol, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_del_symbol, _void, TYPE_Type, TYPE_Symbol);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_refer, TYPE_Bool, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_view, TYPE_Bool, TYPE_Type);
 

@@ -227,7 +227,7 @@ public:
         if (name != SYM_Unnamed) {
             int it = map.find_index(name);
             if (it != -1) {
-                return (const Type *)map.values[it]->value;
+                return (const Type *)map.entries[it].second->value;
             }
         }
         const String *type_title;
@@ -496,7 +496,7 @@ public:
             if (it == -1) {
                 return empty_arguments_type();
             }
-            return (const Type *)dest->typedefs.values[it]->value;
+            return (const Type *)dest->typedefs.entries[it].second->value;
         } break;
         case clang::Type::Record: {
             const RecordType *RT = cast<RecordType>(Ty);
@@ -934,15 +934,15 @@ static void build_namespace_symbols (const Scope *scope, Symbol symbol, T&map) {
     auto &&top = scope->table();
     int idx = top.find_index(ConstInt::symbol_from(symbol));
     if (idx < 0) return;
-    auto value = top.values[idx].value;
+    auto value = top.entries[idx].second.value;
     if (!value.isa<ConstPointer>()) return;
     auto sub = (const Scope *)value.cast<ConstPointer>()->value;
     auto &&subtable = sub->table();
-    for (int i = 0; i < subtable.keys.size(); ++i) {
-        auto key = subtable.keys[i].dyn_cast<ConstInt>();
+    for (int i = 0; i < subtable.entries.size(); ++i) {
+        auto key = subtable.entries[i].first.dyn_cast<ConstInt>();
         if (!key) continue;
         if (key->get_type() != TYPE_Symbol) continue;
-        auto value = subtable.values[i].value.dyn_cast<ConstPointer>();
+        auto value = subtable.entries[i].second.value.dyn_cast<ConstPointer>();
         if (!value) continue;
         if (value->get_type() != TYPE_Type) continue;
         auto symbol = Symbol::wrap(key->msw());
@@ -953,9 +953,9 @@ static void build_namespace_symbols (const Scope *scope, Symbol symbol, T&map) {
 template<typename T>
 static void merge_namespace_symbols (const Scope *&scope, Symbol symbol, const T&map) {
     const Scope *sub = Scope::from(nullptr, nullptr);
-    for (int i = 0; i < map.keys.size(); ++i) {
-        auto &&symbol = map.keys[i];
-        auto &&value = map.values[i];
+    for (int i = 0; i < map.entries.size(); ++i) {
+        auto &&symbol = map.entries[i].first;
+        auto &&value = map.entries[i].second;
         sub = Scope::bind_from(
             ref(value.anchor(), ConstInt::symbol_from(symbol)),
             value, nullptr, sub);
@@ -969,7 +969,7 @@ template<typename T>
 static bool find_value_in_namespace(Symbol symbol, const T&map, PureRef &result) {
     int index = map.find_index(symbol);
     if (index != -1) {
-        result = map.values[index];
+        result = map.entries[index].second;
         return true;
     } else {
         return false;

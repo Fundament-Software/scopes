@@ -86,11 +86,12 @@ const Scope::Map &Scope::table() const {
         while (true) {
             if (self->map) {
                 // copy all elements from map
-                size_t i = self->map->keys.size();
+                size_t i = self->map->entries.size();
                 while (i-- > 0) {
-                    auto &&key = self->map->keys[i];
-                    auto &&entry = self->map->values[i];
-                    map->insert(key, entry);
+                    auto &&entry = self->map->entries[i];
+                    auto &&key = entry.first;
+                    auto &&value = entry.second;
+                    map->insert(key, value);
                 }
                 break;
             } else if (!self->is_header()) {
@@ -126,7 +127,7 @@ const Scope *Scope::reparent_from(const Scope *content, const Scope *parent) {
     #endif
     // can reuse the map because the content is the same
     self->map = &map;
-    self->index = map.keys.size();
+    self->index = map.entries.size();
     return self;
 }
 
@@ -156,13 +157,13 @@ std::vector<Symbol> Scope::find_closest_match(Symbol name) const {
     const Scope *self = this;
     do {
         if (self->map) {
-            size_t count = self->map->keys.size();
+            size_t count = self->map->entries.size();
             for (size_t i = 0; i < count; ++i) {
-                auto &&key = self->map->keys[i];
+                auto &&key = self->map->entries[i].first;
                 if (key->get_type() == TYPE_Symbol) {
                     Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value());
                     if (!done.count(sym)) {
-                        auto &&value = self->map->values[i];
+                        auto &&value = self->map->entries[i].second;
                         if (value.value) {
                             size_t dist = distance(s, sym.name());
                             if (dist == best_dist) {
@@ -209,13 +210,13 @@ std::vector<Symbol> Scope::find_elongations(Symbol name) const {
     const Scope *self = this;
     do {
         if (self->map) {
-            size_t count = self->map->keys.size();
+            size_t count = self->map->entries.size();
             for (size_t i = 0; i < count; ++i) {
-                auto &&key = self->map->keys[i];
+                auto &&key = self->map->entries[i].first;
                 if (key->get_type() == TYPE_Symbol) {
                     Symbol sym = Symbol::wrap(key.cast<ConstInt>()->value());
                     if (!done.count(sym)) {
-                        auto &&value = self->map->values[i];
+                        auto &&value = self->map->entries[i].second;
                         if (value.value) {
                             if (sym.name()->count >= s->count &&
                                     (sym.name()->substr(0, s->count) == s))
@@ -269,7 +270,7 @@ bool Scope::lookup(const ConstRef &name, ValueRef &dest, const String *&doc, siz
         if (self->map) {
             int i = self->map->find_index(name);
             if (i != -1) {
-                auto &&value = self->map->values[i];
+                auto &&value = self->map->entries[i].second;
                 if (value.value) {
                     dest = value.value;
                     doc = value.doc;

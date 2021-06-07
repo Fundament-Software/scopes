@@ -20,9 +20,8 @@ struct OrderedMap {
         auto it = _key_index.find(key);
         if (it == _key_index.end()) {
             // new insertion
-            int index = keys.size();
-            keys.push_back(key);
-            values.push_back(value);
+            int index = entries.size();
+            entries.push_back({ key, value});
             _key_index.insert({ key, index });
             return true;
         }
@@ -33,15 +32,27 @@ struct OrderedMap {
         auto it = _key_index.find(key);
         if (it == _key_index.end()) {
             // new insertion
-            int index = keys.size();
-            keys.push_back(key);
-            values.push_back(value);
+            int index = entries.size();
+            entries.push_back({ key, value});
             _key_index.insert({ key, index });
         } else {
             // update
             int index = it->second;
-            keys[index] = key;
-            values[index] = value;
+            entries[index] = { key, value };
+        }
+    }
+
+    void discard(const KeyType &key) {
+        auto it = _key_index.find(key);
+        if (it != _key_index.end()) {
+            // update
+            int index = it->second;
+            _key_index.erase(it);
+            entries.erase(entries.begin() + index);
+            for (auto &&it : _key_index) {
+                if (it.second > index)
+                    it.second -= 1;
+            }
         }
     }
 
@@ -54,16 +65,14 @@ struct OrderedMap {
 
     // reverse order in-place
     void flip() {
-        std::reverse(keys.begin(), keys.end());
-        std::reverse(values.begin(), values.end());
-        int lastindex = keys.size() - 1;
+        std::reverse(entries.begin(), entries.end());
+        int lastindex = entries.size() - 1;
         for (auto &&it : _key_index) {
             it.second = lastindex - it.second;
         }
     }
 
-    std::vector<KeyType> keys;
-    std::vector<ValueType> values;
+    std::vector< std::pair<KeyType, ValueType> > entries;
     std::unordered_map<KeyType, int, KeyHash> _key_index;
 };
 

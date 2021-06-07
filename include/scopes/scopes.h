@@ -434,6 +434,7 @@ SCOPES_LIBEXPORT bool sc_type_is_default_suffix(const sc_type_t *T);
 SCOPES_LIBEXPORT const sc_string_t *sc_type_string(const sc_type_t *T);
 SCOPES_LIBEXPORT sc_symbol_valueref_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key);
 SCOPES_LIBEXPORT void sc_type_set_symbol(const sc_type_t *T, sc_symbol_t sym, sc_valueref_t value);
+SCOPES_LIBEXPORT void sc_type_del_symbol(const sc_type_t *T, sc_symbol_t sym);
 
 // pointer types
 

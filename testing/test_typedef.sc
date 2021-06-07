@@ -92,4 +92,16 @@ print T T.x T.y
 typedef+ i32
     static-assert (super-type == integer)
 
+# test type symbol deletion
+type M
+    let A = 1
+    let B = 2
+    let C = 3
+
+sc_type_del_symbol M 'A
+run-stage;
+test-compiler-error M.A
+test (M.B == 2)
+test (M.C == 3)
+
 true
