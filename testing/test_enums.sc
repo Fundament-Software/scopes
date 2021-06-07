@@ -265,5 +265,15 @@ do
     copy (Q.A)
     ;
 
+# constant enum comparisons should be constant
+do
+    enum K plain
+        X
+        Y
+        Z
+
+    test (constant? (K.X == K.X))
+
+
 ;
 

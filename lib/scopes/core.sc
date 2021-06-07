@@ -7963,8 +7963,8 @@ do
         simple-binary-op (inline (a b) (f (storagecast a) (storagecast b)))
 
     'set-symbols CEnum
-        __== = (simple-binary-op icmp==)
-        __!= = (simple-binary-op icmp!=)
+        __== = (simple-binary-storage-op (_ ==))
+        __!= = (simple-binary-storage-op (_ !=))
         __> = (simple-binary-storage-op (_ >))
         __< = (simple-binary-storage-op (_ <))
         __>= = (simple-binary-storage-op (_ >=))
