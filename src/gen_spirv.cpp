@@ -1691,6 +1691,10 @@ struct SPIRVGenerator {
         GLSLstd450 _builtin = GLSLstd450Bad;
         auto rtype = builder.getTypeId(x);
         switch (node->op) {
+        case UnOpFNeg: {
+            auto val = builder.createUnaryOp(spv::OpFNegate, rtype, x);
+            map_phi({ val }, node); return {};
+        } break;
         case UnOpBitReverse: {
             auto val = builder.createUnaryOp(spv::OpBitReverse, rtype, x);
             map_phi({ val }, node); return {};

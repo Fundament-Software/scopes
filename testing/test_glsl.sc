@@ -182,6 +182,10 @@ do
         location = 1
     out f2 : ivec3
         location = 1
+    in v3 : f32
+        location = 2
+    out f3 : f32
+        location = 2
 
     fn main ()
         f =
@@ -192,6 +196,8 @@ do
                 findlsb v.w
         f2 =
             findmsb v2
+        f3 =
+            - v3
 
     print
         compile-glsl 440 'fragment
