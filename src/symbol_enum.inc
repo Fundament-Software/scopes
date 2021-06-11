@@ -345,6 +345,7 @@ namespace scopes {
     T(OP_BitCount, "bitcount") \
     T(OP_FindMSB, "findmsb") \
     T(OP_FindLSB, "findlsb") \
+    T(OP_FNeg, "fneg") \
     T(OP_FAdd, "fadd") \
     T(OP_FSub, "fsub") \
     T(OP_FMul, "fmul") \

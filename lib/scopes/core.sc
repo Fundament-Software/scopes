@@ -1912,6 +1912,21 @@ inline simple-binary-op (f)
                 return `f
             `()
 
+inline simple-folding-unary-op (f unboxer boxer)
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let arg = ('getarg args 0)
+            'tag
+                if ('constant? arg)
+                    let T = ('typeof arg)
+                    let arg = (unboxer arg)
+                    boxer T (f arg)
+                else
+                    `(f arg)
+                'anchor args
+
 inline simple-folding-binary-op (f unboxer boxer)
     spice-binary-op-macro
         inline (lhsT rhsT)
@@ -2178,6 +2193,7 @@ inline intdiv (a b)
     __// = (box-pointer (simple-folding-autotype-binary-op intdiv sc_const_real_extract))
     __% = (box-pointer (simple-folding-binary-op frem sc_const_real_extract sc_const_real_new))
     __** = (box-pointer (simple-folding-binary-op powf sc_const_real_extract sc_const_real_new))
+    __neg = (box-pointer (simple-folding-unary-op fneg sc_const_real_extract sc_const_real_new))
 
 'set-symbols Value
     __== = (box-pointer (simple-binary-op sc_value_compare))
@@ -2506,7 +2522,6 @@ let as? = (gen-cast? as-converter)
     __ln = (box-pointer (inline (self) (log (as self real))))
 
 'set-symbols real
-    __neg = (box-pointer (inline (self) (- (as 0 (typeof self)) self)))
     __rcp = (box-pointer (inline (self) (/ (as 1 (typeof self)) self)))
     __tobool = (box-pointer (inline (self) (!= self (as 0 (typeof self)))))
     __ln = `log

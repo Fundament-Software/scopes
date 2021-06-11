@@ -2181,6 +2181,9 @@ struct LLVMIRGenerator {
         UNOP(UnOpFindMSB, llvm_ctlz)
         UNOP(UnOpFindLSB, llvm_cttz)
 #undef UNOP
+        case UnOpFNeg: {
+            val = LLVMBuildFNeg(builder, x, "");
+        } break;
         default: {
             auto T = LLVMTypeOf(x);
             auto ET = T;

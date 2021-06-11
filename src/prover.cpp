@@ -70,6 +70,7 @@ namespace scopes {
     IUN_OP(BitReverse) IUN_OP(BitCount) IUN_OP(FindMSB) IUN_OP(FindLSB) \
     \
     FUN_OP(FAbs) \
+    FUN_OP(FNeg) \
     \
     FUN_OP(FSign) \
     \

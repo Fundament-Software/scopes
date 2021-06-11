@@ -655,6 +655,7 @@ struct FCmp : Instruction {
     T(UnOpBitCount, "unop-kind-bitcount") \
     T(UnOpFindMSB, "unop-kind-findmsb") \
     T(UnOpFindLSB, "unop-kind-findlsb") \
+    T(UnOpFNeg, "unop-kind-fneg") \
     T(UnOpSin, "unop-kind-sin") \
     T(UnOpCos, "unop-kind-cos") \
     T(UnOpTan, "unop-kind-tan") \
