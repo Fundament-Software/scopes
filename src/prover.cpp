@@ -145,6 +145,7 @@ static bool typekinds_compatible(TypeKind k1, TypeKind k2) {
     if ((k1 == TK_Real) && (k2 == TK_Integer)) return true;
     if ((k1 == TK_Integer) && (k2 == TK_Real)) return true;
     if ((k1 == TK_Vector) && (k2 == TK_Integer)) return true;
+    if ((k1 == TK_Integer) && (k2 == TK_Vector)) return true;
     return false;
 }
 

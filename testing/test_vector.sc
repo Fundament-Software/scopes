@@ -62,4 +62,10 @@ test
         bitcast (unconst (vectorof i8 1 2 3 4)) u32
         0x04030201
 
+test
+    all?
+        ==
+            bitcast 0x04030201 (vector i8 4)
+            (vectorof i8 1 2 3 4)
+
 ;
