@@ -7,7 +7,7 @@
 #ifndef SCOPES_EXECUTION_HPP
 #define SCOPES_EXECUTION_HPP
 
-#include <llvm-c/OrcBindings.h>
+//#include <llvm-c/OrcBindings.h>
 #include <llvm-c/TargetMachine.h>
 #include <llvm-c/ExecutionEngine.h>
 

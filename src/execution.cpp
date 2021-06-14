@@ -21,7 +21,8 @@
 #include <llvm-c/TargetMachine.h>
 #include <llvm-c/Support.h>
 #include <llvm-c/BitWriter.h>
-#include <llvm-c/OrcBindings.h>
+#include <llvm-c/LLJIT.h>
+#include <llvm-c/OrcEE.h>
 
 #include <limits.h>
 
@@ -34,10 +35,19 @@
 
 #define SCOPES_CACHE_KEY_BITCODE 1
 
+#if SCOPES_MACOS
+#define SCOPES_JIT_SYMBOL_PREFIX '_'
+#else
+#define SCOPES_JIT_SYMBOL_PREFIX 0
+#endif
+
 namespace scopes {
 
 static void *global_c_namespace = nullptr;
-static LLVMOrcJITStackRef orc = nullptr;
+//static LLVMOrcJITStackRef orc = nullptr;
+static LLVMOrcLLJITRef orc = nullptr;
+static LLVMOrcObjectLayerRef object_layer = nullptr;
+static LLVMOrcJITDylibRef jit_dylib = nullptr;
 static LLVMTargetMachineRef jit_target_machine = nullptr;
 static LLVMTargetMachineRef object_target_machine = nullptr;
 //static std::vector<void *> loaded_libs;
@@ -56,8 +66,8 @@ const String *get_default_target_triple() {
 
 SCOPES_RESULT(uint64_t) get_address(const char *name) {
     SCOPES_RESULT_TYPE(uint64_t);
-    LLVMOrcTargetAddress addr = 0;
-    auto err = LLVMOrcGetSymbolAddress(orc, &addr, name);
+    LLVMOrcJITTargetAddress addr = 0;
+    auto err = LLVMOrcLLJITLookup(orc, &addr, name);
     if (err) {
         SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
     }
@@ -113,13 +123,17 @@ LLVMTargetMachineRef get_object_target_machine() {
 }
 
 void add_jit_event_listener(LLVMJITEventListenerRef listener) {
-    LLVMOrcRegisterJITEventListener(orc, listener);
+    //LLVMOrcRegisterJITEventListener(orc, listener);
+    assert(object_layer);
+    LLVMOrcRTDyldObjectLinkingLayerRegisterJITEventListener(object_layer, listener);
 }
 
+#if 0
 uint64_t lazy_compile_callback(LLVMOrcJITStackRef orc, void *ctx) {
     printf("lazy_compile_callback ???\n");
     return 0;
 }
+#endif
 
 SCOPES_RESULT(void) init_execution() {
     SCOPES_RESULT_TYPE(void);
@@ -165,10 +179,35 @@ SCOPES_RESULT(void) init_execution() {
     jit_target_machine = LLVMCreateTargetMachine(target, triple, CPU, Features,
         optlevel, reloc, codemodel);
     assert(jit_target_machine);
-    orc = LLVMOrcCreateInstance(jit_target_machine);
+    // temporary, will be consumed by orc creation
+    auto jtm = LLVMCreateTargetMachine(target, triple, CPU, Features,
+        optlevel, reloc, codemodel);
+    assert(jtm);
+
+    auto builder = LLVMOrcCreateLLJITBuilder();
+    auto tmb = LLVMOrcJITTargetMachineBuilderCreateFromTargetMachine(jtm);
+    LLVMOrcLLJITBuilderSetJITTargetMachineBuilder(builder, tmb);
+
+    auto err = LLVMOrcCreateLLJIT(&orc, builder);
+    if (err) {
+        SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
+    }
     assert(orc);
 
-    LLVMOrcRegisterJITEventListener(orc, LLVMCreateGDBRegistrationListener());
+    auto ES = LLVMOrcLLJITGetExecutionSession(orc);
+    assert(ES);
+    object_layer = LLVMOrcCreateRTDyldObjectLinkingLayerWithSectionMemoryManager(ES);
+    jit_dylib = LLVMOrcLLJITGetMainJITDylib(orc);
+
+    LLVMOrcDefinitionGeneratorRef defgen = 0;
+    err = LLVMOrcCreateDynamicLibrarySearchGeneratorForProcess(&defgen, SCOPES_JIT_SYMBOL_PREFIX,
+        nullptr, nullptr);
+    if (err) {
+        SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
+    }
+    LLVMOrcJITDylibAddGenerator(jit_dylib, defgen);
+
+    add_jit_event_listener(LLVMCreateGDBRegistrationListener());
 #if 0
     LLVMOrcTargetAddress retaddr = 0;
     LLVMOrcErrorCode err = LLVMOrcCreateLazyCompileCallback(orc, &retaddr, lazy_compile_callback, nullptr);
@@ -177,28 +216,6 @@ SCOPES_RESULT(void) init_execution() {
     return {};
 }
 
-static std::vector<const PointerMap *> pointer_maps;
-
-static uint64_t orc_symbol_resolver(const char *name, void *ctx) {
-#if SCOPES_MACOS
-	assert(*name == '_');
-	name++;
-#endif
-    const PointerMap *map = (const PointerMap *)ctx;
-    if (map) {
-        auto it = map->find(name);
-        if (it != map->end()) {
-            return (uint64_t)it->second;
-        }
-    }
-    void *ptr = retrieve_symbol(name);
-    if (!ptr) {
-        //printf("ORC failed to resolve symbol: %s\n", name);
-    }
-    return reinterpret_cast<uint64_t>(ptr);
-}
-
-static std::vector<LLVMOrcModuleHandle> module_handles;
 SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     uint64_t compiler_flags) {
     SCOPES_RESULT_TYPE(void);
@@ -259,9 +276,24 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     }
 
     LLVMErrorRef err = nullptr;
-    LLVMOrcModuleHandle newhandle = 0;
-    auto ptrmap = new PointerMap(map);
-    pointer_maps.push_back(ptrmap);
+    auto ES = LLVMOrcLLJITGetExecutionSession(orc);
+    std::vector<LLVMJITCSymbolMapPair> symbolpairs;
+    for (auto it = map.begin(); it != map.end(); ++it) {
+        const char *name = it->first.c_str();
+        void *ptr = const_cast< void *>(it->second);
+
+        LLVMJITCSymbolMapPair pair;
+        memset(&pair, 0, sizeof(pair));
+        pair.Name = LLVMOrcExecutionSessionIntern(ES, name);
+        pair.Sym.Address = (uint64_t)ptr;
+        symbolpairs.push_back(pair);
+    }
+    auto mu = LLVMOrcAbsoluteSymbols(&symbolpairs[0], symbolpairs.size());
+    err = LLVMOrcJITDylibDefine(jit_dylib, mu);
+    if (err) {
+        SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
+    }
+
     if (cache && filepath) {
         #if 0
         char *errormsg;
@@ -299,8 +331,8 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
 
         #endif
 
-        err = LLVMOrcAddObjectFile(orc, &newhandle, membuf,
-            orc_symbol_resolver, ptrmap);
+        err = LLVMOrcLLJITAddObjectFile(orc, jit_dylib, membuf);
+        //err = LLVMOrcAddObjectFile(orc, &newhandle, membuf, orc_symbol_resolver, ptrmap);
         goto done;
     } else {
         goto skip_cache;
@@ -323,8 +355,8 @@ skip_cache:
         }
 
         #if 1
-        err = LLVMOrcAddObjectFile(orc, &newhandle, membuf,
-            orc_symbol_resolver, ptrmap);
+        err = LLVMOrcLLJITAddObjectFile(orc, jit_dylib, membuf);
+        //err = LLVMOrcAddObjectFile(orc, &newhandle, membuf, orc_symbol_resolver, ptrmap);
         #else
         LLVMDisposeMemoryBuffer(membuf);
         err = LLVMOrcAddEagerlyCompiledIR(orc, &newhandle, module,
@@ -337,9 +369,9 @@ done:
         LLVMDisposeMemoryBuffer(irbuf);
     }
 
-    if (!err) {
+    /*if (!err) {
         module_handles.push_back(newhandle);
-    }
+    }*/
 
     if (err) {
         SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
@@ -351,16 +383,16 @@ done:
 SCOPES_RESULT(void) add_object(const char *path) {
     SCOPES_RESULT_TYPE(void);
     LLVMErrorRef err = nullptr;
-    LLVMOrcModuleHandle newhandle = 0;
+    //LLVMOrcModuleHandle newhandle = 0;
     LLVMMemoryBufferRef membuf = nullptr;
     char *errormsg;
     if (LLVMCreateMemoryBufferWithContentsOfFile(path, &membuf, &errormsg)) {
         SCOPES_ERROR(CGenBackendFailed, errormsg);
     }
-    err = LLVMOrcAddObjectFile(orc, &newhandle, membuf,
-        orc_symbol_resolver, nullptr);
+    err = LLVMOrcLLJITAddObjectFile(orc, jit_dylib, membuf);
+    //err = LLVMOrcAddObjectFile(orc, &newhandle, membuf, orc_symbol_resolver, nullptr);
     if (!err) {
-        module_handles.push_back(newhandle);
+        //module_handles.push_back(newhandle);
     } else {
         SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
     }
