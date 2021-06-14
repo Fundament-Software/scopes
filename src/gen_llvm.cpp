@@ -65,6 +65,16 @@ namespace scopes {
 
 #define SCOPES_LLVM_EXTENDED_DEBUG_INFO 0
 
+
+// TODO: remove this when LLVM 13 drops
+
+LLVMAttributeRef LLVMCreateTypeAttribute(LLVMContextRef C, unsigned KindID,
+                                         LLVMTypeRef type_ref) {
+    auto &Ctx = *llvm::unwrap(C);
+    auto AttrKind = (llvm::Attribute::AttrKind)KindID;
+    return llvm::wrap(llvm::Attribute::get(Ctx, AttrKind, llvm::unwrap(type_ref)));
+}
+
 //------------------------------------------------------------------------------
 // IL->LLVM IR GENERATOR
 //------------------------------------------------------------------------------
@@ -308,6 +318,7 @@ struct LLVMIRGenerator {
     static LLVMAttributeRef attr_byval;
     static LLVMAttributeRef attr_sret;
     static LLVMAttributeRef attr_nonnull;
+    static unsigned attr_kind_sret;
     LLVMValueRef intrinsics[NumIntrinsics];
 
     // polymorphic intrinsics
@@ -435,10 +446,18 @@ struct LLVMIRGenerator {
     std::vector<LabelInfo> label_info_stack;
 
     template<unsigned N>
-    static LLVMAttributeRef get_attribute(const char (&s)[N], uint64_t val = 0) {
+    static unsigned get_attribute_kind(const char (&s)[N]) {
         unsigned kind = LLVMGetEnumAttributeKindForName(s, N - 1);
         assert(kind);
+        return kind;
+    }
+
+    static LLVMAttributeRef get_attribute(unsigned kind, uint64_t val = 0) {
         return LLVMCreateEnumAttribute(LLVMGetGlobalContext(), kind, val);
+    }
+
+    static LLVMAttributeRef get_type_attribute(unsigned kind, LLVMTypeRef ty) {
+        return LLVMCreateTypeAttribute(LLVMGetGlobalContext(), kind, ty);
     }
 
     LLVMIRGenerator() {
@@ -696,9 +715,10 @@ struct LLVMIRGenerator {
         rawstringT = LLVMPointerType(LLVMInt8Type(), 0);
         falseV = LLVMConstInt(i1T, 0, false);
         trueV = LLVMConstInt(i1T, 1, false);
-        attr_byval = get_attribute("byval");
-        attr_sret = get_attribute("sret");
-        attr_nonnull = get_attribute("nonnull");
+        attr_byval = get_attribute(get_attribute_kind("byval"));
+        attr_sret = get_attribute(get_attribute_kind("sret"));
+        attr_nonnull = get_attribute(get_attribute_kind("nonnull"));
+        attr_kind_sret = get_attribute_kind("sret");
 
         LLVMContextSetDiagnosticHandler(LLVMGetGlobalContext(),
             diag_handler,
@@ -1397,9 +1417,9 @@ struct LLVMIRGenerator {
 
         auto &&params = node->params;
         size_t offset = 0;
-        if (use_sret) {            
-            // todo: no way to specify a type with the C API
-            //LLVMAddAttributeAtIndex(func, 1, attr_sret);
+        if (use_sret) {                        
+            LLVMAddAttributeAtIndex(func, 1, 
+                get_type_attribute(attr_kind_sret, SCOPES_GET_RESULT(_type_to_llvm_type(rtype))));
             offset++;
             //Parameter *param = params[0];
             //bind(param, LLVMGetParam(func, 0));
@@ -3167,8 +3187,9 @@ struct LLVMIRGenerator {
         setup_generate(name);
 
         {
-            constructor_function = LLVMAddFunction(module, "",
+            constructor_function = LLVMAddFunction(module, "constructor",
                 LLVMFunctionType(voidT, nullptr, 0, false));
+            LLVMSetLinkage(constructor_function, LLVMInternalLinkage);
         }
 
         entry_function = entry;
@@ -3216,6 +3237,7 @@ LLVMValueRef LLVMIRGenerator::trueV = nullptr;
 LLVMAttributeRef LLVMIRGenerator::attr_byval = nullptr;
 LLVMAttributeRef LLVMIRGenerator::attr_sret = nullptr;
 LLVMAttributeRef LLVMIRGenerator::attr_nonnull = nullptr;
+unsigned LLVMIRGenerator::attr_kind_sret = 0;
 
 //------------------------------------------------------------------------------
 // IL COMPILER
