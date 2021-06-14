@@ -435,10 +435,10 @@ struct LLVMIRGenerator {
     std::vector<LabelInfo> label_info_stack;
 
     template<unsigned N>
-    static LLVMAttributeRef get_attribute(const char (&s)[N]) {
+    static LLVMAttributeRef get_attribute(const char (&s)[N], uint64_t val = 0) {
         unsigned kind = LLVMGetEnumAttributeKindForName(s, N - 1);
         assert(kind);
-        return LLVMCreateEnumAttribute(LLVMGetGlobalContext(), kind, 0);
+        return LLVMCreateEnumAttribute(LLVMGetGlobalContext(), kind, val);
     }
 
     LLVMIRGenerator() {
@@ -931,8 +931,11 @@ struct LLVMIRGenerator {
             }
             return lltype;
         } break;
-        case TK_Integer:
-            return LLVMIntType(cast<IntegerType>(type)->width);
+        case TK_Integer: {
+            //auto width = std::max(8ul, cast<IntegerType>(type)->width); 
+            auto width = cast<IntegerType>(type)->width; 
+            return LLVMIntType(width);
+        } break;
         case TK_Real:
             switch(cast<RealType>(type)->width) {
             case 32: return f32T;
@@ -1394,7 +1397,9 @@ struct LLVMIRGenerator {
 
         auto &&params = node->params;
         size_t offset = 0;
-        if (use_sret) {
+        if (use_sret) {            
+            // todo: no way to specify a type with the C API
+            //LLVMAddAttributeAtIndex(func, 1, attr_sret);
             offset++;
             //Parameter *param = params[0];
             //bind(param, LLVMGetParam(func, 0));

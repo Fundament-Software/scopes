@@ -498,6 +498,9 @@ void sc_error_append_calltrace(sc_error_t *err, sc_valueref_t callexpr) {
 
 sc_error_t *sc_error_new(const sc_string_t *msg) {
     using namespace scopes;
+#if SCOPES_EARLY_ABORT
+    assert(false);
+#endif    
     return ErrorUser::from(msg);
 }
 const sc_string_t *sc_format_error(const sc_error_t *err) {

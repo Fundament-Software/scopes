@@ -216,6 +216,8 @@ SCOPES_RESULT(void) init_execution() {
     return {};
 }
 
+static std::vector<const PointerMap *> pointer_maps;
+
 SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     uint64_t compiler_flags) {
     SCOPES_RESULT_TYPE(void);
@@ -276,9 +278,12 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     }
 
     LLVMErrorRef err = nullptr;
+    //LLVMOrcModuleHandle newhandle = 0;
+    auto ptrmap = new PointerMap(map);
+    pointer_maps.push_back(ptrmap);
     auto ES = LLVMOrcLLJITGetExecutionSession(orc);
     std::vector<LLVMJITCSymbolMapPair> symbolpairs;
-    for (auto it = map.begin(); it != map.end(); ++it) {
+    for (auto it = ptrmap->begin(); it != ptrmap->end(); ++it) {
         const char *name = it->first.c_str();
         void *ptr = const_cast< void *>(it->second);
 
