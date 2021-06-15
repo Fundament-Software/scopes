@@ -315,10 +315,11 @@ struct LLVMIRGenerator {
     static LLVMValueRef noneV;
     static LLVMValueRef falseV;
     static LLVMValueRef trueV;
-    static LLVMAttributeRef attr_byval;
+    //static LLVMAttributeRef attr_byval;
     static LLVMAttributeRef attr_sret;
     static LLVMAttributeRef attr_nonnull;
     static unsigned attr_kind_sret;
+    static unsigned attr_kind_byval;
     LLVMValueRef intrinsics[NumIntrinsics];
 
     // polymorphic intrinsics
@@ -715,10 +716,11 @@ struct LLVMIRGenerator {
         rawstringT = LLVMPointerType(LLVMInt8Type(), 0);
         falseV = LLVMConstInt(i1T, 0, false);
         trueV = LLVMConstInt(i1T, 1, false);
-        attr_byval = get_attribute(get_attribute_kind("byval"));
+        //attr_byval = get_attribute(get_attribute_kind("byval"));
         attr_sret = get_attribute(get_attribute_kind("sret"));
         attr_nonnull = get_attribute(get_attribute_kind("nonnull"));
         attr_kind_sret = get_attribute_kind("sret");
+        attr_kind_byval = get_attribute_kind("byval");
 
         LLVMContextSetDiagnosticHandler(LLVMGetGlobalContext(),
             diag_handler,
@@ -849,11 +851,14 @@ struct LLVMIRGenerator {
         ABIClass classes[MAX_ABI_CLASSES];
         size_t sz = abi_classify(param_type, classes);
         if (!sz) {
+            LLVMValueRef val = LLVMGetParam(func, k);
 #if defined(__aarch64__)
 #else
-            LLVMAddAttributeAtIndex(func, (k + 1), attr_byval);
+            LLVMAddAttributeAtIndex(func, (k + 1),
+                get_type_attribute(attr_kind_byval, LLVMGetElementType(LLVMTypeOf(val))));
+            //LLVMAddAttributeAtIndex(func, (k + 1), attr_byval);
 #endif
-            LLVMValueRef val = LLVMGetParam(func, k++);
+            k++;
             return LLVMBuildLoad(builder, val, "");
         }
         LLVMTypeRef T = SCOPES_GET_RESULT(type_to_llvm_type(param_type));
@@ -955,8 +960,8 @@ struct LLVMIRGenerator {
             return lltype;
         } break;
         case TK_Integer: {
-            //auto width = std::max(8ul, cast<IntegerType>(type)->width); 
-            auto width = cast<IntegerType>(type)->width; 
+            //auto width = std::max(8ul, cast<IntegerType>(type)->width);
+            auto width = cast<IntegerType>(type)->width;
             return LLVMIntType(width);
         } break;
         case TK_Real:
@@ -1420,8 +1425,8 @@ struct LLVMIRGenerator {
 
         auto &&params = node->params;
         size_t offset = 0;
-        if (use_sret) {                        
-            LLVMAddAttributeAtIndex(func, 1, 
+        if (use_sret) {
+            LLVMAddAttributeAtIndex(func, 1,
                 get_type_attribute(attr_kind_sret, SCOPES_GET_RESULT(_type_to_llvm_type(rtype))));
             offset++;
             //Parameter *param = params[0];
@@ -2835,7 +2840,9 @@ struct LLVMIRGenerator {
             LLVMAddCallSiteAttribute(ret, i, attr_nonnull);
 #if defined(__aarch64__)
 #else
-            LLVMAddCallSiteAttribute(ret, i, attr_byval);
+            LLVMAddCallSiteAttribute(ret, i,
+                get_type_attribute(attr_kind_byval,
+                    LLVMGetElementType(LLVMTypeOf(values[idx]))));
 #endif
         }
         if (use_sret) {
@@ -3240,10 +3247,11 @@ LLVMTypeRef LLVMIRGenerator::noneT = nullptr;
 LLVMValueRef LLVMIRGenerator::noneV = nullptr;
 LLVMValueRef LLVMIRGenerator::falseV = nullptr;
 LLVMValueRef LLVMIRGenerator::trueV = nullptr;
-LLVMAttributeRef LLVMIRGenerator::attr_byval = nullptr;
+//LLVMAttributeRef LLVMIRGenerator::attr_byval = nullptr;
 LLVMAttributeRef LLVMIRGenerator::attr_sret = nullptr;
 LLVMAttributeRef LLVMIRGenerator::attr_nonnull = nullptr;
 unsigned LLVMIRGenerator::attr_kind_sret = 0;
+unsigned LLVMIRGenerator::attr_kind_byval = 0;
 
 //------------------------------------------------------------------------------
 // IL COMPILER
