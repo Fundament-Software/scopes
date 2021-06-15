@@ -137,7 +137,7 @@ inline decoder (coll)
     static-if (none? coll) _decoder
     else (_decoder coll)
 
-spice char (value)
+spice char32 (value)
     using import itertools
     let value =
         match ('typeof value)
@@ -159,5 +159,5 @@ spice char (value)
     result
 
 do
-    let encoder decoder char
+    let encoder decoder char32
     locals;
