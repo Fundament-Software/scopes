@@ -27,6 +27,7 @@ static const Type *is_hfa0 (const Type *ST) {
         auto tt = cast<ArrayLikeType>(ST);
         auto T = is_hfa0(qualified_storage_type(tt->element_type).assert_ok());
         if (T) return T;
+        return nullptr;
     } break;
     case TK_Tuple: {
         auto tt = cast<TupleType>(ST);
@@ -35,10 +36,11 @@ static const Type *is_hfa0 (const Type *ST) {
             auto T = is_hfa0(qualified_storage_type(tt->values[i]).assert_ok());
             if (T) return T;
         }
+        return nullptr;
     } break;
     default: break;
     }
-    return nullptr;
+    return ST;
 }
 
 // A subroutine of is_vfp_type.  Given a structure type, return true if all

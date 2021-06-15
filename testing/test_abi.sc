@@ -92,7 +92,7 @@ fn testf4 ()
         lib.Vec3 4.0 5.0 6.0
 
 compile
-    `[(typify testf1)]
+    `[(typify testf4)]
     'dump-module
 
 test (1 == (testf4))
