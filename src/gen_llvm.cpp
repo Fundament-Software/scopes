@@ -728,6 +728,12 @@ struct LLVMIRGenerator {
 
     }
 
+    bool is_empty_type(LLVMTypeRef T) {
+        if (LLVMGetTypeKind(T) == LLVMStructTypeKind)
+            return (LLVMCountStructElementTypes(T) == 0);
+        return false;
+    }
+
     static LLVMTypeRef abi_struct_type(const ABIClass *classes, size_t sz) {
         LLVMTypeRef types[sz];
         size_t k = 0;
@@ -1616,9 +1622,11 @@ struct LLVMIRGenerator {
             auto phi = phis[i];
             auto ty = LLVMTypeOf(phi);
             auto llvmval = SCOPES_GET_RESULT(ref_to_value(values[i]));
-            llvmval = build_struct_cast(llvmval, ty);
-            LLVMValueRef incovals[] = { llvmval };
-            LLVMAddIncoming(phi, incovals, incobbs, 1);
+            if (!is_empty_type(ty)) {
+                llvmval = build_struct_cast(llvmval, ty);
+                LLVMValueRef incovals[] = { llvmval };
+                LLVMAddIncoming(phi, incovals, incobbs, 1);
+            }
         }
         return {};
     }
@@ -1675,7 +1683,12 @@ struct LLVMIRGenerator {
         int count = get_argument_count(T);
         for (int i = 0; i < count; ++i) {
             auto argT = SCOPES_GET_RESULT(type_to_llvm_type(get_argument(T, i)));
-            auto val = LLVMBuildPhi(builder, argT, "");
+            LLVMValueRef val;
+            if (is_empty_type(argT)) {
+                val = LLVMConstNull(argT);
+            } else {
+                val = LLVMBuildPhi(builder, argT, "");
+            }
             refs.push_back(val);
         }
         return {};
