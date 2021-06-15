@@ -1221,7 +1221,7 @@ let protect =
                 return `(bitcast self [('immutable T)])
             error "syntax: (protect pointer-value)"
 
-let rawstring = (pointer i8)
+let rawstring = (pointer char)
 
 # cheap version of `not` - to be replaced further down
 inline not (value)
@@ -2979,7 +2979,7 @@ let parse-infix-expr =
 # dotted symbol expander
 # --------------------------------------------------------------------------
 
-let dot-char = 46:i8 # "."
+let dot-char = 46:char # "."
 let dot-sym = '.
 
 fn dotted-symbol? (env head)
@@ -3096,11 +3096,11 @@ fn symbol-handler (topexpr env)
     if (>= (countof s) 2:usize)
         let ch = (@ s 0)
         switch ch
-        #pass 126:i8 # ~
-        pass 64:i8 # @
-        #pass 47:i8 # /
-        pass 38:i8 # &
-        pass 45:i8 # -
+        #pass 126:char # ~
+        pass 64:char # @
+        #pass 47:char # /
+        pass 38:char # &
+        pass 45:char # -
         do
             # split
             let anchor = ('anchor sxname)
@@ -3974,7 +3974,7 @@ let incomplete = (typename "incomplete")
 
 run-stage; # 6
 
-let question-mark-char = 63:i8 # "?"
+let question-mark-char = 63:char # "?"
 fn make-module-path (pattern name)
     let sz = (countof pattern)
     loop (i start result = 0:usize 0:usize "")
@@ -4032,8 +4032,8 @@ fn exec-module (expr eval-scope)
                     fptr;
             break result
 
-let slash-char = 47:i8 # "/"
-let backslash-char = 92:i8 # "\"
+let slash-char = 47:char # "/"
+let backslash-char = 92:char # "\"
 fn dots-to-slashes (pattern)
     let sz = (countof pattern)
     loop (i start result = 0:usize 0:usize "")
@@ -4524,7 +4524,7 @@ do
             inline (i) (i + 1:usize)
 
     inline string-collector (maxsize)
-        let buf = (alloca-array i8 maxsize)
+        let buf = (alloca-array char maxsize)
         Collector
             inline () 0
             inline (n) (n < maxsize)
@@ -4534,8 +4534,8 @@ do
                 store (src) (getelementptr buf n)
                 n + 1
 
-    fn i8->string(c)
-        let ptr = (alloca i8)
+    fn char->string(c)
+        let ptr = (alloca char)
         store c ptr
         sc_string_new ptr 1
 
@@ -4548,8 +4548,8 @@ do
         __ras =
             spice-cast-macro
                 fn "string-as" (vT T)
-                    if (vT == i8)
-                        return `i8->string
+                    if (vT == char)
+                        return `char->string
                     `()
         __as =
             spice-cast-macro
@@ -7597,7 +7597,7 @@ sugar include (args...)
                 hide-traceback;
                 error "include string is empty"
             let includestr =
-                if (includestr @ (sz - 1) == 10:i8)
+                if (includestr @ (sz - 1) == 10:char)
                     # code block
                     includestr
                 else (.. "#include \"" includestr "\"")
@@ -8127,23 +8127,23 @@ fn integer->string (value base)
     let value base = (deref value) (deref base)
     let N = 65
     let T = (typeof value)
-    let digits = (alloca-array i8 N)
+    let digits = (alloca-array char N)
     let absvalue = (abs value)
     let neg? = (value != absvalue)
     loop (i value = N absvalue)
         if (i == 0)
             break (string digits N)
         let i = (i - 1)
-        let digit = ((value % base) as i8)
+        let digit = ((value % base) as char)
         digits @ i =
             + digit
-                ? (digit >= 10:i8) (97:i8 - 10:i8) 48:i8
+                ? (digit >= 10:char) (97:char - 10:char) 48:char
         let value = (value // base)
         if (value == (0 as T))
             let i =
                 if ((i > 0) & neg?)
                     let i = (i - 1)
-                    digits @ i = 45:i8
+                    digits @ i = 45:char
                     i
                 else i
             break (string (& (digits @ i)) ((N - i) as usize))
@@ -8336,7 +8336,7 @@ fn print-version ()
     print "Executable path:" compiler-path
     exit 0
 
-let minus-char = 45:i8 # "-"
+let minus-char = 45:char # "-"
 fn run-main ()
     let argc argv = (launch-args)
     let exename = (load (getelementptr argv 0))

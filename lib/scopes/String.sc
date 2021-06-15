@@ -20,7 +20,7 @@ let llvm.memcpy.p0i8.p0i8.i64 =
                                    i64 <len>, i1 <isvolatile>)
 let llvm.memset.p0i8.i64 =
     extern 'llvm.memset.p0i8.i64
-        function void (mutable rawstring) i8 i64 bool
+        function void (mutable rawstring) char i64 bool
 
 inline string-generator (self)
     Generator
@@ -122,7 +122,7 @@ inline string-binary-op (f superf)
         static-if ((T == (pointer ET)) or (T == (mutable pointer ET)))
             inline (self other)
                 f self other (zero-terminated-length other)
-        elseif ((ET == i8) and (T == string))
+        elseif ((ET == char) and (T == string))
             inline (self other)
                 f self (other as rawstring) (countof other)
         elseif (not none? superf)
@@ -155,12 +155,12 @@ typedef+ StringBase
         `Generator`, or directly passed to `for`.
     inline __as (cls T)
         static-if (T == Generator) string-generator
-        elseif ((cls.ElementType == i8) and (T == string))
+        elseif ((cls.ElementType == char) and (T == string))
             inline (self)
                 string self._items self._count
 
     inline __ras (T cls)
-        static-if ((cls.ElementType == i8) and (T == string)) cls
+        static-if ((cls.ElementType == char) and (T == string)) cls
 
     inline reverse (self)
         Generator
@@ -183,7 +183,7 @@ typedef+ StringBase
 
     inline __static-rimply (T cls)
         let ET = cls.ElementType
-        static-if ((ET == i8) and (T == string)) cls
+        static-if ((ET == char) and (T == string)) cls
 
     inline __typecall (cls element-type capacity)
         """"Construct a mutable string type of `element-type` with a variable or
@@ -265,7 +265,7 @@ typedef+ StringBase
         ;
     case (self, value : string)
         let cls = (typeof self)
-        static-assert (cls.ElementType == i8)
+        static-assert (cls.ElementType == char)
         let count = (countof value)
         let ptr = (append-slots self (countof value))
         llvm.memcpy.p0i8.p0i8.i64
@@ -350,7 +350,7 @@ typedef+ StringBase
         # null remainder of memory
         llvm.memset.p0i8.i64
             bitcast self._items (mutable rawstring)
-            0:i8
+            0:char
             (offset * (sizeof cls.ElementType)) as i64
             false
         return;
@@ -370,7 +370,7 @@ typedef+ StringBase
             # null remainder of memory
             llvm.memset.p0i8.i64
                 bitcast (getelementptr self._items count) (mutable rawstring)
-                0:i8
+                0:char
                 (offset * (sizeof cls.ElementType)) as i64
                 false
 
@@ -404,7 +404,7 @@ typedef+ StringBase
         # null remainder of memory
         llvm.memset.p0i8.i64
             bitcast (getelementptr (view new-items) count) (mutable rawstring)
-            0:i8
+            0:char
             ((capacity - count) * (sizeof cls.ElementType)) as i64
             false
         assign new-items newarr._items
@@ -464,7 +464,7 @@ typedef+ FixedString
     """"Implements support for the `repr` operation.
     fn __repr (self)
         let cls = (typeof self)
-        if (cls.ElementType == i8)
+        if (cls.ElementType == char)
             string self._items self._count
         else
             ..
@@ -551,7 +551,7 @@ typedef+ GrowingString
             # null remainder of memory
             llvm.memset.p0i8.i64
                 bitcast (getelementptr (view items) count) (mutable rawstring)
-                0:i8
+                0:char
                 ((capacity - count) * (sizeof ET)) as i64
                 false
             Struct.__typecall cls
@@ -567,7 +567,7 @@ typedef+ GrowingString
             let items = (malloc-array ET capacity)
             llvm.memset.p0i8.i64
                 bitcast items (mutable rawstring)
-                0:i8
+                0:char
                 (capacity * (sizeof ET)) as i64
                 false
             Struct.__typecall cls
@@ -586,7 +586,7 @@ typedef+ GrowingString
     """"Implements support for the `repr` operation.
     fn __repr (self)
         let cls = (typeof self)
-        if (cls.ElementType == i8)
+        if (cls.ElementType == char)
             string self._items self._count
         else
             ..
@@ -624,7 +624,7 @@ typedef+ GrowingString
             # null remainder of memory
             llvm.memset.p0i8.i64
                 bitcast (getelementptr (view new-items) count) (mutable rawstring)
-                0:i8
+                0:char
                 ((new-capacity - count) * (sizeof T.ElementType)) as i64
                 false
             assign new-items self._items
@@ -637,5 +637,5 @@ typedef+ GrowingString
 
 do
     #let StringBase FixedString GrowingString
-    let String = (GrowingString i8)
+    let String = (GrowingString char)
     locals;

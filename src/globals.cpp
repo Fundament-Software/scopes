@@ -2313,7 +2313,7 @@ void init_globals(int argc, char *argv[]) {
     (void)FUNC; /* ensure that the symbol is there */ \
     bind_extern(Symbol(#FUNC), raising_function_type(RETTYPE, { __VA_ARGS__ }));
 
-    const Type *rawstring = native_ro_pointer_type(TYPE_I8);
+    const Type *rawstring = native_ro_pointer_type(TYPE_Char);
     const Type *TYPE_ValuePP = native_ro_pointer_type(TYPE_ValueRef);
     const Type *TYPE_U64PP = native_ro_pointer_type(TYPE_U64);
     const Type *_void = empty_arguments_type();
@@ -2403,8 +2403,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_binding, TYPE_I32, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_descriptor_set, TYPE_I32, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_storage_class, TYPE_Symbol, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_string_new, TYPE_ValueRef, native_ro_pointer_type(TYPE_I8), TYPE_USize);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_string_new_from_cstr, TYPE_ValueRef, native_ro_pointer_type(TYPE_I8));
+    DEFINE_EXTERN_C_FUNCTION(sc_global_string_new, TYPE_ValueRef, rawstring, TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_global_string_new_from_cstr, TYPE_ValueRef, rawstring);
     DEFINE_EXTERN_C_FUNCTION(sc_cond_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_new, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_case, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
@@ -2466,7 +2466,7 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_EXTERN_C_FUNCTION(sc_hash, TYPE_U64, TYPE_U64, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_hash2x64, TYPE_U64, TYPE_U64, TYPE_U64);
-    DEFINE_EXTERN_C_FUNCTION(sc_hashbytes, TYPE_U64, native_ro_pointer_type(TYPE_I8), TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_hashbytes, TYPE_U64, rawstring, TYPE_USize);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_import_c, TYPE_Scope, TYPE_String, TYPE_String, TYPE_List, TYPE_Scope);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_load_library, _void, TYPE_String);
@@ -2496,8 +2496,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_count, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_style, TYPE_Symbol, TYPE_Symbol);
 
-    DEFINE_EXTERN_C_FUNCTION(sc_string_new, TYPE_String, native_ro_pointer_type(TYPE_I8), TYPE_USize);
-    DEFINE_EXTERN_C_FUNCTION(sc_string_new_from_cstr, TYPE_String, native_ro_pointer_type(TYPE_I8));
+    DEFINE_EXTERN_C_FUNCTION(sc_string_new, TYPE_String, rawstring, TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_string_new_from_cstr, TYPE_String, rawstring);
     DEFINE_EXTERN_C_FUNCTION(sc_string_join, TYPE_String, TYPE_String, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_string_match, arguments_type({TYPE_Bool, TYPE_I32, TYPE_I32}), TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_count, TYPE_USize, TYPE_String);

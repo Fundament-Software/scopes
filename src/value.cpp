@@ -690,7 +690,7 @@ static ConstSet<GlobalString> globalstrings;
 GlobalString::GlobalString(const char *_data, size_t _count)
     : Pure(VK_GlobalString,
         refer_type(
-            array_type(TYPE_I8, _count).assert_ok(),
+            array_type(TYPE_Char, _count).assert_ok(),
             PTF_NonWritable,
             SYM_SPIRV_StorageClassPrivate)),
         value(_data, _count) {

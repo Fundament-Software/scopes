@@ -508,6 +508,12 @@ void init_types() {
     TYPE_F80 = real_type(80);
     TYPE_F128 = real_type(128);
 
+#if defined(__aarch64__)
+    TYPE_Char = TYPE_U8;
+#else
+    TYPE_Char = TYPE_I8;
+#endif
+
     DEFINE_BASIC_TYPE("usize", size_t, TYPE_USize, TYPE_Integer, TYPE_U64);
 
     const Type *_TypePtr = native_ro_pointer_type(opaque_typename_type(String::from("_type"),nullptr));

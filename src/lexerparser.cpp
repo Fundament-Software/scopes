@@ -528,6 +528,7 @@ SCOPES_RESULT(bool) LexerParser::select_integer_suffix() {
     else if (is_suffix(":u16")) { newtype = TYPE_U16; }
     else if (is_suffix(":u32")) { newtype = TYPE_U32; }
     else if (is_suffix(":u64")) { newtype = TYPE_U64; }
+    else if (is_suffix(":char")) { newtype = TYPE_Char; }
     //else if (is_suffix(":isize")) { newtype = TYPE_ISize; }
     else if (is_suffix(":usize")) { newtype = TYPE_USize; }
     else if (is_suffix(":f32")) {
