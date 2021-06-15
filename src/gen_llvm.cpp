@@ -849,7 +849,10 @@ struct LLVMIRGenerator {
         ABIClass classes[MAX_ABI_CLASSES];
         size_t sz = abi_classify(param_type, classes);
         if (!sz) {
+#if defined(__aarch64__)
+#else
             LLVMAddAttributeAtIndex(func, (k + 1), attr_byval);
+#endif
             LLVMValueRef val = LLVMGetParam(func, k++);
             return LLVMBuildLoad(builder, val, "");
         }
@@ -2830,7 +2833,10 @@ struct LLVMIRGenerator {
         for (auto idx : memptrs) {
             auto i = idx + 1;
             LLVMAddCallSiteAttribute(ret, i, attr_nonnull);
+#if defined(__aarch64__)
+#else
             LLVMAddCallSiteAttribute(ret, i, attr_byval);
+#endif
         }
         if (use_sret) {
             LLVMAddCallSiteAttribute(ret, 1, attr_sret);

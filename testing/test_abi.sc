@@ -103,25 +103,35 @@ test (1 == (testf1))
 do
     vvv bind cfun
     include
-        """"typedef struct Mesh {
+        """"
+            #include <stdio.h>
+            typedef struct Mesh {
                 int vertexCount;
                 int triangleCount;
                 float *vertices;
                 float *texcoords;
             } Mesh;
             Mesh cfun (Mesh param) {
+                printf("vertexCount = %i, triangleCount = %i\n", param.vertexCount, param.triangleCount);
                 return param;
             }
 
-    let s =
-        cfun.typedef.Mesh
-            vertices = (malloc-array f32 1000)
-            vertexCount = 250
-            triangleCount = 303
-    let s2 = (cfun.extern.cfun s)
-    test (s.vertexCount == s2.vertexCount)
-    test (s.triangleCount == s2.triangleCount)
-    test (s.vertices == s2.vertices)
+    fn testf5 ()
+        let s =
+            cfun.typedef.Mesh
+                vertices = (malloc-array f32 1000)
+                vertexCount = 250
+                triangleCount = 303
+        let s2 = (cfun.extern.cfun s)
+        print s2.vertexCount s2.triangleCount
+        test (s.vertexCount == s2.vertexCount)
+        test (s.triangleCount == s2.triangleCount)
+        test (s.vertices == s2.vertices)
+
+    testf5;
+    #compile
+        static-typify testf5
+        'dump-module
 
 do
     let AB =

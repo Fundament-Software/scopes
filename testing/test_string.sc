@@ -55,7 +55,10 @@ test
 let str = (sc_global_string_new "te\x00st\n" 6)
 run-stage;
 print (sizeof str)
-let C = (include "stdio.h")
+#let C = (include "stdio.h")
+let C =
+    include
+        """"extern int printf (const char *fmt, ...);
 C.extern.printf str
 print (imply str rawstring)
 for k in str
