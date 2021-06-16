@@ -140,9 +140,7 @@ static LLVMErrorRef definition_generator(
     LLVMOrcDefinitionGeneratorRef GeneratorObj, void *Ctx,
     LLVMOrcLookupStateRef *LookupState, LLVMOrcLookupKind Kind,
     LLVMOrcJITDylibRef JD, LLVMOrcJITDylibLookupFlags JDLookupFlags,
-    LLVMOrcCLookupSet LookupSet, size_t LookupSetSize) {        
-
-    auto ES = LLVMOrcLLJITGetExecutionSession(orc);
+    LLVMOrcCLookupSet LookupSet, size_t LookupSetSize) {
     std::vector<LLVMJITCSymbolMapPair> symbolpairs;
 
     for (int i = 0; i < LookupSetSize; ++i) {
@@ -236,7 +234,7 @@ SCOPES_RESULT(void) init_execution() {
     }
     LLVMOrcJITDylibAddGenerator(jit_dylib, defgen);
 
-    LLVMOrcJITDylibAddGenerator(jit_dylib, 
+    LLVMOrcJITDylibAddGenerator(jit_dylib,
         LLVMOrcCreateCustomCAPIDefinitionGenerator(&definition_generator, nullptr));
 
     add_jit_event_listener(LLVMCreateGDBRegistrationListener());
@@ -462,7 +460,7 @@ void init_llvm() {
     LLVMAddSymbol("sincosf", (void *)&sincosf);
 
     LLVMAddSymbol("__mingw_vfprintf", (void *)&__mingw_vfprintf);
-    
+
 #endif
 
 #if 0
