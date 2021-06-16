@@ -209,6 +209,7 @@ SCOPES_RESULT(void) init_execution() {
     LLVMOrcJITDylibAddGenerator(jit_dylib, defgen);
 
     add_jit_event_listener(LLVMCreateGDBRegistrationListener());
+
 #if 0
     LLVMOrcTargetAddress retaddr = 0;
     LLVMOrcErrorCode err = LLVMOrcCreateLazyCompileCallback(orc, &retaddr, lazy_compile_callback, nullptr);
@@ -428,7 +429,6 @@ void init_llvm() {
     // required by LLVM
     LLVMAddSymbol("sincos", (void *)&sincos);
     LLVMAddSymbol("sincosf", (void *)&sincosf);
-
 #endif
 
 #if 0
