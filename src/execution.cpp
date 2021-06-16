@@ -13,6 +13,7 @@
 
 #ifdef SCOPES_WIN32
 #include "dlfcn.h"
+#include <math.h>
 #else
 #include <dlfcn.h>
 #endif
