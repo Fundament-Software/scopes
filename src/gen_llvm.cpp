@@ -3127,18 +3127,6 @@ struct LLVMIRGenerator {
 
     typedef std::pair<LLVMModuleRef, LLVMValueRef> ModuleValuePair;
 
-#ifdef SCOPES_WIN32
-    void build_chkstk_function() {
-        auto func = LLVMAddFunction(module, "___chkstk_ms",
-            LLVMFunctionType(voidT, nullptr, 0, false));
-        LLVMSetLinkage(func, LLVMInternalLinkage);                
-        
-        auto bb = LLVMAppendBasicBlock(func, "");
-        position_builder_at_end(bb);
-        LLVMBuildRetVoid(builder);
-    }
-#endif
-
     void build_constructor_function() {
         assert(constructor_function);
         auto func = constructor_function;
@@ -3239,9 +3227,6 @@ struct LLVMIRGenerator {
 
         SCOPES_CHECK_RESULT(process_functions());
         build_constructor_function();
-#ifdef SCOPES_WIN32
-        build_chkstk_function();
-#endif
         SCOPES_CHECK_RESULT(teardown_generate(entry));
 
         return ModuleValuePair(module, func);

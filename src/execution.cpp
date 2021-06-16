@@ -136,6 +136,33 @@ uint64_t lazy_compile_callback(LLVMOrcJITStackRef orc, void *ctx) {
 }
 #endif
 
+static LLVMErrorRef definition_generator(
+    LLVMOrcDefinitionGeneratorRef GeneratorObj, void *Ctx,
+    LLVMOrcLookupStateRef *LookupState, LLVMOrcLookupKind Kind,
+    LLVMOrcJITDylibRef JD, LLVMOrcJITDylibLookupFlags JDLookupFlags,
+    LLVMOrcCLookupSet LookupSet, size_t LookupSetSize) {        
+
+    auto ES = LLVMOrcLLJITGetExecutionSession(orc);
+    std::vector<LLVMJITCSymbolMapPair> symbolpairs;
+
+    for (int i = 0; i < LookupSetSize; ++i) {
+        auto name = LookupSet[i].Name;
+        auto str = LLVMOrcSymbolStringPoolEntryStr(name);
+        auto ptr = retrieve_symbol(str);
+        //printf("request[%i] = \"%s\" : %p\n", i, str, ptr);
+        if (ptr) {
+            LLVMJITCSymbolMapPair pair;
+            memset(&pair, 0, sizeof(pair));
+            pair.Name = name;
+            pair.Sym.Address = (uint64_t)ptr;
+            symbolpairs.push_back(pair);
+        }
+    }
+
+    auto mu = LLVMOrcAbsoluteSymbols(&symbolpairs[0], symbolpairs.size());
+    return LLVMOrcJITDylibDefine(jit_dylib, mu);
+}
+
 SCOPES_RESULT(void) init_execution() {
     SCOPES_RESULT_TYPE(void);
     if (orc) return {};
@@ -201,12 +228,16 @@ SCOPES_RESULT(void) init_execution() {
     jit_dylib = LLVMOrcLLJITGetMainJITDylib(orc);
 
     LLVMOrcDefinitionGeneratorRef defgen = 0;
+    // should we use LLVMOrcLLJITGetGlobalPrefix() here?
     err = LLVMOrcCreateDynamicLibrarySearchGeneratorForProcess(&defgen, SCOPES_JIT_SYMBOL_PREFIX,
         nullptr, nullptr);
     if (err) {
         SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
     }
     LLVMOrcJITDylibAddGenerator(jit_dylib, defgen);
+
+    LLVMOrcJITDylibAddGenerator(jit_dylib, 
+        LLVMOrcCreateCustomCAPIDefinitionGenerator(&definition_generator, nullptr));
 
     add_jit_event_listener(LLVMCreateGDBRegistrationListener());
 
@@ -429,6 +460,9 @@ void init_llvm() {
     // required by LLVM
     LLVMAddSymbol("sincos", (void *)&sincos);
     LLVMAddSymbol("sincosf", (void *)&sincosf);
+
+    LLVMAddSymbol("__mingw_vfprintf", (void *)&__mingw_vfprintf);
+    
 #endif
 
 #if 0

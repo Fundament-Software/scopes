@@ -6,9 +6,14 @@ let C =
         """"#include <stdlib.h>
             #include <time.h>
 
+run-stage;
+
 C.extern.srand
     u32
-        C.extern.time null
+        static-if (operating-system == 'windows)
+            C.extern._time32 null
+        else
+            C.extern.time null
 
 fn random ()
     (C.extern.rand) / (i32 C.define.RAND_MAX)

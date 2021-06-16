@@ -8,6 +8,12 @@ let C =
         using C.extern
         locals;
 
+let printf =
+    static-if (operating-system == 'windows)
+        C.printf_s
+    else
+        C.printf
+
 let i32x10 = (array i32 10)
 
 fn static-array-init ()
@@ -29,7 +35,7 @@ global x = x
 # global constructor syntax
 global y : i32 =
     inline ()
-        C.printf "y constructor called\n"
+        printf "y constructor called\n"
         7
 
 print "y=" (deref y)
@@ -37,7 +43,7 @@ print "y=" (deref y)
 fn main (argc argv)
     x @ 3 = 6
     #y = 7
-    C.printf ("hello world %i %i\n" as rawstring)
+    printf ("hello world %i %i\n" as rawstring)
         deref (x @ 3)
         deref y
     #print "hello world"
