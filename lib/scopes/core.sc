@@ -3191,10 +3191,13 @@ inline make-expand-and-or (f)
         expand-and-or expr f
 
 fn ltr-multiop (args target mincount)
+    raising Error
     let argc = ('argcount args)
-    verify-count argc mincount -1
+    #verify-count argc mincount -1
     'tag
-        if (<= argc mincount)
+        if (< argc mincount)
+            args
+        elseif (== argc mincount)
             `(target args)
         else
             # call for multiple args
@@ -3209,10 +3212,13 @@ fn ltr-multiop (args target mincount)
         'anchor args
 
 fn rtl-multiop (args target mincount)
+    raising Error
     let argc = ('argcount args)
-    verify-count argc mincount -1
+    #verify-count argc mincount -1
     'tag
-        if (<= argc mincount)
+        if (< argc mincount)
+            args
+        elseif (== argc mincount)
             `(target args)
         else
             # call for multiple args

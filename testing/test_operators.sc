@@ -27,9 +27,9 @@ test (all? ((findlsb (vectorof i8 1 2 3 4)) == (vectorof i8 0 1 0 2)))
 print
     256 ** (/ 3)
 
-test-compiler-error
-    do
-        let x = (+ 1)
+# fewer arguments are passed through
+test ((+ 1) == 1)
+test (va-empty? (+))
 
 test ((floor 3) == 3)
 test ((floor 3.5) == 3.0)
