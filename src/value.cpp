@@ -731,7 +731,7 @@ PureRef PureCast::from(const Type *type, PureRef value) {
     if (value.isa<Undef>()) {
         return Undef::from(type);
     } else if (value.isa<Const>()
-        && (storage_kind(type) == storage_kind(value->get_type()))) {
+        && (storage_type(type).assert_ok() == storage_type(value->get_type()).assert_ok())) {
         ConstRef result;
         switch (value->kind()) {
         case VK_ConstInt: {
