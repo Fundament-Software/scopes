@@ -49,17 +49,15 @@ test ((vector-reduce add (vectorof i32 1 2 3 4 5 6 7 8 9 10 11 12)) == 78)
 
 test (constant? (vectorof i32 11 24.5 39 56))
 
-# TODO: the bitcast below produces an illegal result when the argument is constant
-fn unconst (x) x
 test
     all?
         ==
-            bitcast (unconst (vectorof i8 1 2 3 4 5 6 7 8)) (vector i16 4)
+            bitcast (vectorof i8 1 2 3 4 5 6 7 8) (vector i16 4)
             vectorof i16 0x0201 0x0403 0x0605 0x0807
 
 test
     ==
-        bitcast (unconst (vectorof i8 1 2 3 4)) u32
+        bitcast (vectorof i8 1 2 3 4) u32
         0x04030201
 
 test
