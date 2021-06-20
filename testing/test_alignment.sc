@@ -22,18 +22,22 @@ test-alignment (vector i8 3)
 test-alignment (vector f32 9)
 test-alignment (vector i8 11)
 test-alignment (vector bool 32) true
+test-alignment (vector bool 8) true
 let i1 = (integer 1 true)
 test-alignment (vector i1 32) true
 
 do
-    let K = (alloca (vector bool 4))
+    let K = (alloca (vector bool 8))
     fn unconst (x) x
-    store (unconst (vectorof bool false true true false)) K
+    let V = (vectorof bool true true false false true false true false)
+    store (unconst V) K
     let PK = (bitcast K (mutable pointer u8))
     print (PK @ 0)
     print (PK @ 1)
     print (PK @ 2)
     print (PK @ 3)
+    let PK = (bitcast K (mutable pointer u8))
+    test ((PK @ 0) == 0b1010011)
 
 va-map
     inline (i)

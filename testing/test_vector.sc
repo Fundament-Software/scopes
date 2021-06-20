@@ -66,4 +66,10 @@ test
             bitcast 0x04030201 (vector i8 4)
             (vectorof i8 1 2 3 4)
 
+
+# casting between bit vectors and integers
+let V = (vectorof bool true true false false true false true false)
+test ((bitcast V u8) == 0b1010011)
+test (all? ((bitcast 0b1010011:u8 (vector bool 8)) == V))
+
 ;

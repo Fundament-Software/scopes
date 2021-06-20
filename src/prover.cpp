@@ -2031,6 +2031,13 @@ const Type *remap_unique_return_arguments(
     return rt;
 }
 
+static bool is_bool_vector_and_integer(const Type *A, const Type *B) {
+    return
+        (A->kind() == TK_Vector)
+        && (cast<VectorType>(A)->element_type == TYPE_Bool)
+        && (B->kind() == TK_Integer);
+}
+
 static SCOPES_RESULT(TypedValueRef) prove_CallTemplate(
     const ASTContext &ctx, const CallTemplateRef &call) {
     SCOPES_RESULT_TYPE(TypedValueRef);
@@ -2547,7 +2554,20 @@ repeat:
                     default: break;
                     }
                 }
-                if (size_of(SSrcT).assert_ok() != size_of(SDestT).assert_ok()) {
+
+                size_t srcsize = size_of(SSrcT).assert_ok();
+                size_t dstsize = size_of(SDestT).assert_ok();
+                if (is_bool_vector_and_integer(SSrcT, SDestT)) {
+                    // count bit sizes
+                    srcsize = cast<VectorType>(SSrcT)->count();
+                    dstsize = cast<IntegerType>(SDestT)->width;
+                } else if (is_bool_vector_and_integer(SDestT, SSrcT)) {
+                    // count bit sizes
+                    srcsize = cast<VectorType>(SDestT)->count();
+                    dstsize = cast<IntegerType>(SSrcT)->width;
+                }
+
+                if (srcsize != dstsize) {
                     SCOPES_ERROR(CastSizeError, SrcT, DestT);
                 }
 
@@ -2687,8 +2707,10 @@ repeat:
             CHECKARGS(2, 2);
             READ_STORAGETYPEOF(T);
             READ_TYPE_CONST(DestT);
-            SCOPES_CHECK_RESULT(verify_integer(T));
-            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
+            auto DT = SCOPES_GET_RESULT(storage_type(DestT));
+            SCOPES_CHECK_RESULT(verify_integer_vector(T));
+            SCOPES_CHECK_RESULT(verify_integer_vector(DT));
+            SCOPES_CHECK_RESULT(verify_vector_sizes(T, DT));
             if (b.value() == FN_ZExt) {
                 return TypedValueRef(call.anchor(), Cast::from(CastZExt, _T, VIEWTYPE1(DestT, _T)));
             } else {
