@@ -2031,10 +2031,9 @@ const Type *remap_unique_return_arguments(
     return rt;
 }
 
-static bool is_bool_vector_and_integer(const Type *A, const Type *B) {
+static bool is_vector_and_integer(const Type *A, const Type *B) {
     return
         (A->kind() == TK_Vector)
-        && (cast<VectorType>(A)->element_type == TYPE_Bool)
         && (B->kind() == TK_Integer);
 }
 
@@ -2557,14 +2556,11 @@ repeat:
 
                 size_t srcsize = size_of(SSrcT).assert_ok();
                 size_t dstsize = size_of(SDestT).assert_ok();
-                if (is_bool_vector_and_integer(SSrcT, SDestT)) {
+                if (is_vector_and_integer(SSrcT, SDestT)
+                    || is_vector_and_integer(SDestT, SSrcT)) {
                     // count bit sizes
-                    srcsize = cast<VectorType>(SSrcT)->count();
-                    dstsize = cast<IntegerType>(SDestT)->width;
-                } else if (is_bool_vector_and_integer(SDestT, SSrcT)) {
-                    // count bit sizes
-                    srcsize = cast<VectorType>(SDestT)->count();
-                    dstsize = cast<IntegerType>(SSrcT)->width;
+                    srcsize = SCOPES_GET_RESULT(bitsize_of(SSrcT));
+                    dstsize = SCOPES_GET_RESULT(bitsize_of(SDestT));
                 }
 
                 if (srcsize != dstsize) {

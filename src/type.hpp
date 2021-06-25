@@ -186,6 +186,7 @@ B_TYPES()
 bool is_opaque(const Type *T);
 TypeKind storage_kind(const Type *T);
 SCOPES_RESULT(size_t) size_of(const Type *T);
+SCOPES_RESULT(size_t) bitsize_of(const Type *T);
 SCOPES_RESULT(size_t) qualified_size_of(const Type *T);
 SCOPES_RESULT(size_t) align_of(const Type *T);
 SCOPES_RESULT(size_t) qualified_align_of(const Type *T);

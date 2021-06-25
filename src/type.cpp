@@ -272,6 +272,34 @@ SCOPES_RESULT(size_t) size_of(const Type *T) {
     SCOPES_ERROR(OpaqueType, T);
 }
 
+SCOPES_RESULT(size_t) bitsize_of(const Type *T) {
+    SCOPES_RESULT_TYPE(size_t);
+    switch(T->kind()) {
+    case TK_Qualify:
+        return bitsize_of(cast<QualifyType>(T)->type);
+    case TK_Integer: {
+        const IntegerType *it = cast<IntegerType>(T);
+        return it->width;
+    }
+    case TK_Real: {
+        const RealType *rt = cast<RealType>(T);
+        return rt->width;
+    }
+    case TK_Pointer: return PointerType::size() * 8;
+    case TK_Array: return cast<ArrayType>(T)->size * 8;
+    case TK_Vector: {
+        auto VT = cast<VectorType>(T);
+        return VT->count() * SCOPES_GET_RESULT(bitsize_of(VT->element_type));
+    }
+    case TK_Matrix: return cast<MatrixType>(T)->size * 8;
+    case TK_Tuple: return cast<TupleType>(T)->size * 8;
+    case TK_Typename: return bitsize_of(SCOPES_GET_RESULT(storage_type(T)));
+    default: break;
+    }
+
+    SCOPES_ERROR(OpaqueType, T);
+}
+
 SCOPES_RESULT(size_t) qualified_size_of(const Type *T) {
     SCOPES_RESULT_TYPE(size_t);
     return size_of(SCOPES_GET_RESULT(qualified_storage_type(T)));
