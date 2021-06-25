@@ -2632,8 +2632,11 @@ repeat:
             CHECKARGS(2, 2);
             READ_STORAGETYPEOF(T);
             READ_TYPE_CONST(DestT);
-            SCOPES_CHECK_RESULT(verify_integer(T));
-            SCOPES_CHECK_RESULT(verify_integer(SCOPES_GET_RESULT(storage_type(DestT))));
+
+            auto DT = SCOPES_GET_RESULT(storage_type(DestT));
+            SCOPES_CHECK_RESULT(verify_integer_vector(T));
+            SCOPES_CHECK_RESULT(verify_integer_vector(DT));
+            SCOPES_CHECK_RESULT(verify_vector_sizes(T, DT));
             return TypedValueRef(call.anchor(), Cast::from(CastITrunc, _T, VIEWTYPE1(DestT, _T)));
         } break;
         case FN_FPTrunc: {
