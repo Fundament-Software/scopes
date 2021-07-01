@@ -60,11 +60,11 @@ inline Option (T)
         inline __rimply (other-cls cls)
             option-rimply other-cls cls T
 
-        fn force-unwrap (self)
+        inline force-unwrap (self)
             assert self "unwrapping empty Option failed"
             extract-payload self T
 
-        fn unwrap (self)
+        inline unwrap (self)
             if (not self)
                 raise (UnwrapError)
             extract-payload self T
