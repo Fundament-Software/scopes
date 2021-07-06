@@ -239,12 +239,21 @@ ArgumentList::ArgumentList(const TypedValues &_values)
     values.reserve(get_argument_count(get_type()));
     int idx = 1;
     for (auto value : _values) {
-        if (value.isa<ArgumentList>()) {
-            auto al = value.cast<ArgumentList>();
-            for (auto &&value : al->values) {
-                values.push_back(value);
-                if (idx != _values.size())
-                    break;
+        if (is_arguments_type(value->get_type())) {
+            if (value.isa<ArgumentList>()) {
+                auto al = value.cast<ArgumentList>();
+                for (auto &&value : al->values) {
+                    assert (!value.isa<ArgumentList>());
+                    values.push_back(value);
+                    if (idx != _values.size())
+                        break;
+                }
+            } else {
+                for (int i = 0; i < get_argument_count(value->get_type()); ++i) {
+                    values.push_back(ExtractArgument::from(value, i));
+                    if (idx != _values.size())
+                        break;
+                }
             }
         } else {
             values.push_back(value);
