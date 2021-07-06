@@ -5915,15 +5915,17 @@ define va-map
             let argc = ('argcount args)
             verify-count argc 1 -1
             let f = ('getarg args 0)
-            sc_argument_list_map_filter_new (argc - 1)
-                inline (i)
-                    let i = (i + 1)
-                    let arg = ('getarg args i)
-                    let outarg =
-                        do
-                            hide-traceback;
-                            sc_prove ('tag `(f arg) ('anchor arg))
-                    _ (('typeof outarg) != void) outarg
+            'tag
+                sc_argument_list_map_filter_new (argc - 1)
+                    inline (i)
+                        let i = (i + 1)
+                        let arg = ('getarg args i)
+                        let outarg =
+                            do
+                                hide-traceback;
+                                sc_prove ('tag `(f arg) ('anchor arg))
+                        _ (('typeof outarg) != void) outarg
+                'anchor args
 
 """"*spice*{.property} `va-range`{.descname} (*&ensp;a [ b ]&ensp;*)[](#scopes.spice.va-range "Permalink to this definition"){.headerlink} {#scopes.spice.va-range}
 
