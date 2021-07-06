@@ -4783,11 +4783,31 @@ let __unpack-keyed-aggregate =
                     let key = ('keyof argT)
                     sc_keyed_new key `(extractvalue self i)
 
+let __explode-keyed-aggregate =
+    spice-macro
+        fn (args)
+            let argc = ('argcount args)
+            verify-count argc 1 1
+            let self = ('getarg args 0)
+            let T = ('typeof self)
+            let count = ('element-count T)
+            spice-quote
+                let fields... =
+                    spice-unquote
+                        sc_argument_list_map_new count
+                            inline (i)
+                                let argT = ('element@ T i)
+                                let key = ('keyof argT)
+                                sc_keyed_new key `(dupe (extractvalue self i))
+                lose self
+                fields...
+
 'set-symbols tuple
     __unpack = __unpack-keyed-aggregate
     __countof = __countof-aggregate
     __getattr = extractvalue
     __@ = extractvalue
+    explode = __explode-keyed-aggregate
 
 inline gen-tupleof (type-func)
     spice-macro
@@ -7847,6 +7867,14 @@ typedef+ tuple
                     load (getelementptr fields i)
             let result = `(insertvalue result elem i)
             _ (i + 1) result
+
+    inline emit (self keys...)
+        do
+            let values... = ('explode self)
+            va-map
+                inline (x)
+                    va@ x values...
+                keys...
 
 # C structs
 #-------------------------------------------------------------------------------
