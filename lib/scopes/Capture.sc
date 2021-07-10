@@ -139,8 +139,11 @@ sugar capture (head body...)
         inline (namestr args params body)
             qq [pack-capture] ([tupleof] (unquote-splice args))
                 [fn] [namestr] (self (unquote-splice params))
-                    [let] (unquote-splice args) =
-                        [unpack-capture] self
+                    unquote-splice
+                        if (empty? args) '()
+                        else
+                            qq (([let] (unquote-splice args) =
+                                ([unpack-capture] self)))
                     unquote-splice body
 
 #-------------------------------------------------------------------------------
@@ -177,8 +180,11 @@ sugar spice-capture (head body...)
                     [pack-capture-spice] ([tupleof] (unquote-splice args))
                 [finalize-capture-spice] [payload]
                     [spice] [namestr] (self (unquote-splice params))
-                        [let] (unquote-splice args) =
-                            [unpack-capture-spice] self [payload-type]
+                        unquote-splice
+                            if (empty? args) '()
+                            else
+                                qq (([let] (unquote-splice args) =
+                                    ([unpack-capture-spice] self [payload-type])))
                         unquote-splice body
 
 #-------------------------------------------------------------------------------
