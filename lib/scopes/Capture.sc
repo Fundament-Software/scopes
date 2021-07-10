@@ -116,8 +116,9 @@ inline capture-parser (macroname head body genf)
                     let k = (decons args)
                     repeat (cons k argnames) (cons k argvalues) rest...
                 case (('view (name as Symbol)) rest...)
-                    let x k = (decons ((decons args) as list) 2)
-                    repeat (cons k argnames) (cons k argvalues) rest...
+                    let w = (decons args)
+                    let x k = (decons (w as list) 2)
+                    repeat (cons k argnames) (cons w argvalues) rest...
                 case ()
                     break ('reverse argnames) ('reverse argvalues)
                 default

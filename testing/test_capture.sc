@@ -94,6 +94,16 @@ do
 
     test ((testcap) == -1)
     test ((testcap) == -1)
+
+    # test access
+    dump a
+
+    test ((One.refcount) == 2)
+    drop a
+    drop b
+    test ((One.refcount) == 0)
+    test-compiler-error ((testcap) == -1)
+
     ;
 One.test-refcount-balanced;
 
