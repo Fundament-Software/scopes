@@ -89,12 +89,11 @@ do
     let a = (One 1)
     let b = (One 2)
 
-    let va vb = (view a) (view b)
-    capture testcap () {va vb}
-        ('value va) + ('value vb)
+    capture testcap () {(view a) (view b)}
+        ('value a) - ('value b)
 
-    test ((testcap) == 3)
-    test ((testcap) == 3)
+    test ((testcap) == -1)
+    test ((testcap) == -1)
     ;
 One.test-refcount-balanced;
 
