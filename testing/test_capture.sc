@@ -102,9 +102,31 @@ do
     drop a
     drop b
     test ((One.refcount) == 0)
-    test-compiler-error ((testcap) == -1)
 
     ;
+One.test-refcount-balanced;
+
+test-compiler-error
+    do
+        # unique borrowed arguments
+        let a = (One 1)
+        let b = (One 2)
+
+        capture testcap () {(view a) (view b)}
+            ('value a) - ('value b)
+
+        test ((testcap) == -1)
+        test ((testcap) == -1)
+
+        # test access
+        dump a
+
+        test ((One.refcount) == 2)
+        drop a
+        drop b
+        test ((One.refcount) == 0)
+        test ((testcap) == -1)
+        ;
 One.test-refcount-balanced;
 
 ;
