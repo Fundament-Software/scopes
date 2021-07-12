@@ -69,7 +69,12 @@ namespace scopes {
     T(g_sc_expression_append, "sc_expression_append") \
     T(g_sc_expression_set_scoped, "sc_expression_set_scoped") \
     T(g_sc_cond_new, "sc_cond_new") \
+    T(g_sc_case_new, "sc_case_new") \
+    T(g_sc_pass_case_new, "sc_pass_case_new") \
+    T(g_sc_do_case_new, "sc_do_case_new") \
+    T(g_sc_default_case_new, "sc_default_case_new") \
     T(g_sc_switch_new, "sc_switch_new") \
+    T(g_sc_switch_append, "sc_switch_append") \
     T(g_sc_switch_append_case, "sc_switch_append_case") \
     T(g_sc_switch_append_pass, "sc_switch_append_pass") \
     T(g_sc_switch_append_default, "sc_switch_append_default") \

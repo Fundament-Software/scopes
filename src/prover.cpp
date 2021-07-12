@@ -3523,6 +3523,8 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     const Anchor *last_anchor = newexpr.anchor();
 
     auto _switch = ref(node.anchor(), Switch::from(newexpr));
+    // protect against pointer invalidation
+    _switch->cases.reserve(node->cases.size());
 
     LabelRef merge_label = make_merge_label(ctx, node.anchor());
     merge_label->splitpoints.insert(_switch.unref());
@@ -3534,26 +3536,29 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     Switch::Case *passcase = nullptr;
 
     for (auto &&_case : node->cases) {
-        SCOPES_TRACE_PROVE_EXPR(ref(_case.anchor, g_none));
+        SCOPES_TRACE_PROVE_EXPR(_case);
         Switch::Case *newcase = nullptr;
-        if (_case.kind == CK_Default) {
+        switch(_case->case_kind) {
+        case CK_Default: {
             if (defaultcase) {
                 SCOPES_ERROR(DuplicateSwitchDefaultCase);
             }
-            newcase = &_switch->append_default(_case.anchor);
+            newcase = &_switch->append_default(_case.anchor());
             defaultcase = newcase;
             passcase = nullptr;
-        } else if (_case.kind == CK_Do) {
+        } break;
+        case CK_Do: {
             if (!passcase) {
                 SCOPES_ERROR(DoWithoutPass);
             }
             newcase = passcase;
             passcase = nullptr;
-        } else {
-            if (passcase && (_case.kind == CK_Case)) {
+        } break;
+        default: {
+            if (passcase && (_case->case_kind == CK_Case)) {
                 SCOPES_ERROR(UnclosedPass);
             }
-            auto newlit = SCOPES_GET_RESULT(prove(ctx, _case.literal));
+            auto newlit = SCOPES_GET_RESULT(prove(ctx, _case->literal));
             if ((newlit->get_type() != casetype) && has_typecast_handler()) {
                 newlit = SCOPES_GET_RESULT(run_typecast_handler(ctx, newlit, casetype));
             }
@@ -3563,19 +3568,20 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
             casetype = SCOPES_GET_RESULT(
                 merge_value_type("switch case literal", casetype, newlit->get_type(),
                 last_anchor, newlit.anchor()));
-            newcase = &_switch->append_pass(_case.anchor, newlit.cast<ConstInt>());
+            newcase = &_switch->append_pass(_case.anchor(), newlit.cast<ConstInt>());
+        } break;
         }
-        assert(_case.value);
+        assert(_case->value);
         ASTContext newctx;
         TypedValueRef newvalue;
-        if (_case.kind == CK_Do) {
+        if (_case->case_kind == CK_Do) {
             // append to last case
             newctx = ctx.with_block(newcase->body);
-            newvalue = SCOPES_GET_RESULT(prove(newctx, _case.value));
+            newvalue = SCOPES_GET_RESULT(prove(newctx, _case->value));
         } else {
-            newvalue = SCOPES_GET_RESULT(prove_block(subctx, newcase->body, _case.value, newctx));
+            newvalue = SCOPES_GET_RESULT(prove_block(subctx, newcase->body, _case->value, newctx));
         }
-        if (_case.kind == CK_Pass) {
+        if (_case->case_kind == CK_Pass) {
             passcase = newcase;
             SCOPES_CHECK_RESULT(validate_pass_block(subctx, newcase->body));
         } else {
@@ -3666,6 +3672,11 @@ static SCOPES_RESULT(TypedValueRef) prove_Quote(const ASTContext &ctx, const Quo
 }
 
 static SCOPES_RESULT(TypedValueRef) prove_Unquote(const ASTContext &ctx, const UnquoteRef &node) {
+    SCOPES_RESULT_TYPE(TypedValueRef);
+    SCOPES_ERROR(UnexpectedValueKind, node->kind());
+}
+
+static SCOPES_RESULT(TypedValueRef) prove_CaseTemplate(const ASTContext &ctx, const CaseTemplateRef &node) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     SCOPES_ERROR(UnexpectedValueKind, node->kind());
 }

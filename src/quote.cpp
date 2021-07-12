@@ -199,6 +199,34 @@ struct Quoter {
         return value;
     }
 
+    SCOPES_RESULT(ValueRef) quote_CaseTemplate(int level, const CaseTemplateRef &node) {
+        SCOPES_RESULT_TYPE(ValueRef);
+        auto _anchor = node.anchor();
+        ValueRef result;
+        switch(node->case_kind) {
+        case CK_Case: {
+            result = REF(CallTemplate::from(g_sc_case_new, {
+                SCOPES_GET_RESULT(quote(level, node->literal)),
+                SCOPES_GET_RESULT(quote(level, node->value)) }));
+        } break;
+        case CK_Pass: {
+            result = REF(CallTemplate::from(g_sc_pass_case_new, {
+                SCOPES_GET_RESULT(quote(level, node->literal)),
+                SCOPES_GET_RESULT(quote(level, node->value)) }));
+        } break;
+        case CK_Do: {
+            result = REF(CallTemplate::from(g_sc_do_case_new, {
+                SCOPES_GET_RESULT(quote(level, node->value)) }));
+        } break;
+        case CK_Default: {
+            result = REF(CallTemplate::from(g_sc_default_case_new, {
+                SCOPES_GET_RESULT(quote(level, node->value)) }));
+        } break;
+        default: assert(false);
+        }
+        return result;
+    }
+
     SCOPES_RESULT(ValueRef) quote_SwitchTemplate(int level, const SwitchTemplateRef &node) {
         SCOPES_RESULT_TYPE(ValueRef);
         auto _anchor = node.anchor();
@@ -207,24 +235,9 @@ struct Quoter {
         }));
         auto expr = REF(Expression::unscoped_from());
         for (auto &&_case : node->cases) {
-            //auto _case_anchor = _case.anchor;
-            switch(_case.kind) {
-            case CK_Case: {
-                expr->append(REF(CallTemplate::from(g_sc_switch_append_case, { value,
-                    SCOPES_GET_RESULT(quote(level, _case.literal)),
-                    SCOPES_GET_RESULT(quote(level, _case.value)) })));
-            } break;
-            case CK_Pass: {
-                expr->append(REF(CallTemplate::from(g_sc_switch_append_pass, { value,
-                    SCOPES_GET_RESULT(quote(level, _case.literal)),
-                    SCOPES_GET_RESULT(quote(level, _case.value)) })));
-            } break;
-            case CK_Default: {
-                expr->append(REF(CallTemplate::from(g_sc_switch_append_default, { value,
-                    SCOPES_GET_RESULT(quote(level, _case.value)) })));
-            } break;
-            default: assert(false);
-            }
+            auto _anchor = _case.anchor();
+            expr->append(REF(CallTemplate::from(g_sc_switch_append, { value,
+                SCOPES_GET_RESULT(quote(level, _case)) })));
         }
         expr->append(value);
         return canonicalize(expr);

@@ -745,7 +745,7 @@ struct Expander {
         auto expr = SCOPES_GET_RESULT(subexp.expand(it->at));
         it = subexp.next;
 
-        SwitchTemplate::Cases cases;
+        CaseTemplates cases;
 
         it = next;
     collect_case:
@@ -753,8 +753,9 @@ struct Expander {
             SCOPES_ERROR(SyntaxMissingDefaultCase);
         }
         next = it->next;
-        auto _case = SwitchTemplate::Case();
-        _case.anchor = it->at.anchor();
+
+        //auto _case = SwitchTemplate::Case();
+        auto case_tl_anchor = it->at.anchor();
         it = SCOPES_GET_RESULT(extract_list_constant(it->at));
         if (it == EOL) {
             SCOPES_ERROR(SyntaxCaseBlockExpected);
@@ -763,47 +764,42 @@ struct Expander {
         auto head = try_extract_symbol(it->at);
         if ((head == KW_Case) || (head == KW_Pass)) {
             SCOPES_CHECK_RESULT(verify_list_parameter_count("case", it, 1, -1));
-            if (head == KW_Pass) {
-                _case.kind = CK_Pass;
-            }
 
             it = it->next;
             subexp.next = it->next;
-            _case.literal = SCOPES_GET_RESULT(subexp.expand(it->at));
+            auto literal = SCOPES_GET_RESULT(subexp.expand(it->at));
             it = subexp.next;
 
             Expander nativeexp(Scope::from(nullptr, env), astscope);
-            _case.value = SCOPES_GET_RESULT(
+            auto value = SCOPES_GET_RESULT(
                 nativeexp.expand_expression(ref(case_anchor, it), false));
-            cases.push_back(_case);
+            CaseTemplateRef _case;
+            if (head == KW_Pass) {
+                _case = CaseTemplate::pass_from(literal, value);
+            } else {
+                _case = CaseTemplate::case_from(literal, value);
+            }
+            cases.push_back(ref(case_tl_anchor, _case));
 
             it = next;
             goto collect_case;
         } else if (head == KW_Do) {
             it = it->next;
 
-            _case.kind = CK_Do;
-
             Expander nativeexp(Scope::from(nullptr, env), astscope);
-            _case.value = SCOPES_GET_RESULT(
+            auto value = SCOPES_GET_RESULT(
                 nativeexp.expand_expression(ref(case_anchor, it), false));
-            cases.push_back(_case);
+            cases.push_back(ref(case_tl_anchor, CaseTemplate::do_from(value)));
 
             it = next;
             goto collect_case;
         } else if (head == KW_Default) {
             it = it->next;
 
-            if (head == KW_Do) {
-                _case.kind = CK_Do;
-            } else {
-                _case.kind = CK_Default;
-            }
-
             Expander nativeexp(Scope::from(nullptr, env), astscope);
-            _case.value = SCOPES_GET_RESULT(
+            auto value = SCOPES_GET_RESULT(
                 nativeexp.expand_expression(ref(case_anchor, it), false));
-            cases.push_back(_case);
+            cases.push_back(ref(case_tl_anchor, CaseTemplate::default_from(value)));
         }
 
         return ValueRef(ref(anchor, SwitchTemplate::from(expr, cases)));

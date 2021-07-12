@@ -21,6 +21,7 @@ namespace scopes {
     T(VK_CompileStage, "value-kind-compile-stage", CompileStage) \
     T(VK_CondTemplate, "value-kind-cond-template", CondTemplate) \
     T(VK_SwitchTemplate, "value-kind-switch-template", SwitchTemplate) \
+    T(VK_CaseTemplate, "value-kind-case-template", CaseTemplate) \
     T(VK_MergeTemplate, "value-kind-merge-template", MergeTemplate) \
     T(VK_CallTemplate, "value-kind-call-template", CallTemplate) \
     T(VK_ArgumentListTemplate, "value-kind-argument-list-template", ArgumentListTemplate) \

@@ -500,7 +500,7 @@ sc_error_t *sc_error_new(const sc_string_t *msg) {
     using namespace scopes;
 #if SCOPES_EARLY_ABORT
     assert(false);
-#endif    
+#endif
     return ErrorUser::from(msg);
 }
 const sc_string_t *sc_format_error(const sc_error_t *err) {
@@ -1473,9 +1473,33 @@ sc_valueref_t sc_cond_new(sc_valueref_t cond, sc_valueref_t then_value, sc_value
     return CondTemplate::from(cond, then_value, else_value);
 }
 
+sc_valueref_t sc_case_new(sc_valueref_t literal, sc_valueref_t body) {
+    using namespace scopes;
+    return CaseTemplate::case_from(literal, body);
+}
+
+sc_valueref_t sc_pass_case_new(sc_valueref_t literal, sc_valueref_t body) {
+    using namespace scopes;
+    return CaseTemplate::pass_from(literal, body);
+}
+
+sc_valueref_t sc_do_case_new(sc_valueref_t body) {
+    using namespace scopes;
+    return CaseTemplate::do_from(body);
+}
+
+sc_valueref_t sc_default_case_new(sc_valueref_t body) {
+    using namespace scopes;
+    return CaseTemplate::default_from(body);
+}
+
 sc_valueref_t sc_switch_new(sc_valueref_t expr) {
     using namespace scopes;
     return SwitchTemplate::from(expr);
+}
+void sc_switch_append(sc_valueref_t value, sc_valueref_t _case) {
+    using namespace scopes;
+    value.cast<SwitchTemplate>()->append(_case.cast<CaseTemplate>());
 }
 void sc_switch_append_case(sc_valueref_t value, sc_valueref_t literal, sc_valueref_t body) {
     using namespace scopes;
@@ -2406,7 +2430,12 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_global_string_new, TYPE_ValueRef, rawstring, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_global_string_new_from_cstr, TYPE_ValueRef, rawstring);
     DEFINE_EXTERN_C_FUNCTION(sc_cond_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_case_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_pass_case_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_do_case_new, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_default_case_new, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_new, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_switch_append, _void, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_case, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_pass, _void, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_switch_append_do, _void, TYPE_ValueRef, TYPE_ValueRef);

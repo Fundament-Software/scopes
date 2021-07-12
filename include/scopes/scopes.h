@@ -241,7 +241,13 @@ SCOPES_LIBEXPORT sc_valueref_t sc_global_string_new_from_cstr(const char *ptr);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_cond_new(sc_valueref_t cond, sc_valueref_t then_value, sc_valueref_t else_value);
 
+SCOPES_LIBEXPORT sc_valueref_t sc_case_new(sc_valueref_t literal, sc_valueref_t body);
+SCOPES_LIBEXPORT sc_valueref_t sc_pass_case_new(sc_valueref_t literal, sc_valueref_t body);
+SCOPES_LIBEXPORT sc_valueref_t sc_do_case_new(sc_valueref_t body);
+SCOPES_LIBEXPORT sc_valueref_t sc_default_case_new(sc_valueref_t body);
+
 SCOPES_LIBEXPORT sc_valueref_t sc_switch_new(sc_valueref_t expr);
+SCOPES_LIBEXPORT void sc_switch_append(sc_valueref_t value, sc_valueref_t _case);
 SCOPES_LIBEXPORT void sc_switch_append_case(sc_valueref_t value, sc_valueref_t literal, sc_valueref_t body);
 SCOPES_LIBEXPORT void sc_switch_append_pass(sc_valueref_t value, sc_valueref_t literal, sc_valueref_t body);
 SCOPES_LIBEXPORT void sc_switch_append_do(sc_valueref_t value, sc_valueref_t body);

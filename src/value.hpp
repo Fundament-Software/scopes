@@ -37,6 +37,7 @@ struct Block;
 
 typedef std::vector<ParameterRef> Parameters;
 typedef std::vector<ParameterTemplateRef> ParameterTemplates;
+typedef std::vector<CaseTemplateRef> CaseTemplates;
 typedef std::vector<ValueRef> Values;
 typedef std::vector<TypedValueRef> TypedValues;
 typedef std::vector<InstructionRef> Instructions;
@@ -351,31 +352,38 @@ enum CaseKind {
     CK_Default
 };
 
-struct SwitchTemplate : UntypedValue {
-    struct Case {
-        const Anchor *anchor;
-        CaseKind kind;
-        ValueRef literal;
-        ValueRef value;
-
-        Case() : anchor(nullptr), kind(CK_Case) {}
-    };
-
-    typedef std::vector<Case> Cases;
-
+struct CaseTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    SwitchTemplate(const ValueRef &expr, const Cases &cases);
+    CaseTemplate(CaseKind kind, const ValueRef &literal, const ValueRef &value);
 
-    static SwitchTemplateRef from(const ValueRef &expr = ValueRef(), const Cases &cases = {});
+    static CaseTemplateRef case_from(const ValueRef &literal, const ValueRef &value);
+    static CaseTemplateRef pass_from(const ValueRef &literal, const ValueRef &value);
+    static CaseTemplateRef do_from(const ValueRef &value);
+    static CaseTemplateRef default_from(const ValueRef &value);
 
+    CaseKind case_kind;
+    ValueRef literal;
+    ValueRef value;
+};
+
+//------------------------------------------------------------------------------
+
+struct SwitchTemplate : UntypedValue {
+    static bool classof(const Value *T);
+
+    SwitchTemplate(const ValueRef &expr, const CaseTemplates &cases);
+
+    static SwitchTemplateRef from(const ValueRef &expr = ValueRef(), const CaseTemplates &cases = {});
+
+    void append(const CaseTemplateRef &_case);
     void append_case(const ValueRef &literal, const ValueRef &value);
     void append_pass(const ValueRef &literal, const ValueRef &value);
     void append_do(const ValueRef &value);
     void append_default(const ValueRef &value);
 
     ValueRef expr;
-    Cases cases;
+    CaseTemplates cases;
 };
 
 //------------------------------------------------------------------------------

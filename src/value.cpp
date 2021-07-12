@@ -970,52 +970,61 @@ CondTemplateRef CondTemplate::from(
 
 //------------------------------------------------------------------------------
 
-SwitchTemplate::SwitchTemplate(const ValueRef &_expr, const Cases &_cases)
+CaseTemplate::CaseTemplate(CaseKind _kind, const ValueRef &_literal, const ValueRef &_value)
+    : UntypedValue(VK_CaseTemplate), case_kind(_kind), literal(_literal), value(_value)
+{}
+
+CaseTemplateRef CaseTemplate::case_from(const ValueRef &literal, const ValueRef &value) {
+    assert(literal);
+    assert(value);
+    return ref(value.anchor(), new CaseTemplate(CK_Case, literal, value));
+}
+
+CaseTemplateRef CaseTemplate::pass_from(const ValueRef &literal, const ValueRef &value) {
+    assert(literal);
+    assert(value);
+    return ref(value.anchor(), new CaseTemplate(CK_Pass, literal, value));
+}
+
+CaseTemplateRef CaseTemplate::do_from(const ValueRef &value) {
+    assert(value);
+    return ref(value.anchor(), new CaseTemplate(CK_Do, ValueRef(), value));
+}
+
+CaseTemplateRef CaseTemplate::default_from(const ValueRef &value) {
+    assert(value);
+    return ref(value.anchor(), new CaseTemplate(CK_Default, ValueRef(), value));
+}
+
+//------------------------------------------------------------------------------
+
+SwitchTemplate::SwitchTemplate(const ValueRef &_expr, const CaseTemplates &_cases)
     : UntypedValue(VK_SwitchTemplate), expr(_expr), cases(_cases)
 {}
 
-SwitchTemplateRef SwitchTemplate::from(const ValueRef &expr, const Cases &cases) {
+SwitchTemplateRef SwitchTemplate::from(const ValueRef &expr, const CaseTemplates &cases) {
     return ref(unknown_anchor(), new SwitchTemplate(expr, cases));
 }
 
-void SwitchTemplate::append_case(const ValueRef &literal, const ValueRef &value) {
-    assert(literal);
-    assert(value);
-    Case _case;
-    _case.anchor = value.anchor();
-    _case.kind = CK_Case;
-    _case.literal = literal;
-    _case.value = value;
+void SwitchTemplate::append(const CaseTemplateRef &_case) {
+    assert(_case);
     cases.push_back(_case);
+}
+
+void SwitchTemplate::append_case(const ValueRef &literal, const ValueRef &value) {
+    cases.push_back(CaseTemplate::case_from(literal, value));
 }
 
 void SwitchTemplate::append_pass(const ValueRef &literal, const ValueRef &value) {
-    assert(literal);
-    assert(value);
-    Case _case;
-    _case.anchor = value.anchor();
-    _case.kind = CK_Pass;
-    _case.literal = literal;
-    _case.value = value;
-    cases.push_back(_case);
+    cases.push_back(CaseTemplate::pass_from(literal, value));
 }
 
 void SwitchTemplate::append_do(const ValueRef &value) {
-    assert(value);
-    Case _case;
-    _case.anchor = value.anchor();
-    _case.kind = CK_Do;
-    _case.value = value;
-    cases.push_back(_case);
+    cases.push_back(CaseTemplate::do_from(value));
 }
 
 void SwitchTemplate::append_default(const ValueRef &value) {
-    assert(value);
-    Case _case;
-    _case.anchor = value.anchor();
-    _case.kind = CK_Default;
-    _case.value = value;
-    cases.push_back(_case);
+    cases.push_back(CaseTemplate::default_from(value));
 }
 
 //------------------------------------------------------------------------------
