@@ -731,7 +731,10 @@ struct Expander {
     }
 
     // (switch cond)
-    // [(case literal body ...)]
+    // (case literal body ...)
+    // (pass literal body ...)
+    // ...
+    // (do literal body ...)
     // (default body ...)
     SCOPES_RESULT(ValueRef) expand_switch(const List *it) {
         SCOPES_RESULT_TYPE(ValueRef);
@@ -745,7 +748,7 @@ struct Expander {
         auto expr = SCOPES_GET_RESULT(subexp.expand(it->at));
         it = subexp.next;
 
-        CaseTemplates cases;
+        Values cases;
 
         it = next;
     collect_case:
@@ -791,6 +794,28 @@ struct Expander {
                 nativeexp.expand_expression(ref(case_anchor, it), false));
             cases.push_back(ref(case_tl_anchor, CaseTemplate::do_from(value)));
 
+            it = next;
+            goto collect_case;
+        } else if (head == KW_ASTUnquote) {
+            it = it->next;
+
+            Expander nativeexp(Scope::from(nullptr, env), astscope);
+            auto value = SCOPES_GET_RESULT(
+                nativeexp.expand_expression(ref(case_anchor, it), false));
+            cases.push_back(ref(case_tl_anchor, Unquote::from(value)));
+
+            it = next;
+            goto collect_case;
+        } else if ((head == KW_ASTUnquoteArguments) || (head == SYM_SquareList)) {
+            it = it->next;
+
+            Values args;
+            if (it) {
+                Expander nativeexp(Scope::from(nullptr, env), astscope, it->next);
+                SCOPES_CHECK_RESULT(subexp.expand_arguments(args, it));
+            }
+            cases.push_back(ref(case_tl_anchor, Unquote::from(
+                ref(case_anchor, ArgumentListTemplate::from(args)))));
             it = next;
             goto collect_case;
         } else if (head == KW_Default) {

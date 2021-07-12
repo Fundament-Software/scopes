@@ -3523,8 +3523,6 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     const Anchor *last_anchor = newexpr.anchor();
 
     auto _switch = ref(node.anchor(), Switch::from(newexpr));
-    // protect against pointer invalidation
-    _switch->cases.reserve(node->cases.size());
 
     LabelRef merge_label = make_merge_label(ctx, node.anchor());
     merge_label->splitpoints.insert(_switch.unref());
@@ -3532,11 +3530,34 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     ASTContext subctx = ctx.with_block(merge_label->body);
     SCOPES_CHECK_RESULT(subctx.append(_switch));
 
+    std::vector<CaseTemplateRef> cases;
+    for (auto &&expr : node->cases) {
+        SCOPES_TRACE_PROVE_EXPR(expr);
+        if (expr.isa<ArgumentListTemplate>()) {
+            auto al = expr.cast<ArgumentListTemplate>();
+            for (auto &&val : al->values()) {
+                if (!val.isa<CaseTemplate>()) {
+                    SCOPES_ERROR(CaseValueExpected);
+                }
+                cases.push_back(val.cast<CaseTemplate>());
+            }
+        } else {
+            if (!expr.isa<CaseTemplate>()) {
+                SCOPES_ERROR(CaseValueExpected);
+            }
+            cases.push_back(expr.cast<CaseTemplate>());
+        }
+    }
+
+    // protect against pointer invalidation
+    _switch->cases.reserve(cases.size());
+
     Switch::Case *defaultcase = nullptr;
     Switch::Case *passcase = nullptr;
 
-    for (auto &&_case : node->cases) {
+    for (auto &&_case : cases) {
         SCOPES_TRACE_PROVE_EXPR(_case);
+
         Switch::Case *newcase = nullptr;
         switch(_case->case_kind) {
         case CK_Default: {

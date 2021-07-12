@@ -37,7 +37,6 @@ struct Block;
 
 typedef std::vector<ParameterRef> Parameters;
 typedef std::vector<ParameterTemplateRef> ParameterTemplates;
-typedef std::vector<CaseTemplateRef> CaseTemplates;
 typedef std::vector<ValueRef> Values;
 typedef std::vector<TypedValueRef> TypedValues;
 typedef std::vector<InstructionRef> Instructions;
@@ -372,18 +371,18 @@ struct CaseTemplate : UntypedValue {
 struct SwitchTemplate : UntypedValue {
     static bool classof(const Value *T);
 
-    SwitchTemplate(const ValueRef &expr, const CaseTemplates &cases);
+    SwitchTemplate(const ValueRef &expr, const Values &values);
 
-    static SwitchTemplateRef from(const ValueRef &expr = ValueRef(), const CaseTemplates &cases = {});
+    static SwitchTemplateRef from(const ValueRef &expr = ValueRef(), const Values &cases = {});
 
-    void append(const CaseTemplateRef &_case);
+    void append(const ValueRef &_case);
     void append_case(const ValueRef &literal, const ValueRef &value);
     void append_pass(const ValueRef &literal, const ValueRef &value);
     void append_do(const ValueRef &value);
     void append_default(const ValueRef &value);
 
     ValueRef expr;
-    CaseTemplates cases;
+    Values cases;
 };
 
 //------------------------------------------------------------------------------

@@ -998,15 +998,15 @@ CaseTemplateRef CaseTemplate::default_from(const ValueRef &value) {
 
 //------------------------------------------------------------------------------
 
-SwitchTemplate::SwitchTemplate(const ValueRef &_expr, const CaseTemplates &_cases)
-    : UntypedValue(VK_SwitchTemplate), expr(_expr), cases(_cases)
+SwitchTemplate::SwitchTemplate(const ValueRef &_expr, const Values &values)
+    : UntypedValue(VK_SwitchTemplate), expr(_expr), cases(values)
 {}
 
-SwitchTemplateRef SwitchTemplate::from(const ValueRef &expr, const CaseTemplates &cases) {
+SwitchTemplateRef SwitchTemplate::from(const ValueRef &expr, const Values &cases) {
     return ref(unknown_anchor(), new SwitchTemplate(expr, cases));
 }
 
-void SwitchTemplate::append(const CaseTemplateRef &_case) {
+void SwitchTemplate::append(const ValueRef &_case) {
     assert(_case);
     cases.push_back(_case);
 }

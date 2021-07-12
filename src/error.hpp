@@ -191,6 +191,8 @@ formatters:
     T(SwitchPassMovedValue, \
         "skippable switch pass moved value of type %0 out of parent scope", \
         PType) \
+    T(CaseValueExpected, \
+        "switch case expression expected") \
     T(LoopMovedValue, \
         "loop moved value of type %0 out of parent scope", \
         PType) \

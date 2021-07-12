@@ -1499,7 +1499,7 @@ sc_valueref_t sc_switch_new(sc_valueref_t expr) {
 }
 void sc_switch_append(sc_valueref_t value, sc_valueref_t _case) {
     using namespace scopes;
-    value.cast<SwitchTemplate>()->append(_case.cast<CaseTemplate>());
+    value.cast<SwitchTemplate>()->append(_case);
 }
 void sc_switch_append_case(sc_valueref_t value, sc_valueref_t literal, sc_valueref_t body) {
     using namespace scopes;
