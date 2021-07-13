@@ -19,6 +19,40 @@ spice-quote
 
 run-stage;
 
+using import switcher
+
+# define and run the switch case
+call
+    switcher sw
+        case 0
+            print "zero"
+        va-map
+            inline (i)
+                case i
+                    print (tostring i)
+            va-range 1 5
+        default
+            # this-condition and context... are implicitly bound
+            # prints "???" <some number> "extra argument"
+            print "???" this-condition switcher-context...
+    3
+
+# actually runs the switch case
+for i in (range 11)
+    sw i "extra argument"
+
+# extend
+switcher+ sw
+    va-map
+        inline (i)
+            case i
+                print (tostring i)
+        va-range 5 10
+
+# actually runs the switch case
+for i in (range 11)
+    sw i "extra argument"
+
 print
     switch 3
     case 0
