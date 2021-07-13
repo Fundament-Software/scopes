@@ -52,12 +52,13 @@ type Switcher
                     let lit handler = ('getarg literals i) ('getarg handlers i)
                     let same? =
                         if (lit == value) true # fast path
-                        else # exact path
+                        elseif ((sc_const_int_word_count lit) == words) # exact path
                             for w in (range words)
                                 if ((sc_const_int_extract_word value w)
                                     != (sc_const_int_extract_word lit w))
                                     break false
                             else true
+                        else false
                     if same?
                         return `(handler value ctx...)
                 return `(default value ctx...)
