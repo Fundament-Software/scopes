@@ -1618,6 +1618,12 @@ uint64_t sc_const_int_extract_word(const sc_valueref_t value, int index) {
     assert (index < ci->words.size());
     return ci->words[index];
 }
+int sc_const_int_word_count(const sc_valueref_t value) {
+    using namespace scopes;
+    auto ci = value.cast<ConstInt>();
+    return (int)ci->words.size();
+}
+
 double sc_const_real_extract(const sc_valueref_t value) {
     using namespace scopes;
     return value.cast<ConstReal>()->value;
@@ -2458,6 +2464,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_const_null_new, TYPE_ValueRef, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_extract, TYPE_U64, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_extract_word, TYPE_U64, TYPE_ValueRef, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_int_word_count, TYPE_I32, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_extract, TYPE_F64, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_const_extract_at, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_extract, voidstar, TYPE_ValueRef);

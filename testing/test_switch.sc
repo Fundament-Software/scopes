@@ -1,4 +1,6 @@
 
+using import testing
+
 spice-quote
     inline test-switch-quote (x)
         switch x
@@ -93,3 +95,31 @@ print
         print "???"
 
 print "done."
+
+switcher get-name
+    default "???"
+switcher get-arguments
+    default -1
+
+inline define-op (id name argcount)
+    switcher+ get-name
+        case id name
+    switcher+ get-arguments
+        case id argcount
+
+# modular definitions
+define-op 1 "foo" 3
+define-op 2 "bar" 6
+
+fn print-info (id)
+    print "name:" (get-name id) "args:" (get-arguments id)
+
+print-info 1 # prints name: foo args: 3
+print-info 2 # prints name: bar args: 6
+print-info 3 # prints name: ??? args: -1
+
+test ((get-arguments 2) == 6)
+test ((get-arguments 3) == -1)
+test (constant? (get-arguments 2))
+
+

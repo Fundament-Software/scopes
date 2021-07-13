@@ -41,14 +41,30 @@ type Switcher
 
     spice __typecall (cls name)
         spice build-switch-expr (cls value ctx...)
-            let sw = (sc_switch_new value)
             let cls = (cls as type)
             let literals = ('@ cls 'literals)
             let handlers = ('@ cls 'handlers)
+            let default = ('@ cls 'default)
+            if ('constant? value)
+                let words = (sc_const_int_word_count value)
+                # find constant
+                for i in (range ('argcount literals))
+                    let lit handler = ('getarg literals i) ('getarg handlers i)
+                    let same? =
+                        if (lit == value) true # fast path
+                        else # exact path
+                            for w in (range words)
+                                if ((sc_const_int_extract_word value w)
+                                    != (sc_const_int_extract_word lit w))
+                                    break false
+                            else true
+                    if same?
+                        return `(handler value ctx...)
+                return `(default value ctx...)
+            let sw = (sc_switch_new value)
             for i in (range ('argcount literals))
                 let lit handler = ('getarg literals i) ('getarg handlers i)
                 sc_switch_append_case sw lit `(handler value ctx...)
-            let default = ('@ cls 'default)
             sc_switch_append_default sw `(default value ctx...)
             sw
 

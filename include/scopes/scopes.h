@@ -274,6 +274,7 @@ SCOPES_LIBEXPORT sc_valueref_t sc_const_pointer_new(const sc_type_t *type, const
 SCOPES_LIBEXPORT sc_valueref_raises_t sc_const_null_new(const sc_type_t *type);
 SCOPES_LIBEXPORT uint64_t sc_const_int_extract(const sc_valueref_t value);
 SCOPES_LIBEXPORT uint64_t sc_const_int_extract_word(const sc_valueref_t value, int index);
+SCOPES_LIBEXPORT int sc_const_int_word_count(const sc_valueref_t value);
 SCOPES_LIBEXPORT double sc_const_real_extract(const sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_const_extract_at(const sc_valueref_t value, int index);
 SCOPES_LIBEXPORT const void *sc_const_pointer_extract(const sc_valueref_t value);
