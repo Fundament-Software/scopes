@@ -3531,6 +3531,8 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     SCOPES_CHECK_RESULT(subctx.append(_switch));
 
     std::vector<CaseTemplateRef> cases;
+    typedef std::tuple<TypedValueRef, TypedValueRef> IndirectCase;
+    std::vector< IndirectCase > indirect_cases;
     for (auto &&expr : node->cases) {
         SCOPES_TRACE_PROVE_EXPR(expr);
         if (expr.isa<ArgumentListTemplate>()) {
@@ -3542,15 +3544,71 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
                 cases.push_back(val.cast<CaseTemplate>());
             }
         } else {
-            if (!expr.isa<CaseTemplate>()) {
-                SCOPES_ERROR(CaseValueExpected);
+            if (expr.isa<CaseTemplate>()) {
+                cases.push_back(expr.cast<CaseTemplate>());
+            } else {
+                TypedValueRef newexpr = SCOPES_GET_RESULT(prove(ctx, expr));
+                if (newexpr.isa<ArgumentList>()) {
+                    ArgumentListRef al = newexpr.cast<ArgumentList>();
+                    auto &&vals = al->values;
+                    if ((vals.size() % 2) != 0)
+                        SCOPES_ERROR(BadIndirectCaseArgumentList);
+                    for (size_t i = 0; i < vals.size(); i += 2) {
+                        auto lit = vals[i];
+                        auto val = vals[i + 1];
+                        indirect_cases.push_back(IndirectCase(lit, val));
+                    }
+                } else {
+                    SCOPES_ERROR(CaseValueExpected);
+                }
             }
-            cases.push_back(expr.cast<CaseTemplate>());
         }
     }
 
     // protect against pointer invalidation
-    _switch->cases.reserve(cases.size());
+    _switch->cases.reserve(cases.size() + indirect_cases.size());
+
+    std::unordered_set<uint64_t> seen_literals;
+
+    // handle indirect cases
+    for (auto &&_case : indirect_cases) {
+        TypedValueRef lit = std::get<0>(_case);
+        TypedValueRef val = std::get<1>(_case);
+        SCOPES_TRACE_PROVE_EXPR(val);
+
+        if ((lit->get_type() != casetype) && has_typecast_handler()) {
+            lit = SCOPES_GET_RESULT(run_typecast_handler(ctx, lit, casetype));
+        }
+        if (!lit.isa<ConstInt>()) {
+            SCOPES_ERROR(ValueKindMismatch, VK_ConstInt, lit->kind());
+        }
+        casetype = SCOPES_GET_RESULT(
+            merge_value_type("switch case literal", casetype, lit->get_type(),
+            last_anchor, lit.anchor()));
+        auto ci = lit.cast<ConstInt>();
+        auto cival = ci->value();
+        if (seen_literals.find(cival) != seen_literals.end()) {
+            SCOPES_ERROR(DuplicateCaseLiteral);
+        }
+        seen_literals.insert(cival);
+        Switch::Case *newcase = &_switch->append_pass(val.anchor(), ci);
+
+        const Type *T = strip_qualifiers(val->get_type());
+        if (T != TYPE_Closure) {
+            SCOPES_ERROR(BadIndirectCaseArgumentList);
+        }
+        const Closure *cl = SCOPES_GET_RESULT((extract_closure_constant(val)));
+        if (!cl->func->is_inline()) {
+            SCOPES_ERROR(BadIndirectCaseArgumentList);
+        }
+
+        newcase->body.set_parent(subctx.block);
+        auto newctx = subctx.with_block(newcase->body);
+        auto newvalue = SCOPES_GET_RESULT(prove_inline(newctx, cl, {}));
+        if (is_returning(newvalue->get_type())) {
+            SCOPES_CHECK_RESULT(make_merge(newctx, newvalue.anchor(), merge_label, newvalue));
+        }
+    }
 
     Switch::Case *defaultcase = nullptr;
     Switch::Case *passcase = nullptr;
@@ -3589,7 +3647,13 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
             casetype = SCOPES_GET_RESULT(
                 merge_value_type("switch case literal", casetype, newlit->get_type(),
                 last_anchor, newlit.anchor()));
-            newcase = &_switch->append_pass(_case.anchor(), newlit.cast<ConstInt>());
+            auto ci = newlit.cast<ConstInt>();
+            auto cival = ci->value();
+            if (seen_literals.find(cival) != seen_literals.end()) {
+                SCOPES_ERROR(DuplicateCaseLiteral);
+            }
+            seen_literals.insert(cival);
+            newcase = &_switch->append_pass(_case.anchor(), ci);
         } break;
         }
         assert(_case->value);

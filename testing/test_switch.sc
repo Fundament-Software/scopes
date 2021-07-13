@@ -7,12 +7,11 @@ spice-quote
             print "zero"
         spice-unquote
             sc_case_new `1 `(print "one")
-        spice-unquote
-            let a b c =
-                sc_pass_case_new `2 `(print "two or larger");
-                sc_pass_case_new `3 `(print "three or larger");
-                sc_pass_case_new `4 `(print "two to four");
-            _ a b c
+        [
+            sc_pass_case_new `2 `(print "two or larger");
+            sc_pass_case_new `3 `(print "three or larger");
+            sc_pass_case_new `4 `(print "two to four");
+        ]
         do;
         case 5
             print "five"
@@ -42,5 +41,22 @@ print
 
 print
     test-switch-quote 3
+
+# indirect case generation; does not support `pass` or `default`
+# this example prints "3"
+print
+    switch 3
+    embed
+        va-lfold ()
+            inline (k v ...)
+                _ v
+                    inline ()
+                        print (tostring v)
+                    static-if (none? (_ ... ()))
+                    else
+                        ...
+            va-range 6
+    default
+        print "???"
 
 print "done."

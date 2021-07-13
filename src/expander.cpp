@@ -796,6 +796,19 @@ struct Expander {
 
             it = next;
             goto collect_case;
+        } else if (head == KW_DoIn) { // indirect cases
+            it = it->next;
+
+            Expander nativeexp(Scope::from(nullptr, env), astscope);
+            auto value = SCOPES_GET_RESULT(
+                nativeexp.expand_expression(ref(case_anchor, it), false));
+            // distinguish from an argument list
+            auto expr = ref(case_anchor, Expression::unscoped_from());
+            expr->append(value);
+            cases.push_back(expr);
+
+            it = next;
+            goto collect_case;
         } else if (head == KW_ASTUnquote) {
             it = it->next;
 

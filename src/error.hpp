@@ -193,6 +193,10 @@ formatters:
         PType) \
     T(CaseValueExpected, \
         "switch case expression expected") \
+    T(BadIndirectCaseArgumentList, \
+        "switch case list must be pairs of literals and inline closures") \
+    T(DuplicateCaseLiteral, \
+        "duplicate literal in switch case block") \
     T(LoopMovedValue, \
         "loop moved value of type %0 out of parent scope", \
         PType) \
