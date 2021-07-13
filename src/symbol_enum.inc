@@ -223,6 +223,7 @@ namespace scopes {
     T(FN_GetSyntaxScope, "__this-scope") \
     T(KW_RunStage, "run-stage") \
     T(KW_SyntaxLog, "sugar-log") \
+    T(KW_Using, "using") \
 
 // list of builtin symbols recognized as intrinsics
 #define SCOPES_BUILTIN_SPICE_SYMBOLS() \

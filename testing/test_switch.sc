@@ -2,11 +2,10 @@
 spice-quote
     inline test-switch-quote (x)
         switch x
-        case 0
-            print "!"
-            print "zero"
         spice-unquote
-            sc_case_new `1 `(print "one")
+            _
+                sc_case_new `0 `(print "zero")
+                sc_case_new `1 `(print "one")
         [
             sc_pass_case_new `2 `(print "two or larger");
             sc_pass_case_new `3 `(print "three or larger");
