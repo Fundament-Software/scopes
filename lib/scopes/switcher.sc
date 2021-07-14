@@ -21,23 +21,27 @@ sugar switcher-default (body...)
 run-stage;
 
 type Switcher
-    spice case (cls lit value)
+    fn stage-case (cls lit value)
         if (not ('constant? lit))
             error "constant literal expected"
         if (not ('pure? value))
             error "pure callable expected"
-        let cls = (cls as type)
         'set-symbols cls
             literals = (sc_argument_list_join_values ('@ cls 'literals) lit)
             handlers = (sc_argument_list_join_values ('@ cls 'handlers) value)
         ;
 
-    spice default (cls value)
+    fn stage-default (cls value)
         if (not ('pure? value))
             error "pure callable expected"
-        let cls = (cls as type)
         'set-symbol cls 'default value
         ;
+
+    spice case (cls lit value)
+        stage-case (cls as type) lit value
+
+    spice default (cls value)
+        stage-default (cls as type) value
 
     spice __typecall (cls name)
         spice build-switch-expr (cls value ctx...)
