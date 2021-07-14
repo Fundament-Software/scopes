@@ -20,11 +20,15 @@ sugar switcher-default (body...)
 
 run-stage;
 
+fn valid-case-handler? (value)
+    or ('pure? value)
+        ('kind value) == value-kind-template
+
 type Switcher
     fn stage-case (cls lit value)
         if (not ('constant? lit))
             error "constant literal expected"
-        if (not ('pure? value))
+        if (not (valid-case-handler? value))
             error "pure callable expected"
         'set-symbols cls
             literals = (sc_argument_list_join_values ('@ cls 'literals) lit)
@@ -32,7 +36,7 @@ type Switcher
         ;
 
     fn stage-default (cls value)
-        if (not ('pure? value))
+        if (not (valid-case-handler? value))
             error "pure callable expected"
         'set-symbol cls 'default value
         ;
