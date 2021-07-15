@@ -4846,7 +4846,7 @@ inline gen-tupleof (type-func)
                     let arg = (load (getelementptr values i))
                     let arg =
                         if view?
-                            `(view arg)
+                            'tag `(view arg) ('anchor arg)
                         else arg
                     _ (i + 1)
                         'tag `(insertvalue result arg i) ('anchor arg)

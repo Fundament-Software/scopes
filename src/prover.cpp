@@ -2859,7 +2859,8 @@ repeat:
                 movable = is_movable(AT);
                 if (movable != is_movable(typeof_ET)) {
                     // borrow both arguments if one isn't movable
-                    SCOPES_ERROR(MovableTypeMismatch, AT, typeof_ET);
+                    //SCOPES_ERROR(MovableTypeMismatch, AT, typeof_ET);
+                    movable = false;
                 }
             }
             auto T = SCOPES_GET_RESULT(storage_type(AT));
