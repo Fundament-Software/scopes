@@ -85,6 +85,13 @@ do
 One.test-refcount-balanced;
 
 do
+    local k = 0
+    capture testcap () {&k}
+        k = 1
+    testcap;
+    test (k == 1)
+
+do
     # unique borrowed arguments
     let a = (One 1)
     let b = (One 2)

@@ -109,24 +109,37 @@ inline capture-parser (macroname head body genf)
     let expr =
         sugar-match body
         case ((params...) ('curly-list args...) body...)
-            vvv bind argnames argvalues
-            loop (argnames argvalues args = '() '() args...)
+            vvv bind argnames unreflist argvalues
+            loop (argnames unreflist argvalues args = '() '() '() args...)
                 sugar-match args
                 case ((name as Symbol) rest...)
+                    let namestr = (name as string)
                     let k = (decons args)
-                    repeat (cons k argnames) (cons k argvalues) rest...
+                    if ((lslice namestr 1) == "&")
+                        # reference
+                        let anchor = ('anchor k)
+                        let k =
+                            'tag `[(Symbol (rslice namestr 1))] anchor
+                        let expr = (qq [&] ([view] [k]))
+                        let unreflist =
+                            cons
+                                qq [let] [k] = ([@] [k])
+                                unreflist
+                        repeat (cons k argnames) unreflist (cons expr argvalues) rest...
+                    else
+                        repeat (cons k argnames) unreflist (cons k argvalues) rest...
                 case (('view (name as Symbol)) rest...)
                     let w = (decons args)
                     let x k = (decons (w as list) 2)
-                    repeat (cons k argnames) (cons w argvalues) rest...
+                    repeat (cons k argnames) unreflist (cons w argvalues) rest...
                 case ()
-                    break ('reverse argnames) ('reverse argvalues)
+                    break ('reverse argnames) unreflist ('reverse argvalues)
                 default
                     hide-traceback;
                     let k = (decons args)
                     error@ ('anchor k) "while parsing capture names"
                         \ "syntax error: captured names must have format {var|(view var) ...}"
-            genf namestr argnames argvalues params... body...
+            genf namestr argnames unreflist argvalues params... body...
         default
             error
                 .. "syntax error: try (" macroname
@@ -153,7 +166,7 @@ spice pack-capture (argtuple func)
 # capture name|"name"| (param ...) {var ...} body ...
 sugar capture (head body...)
     capture-parser "capture" head body...
-        inline (namestr argnames argvalues params body)
+        inline (namestr argnames unreflist argvalues params body)
             qq [pack-capture] ([tupleof] (unquote-splice argvalues))
                 [fn] [namestr] (self (unquote-splice params))
                     unquote-splice
@@ -161,6 +174,7 @@ sugar capture (head body...)
                         else
                             qq (([let] (unquote-splice argnames) =
                                 ([unpack-capture] self)))
+                    unquote-splice unreflist
                     unquote-splice body
 
 #-------------------------------------------------------------------------------
@@ -189,7 +203,7 @@ spice finalize-capture-spice (capture func)
 # spice-capture name|"name"| (param ...) {var ...} body ...
 sugar spice-capture (head body...)
     capture-parser "spice-capture" head body...
-        inline (namestr argnames argvalues params body)
+        inline (namestr argnames unreflist argvalues params body)
             let payload = ('unique Symbol "payload")
             let payload-type = ('unique Symbol "payload-type")
             qq [do]
@@ -202,6 +216,7 @@ sugar spice-capture (head body...)
                             else
                                 qq (([let] (unquote-splice argnames) =
                                     ([unpack-capture-spice] self [payload-type])))
+                        unquote-splice unreflist
                         unquote-splice body
 
 #-------------------------------------------------------------------------------
