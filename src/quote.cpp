@@ -25,7 +25,8 @@
 #include "anchor.hpp"
 #include "scopes/scopes.h"
 
-
+#include "qualifier/refer_qualifier.hpp"
+#include "qualifier.inc"
 
 //#pragma GCC diagnostic ignored "-Wvla-extension"
 
@@ -296,8 +297,14 @@ struct Quoter {
     }
 
     ValueRef quote_typed(const TypedValueRef &node) {
-        if (node->get_type() == TYPE_ValueRef)
+        auto T = node->get_type();
+        if (T == TYPE_ValueRef)
             return node;
+        if (is_reference(T) && (strip_qualifiers(T) == TYPE_ValueRef)) {
+            auto _anchor = node.anchor();
+            return REF(CallTemplate::from(g_deref, { node }));
+        }
+
         if (node.isa<ArgumentList>()) {
             return quote_typed_argument_list(node.cast<ArgumentList>());
         } else {

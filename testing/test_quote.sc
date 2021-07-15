@@ -38,5 +38,14 @@ print
         _ args 4
 
 
+using import testing
+
+do
+    let k = `5
+    test (('typeof `k) == i32)
+
+    # references should also be embedded
+    local k = `5
+    test (('typeof `k) == i32)
 
 ;
