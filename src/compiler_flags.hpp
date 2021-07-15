@@ -15,8 +15,9 @@ namespace scopes {
     T(CF_DumpFunction, (1 << 2), "compile-flag-dump-function") \
     T(CF_DumpTime, (1 << 3), "compile-flag-dump-time") \
     T(CF_NoDebugInfo, (1 << 4), "compile-flag-no-debug-info") \
-    T(CF_O1, (1 << 5), "compile-flag-O1") \
-    T(CF_O2, (1 << 6), "compile-flag-O2") \
+    T(CF_O0, (1 << 4), "compile-flag-O0") \
+    T(CF_O1, (CF_O0 | (1 << 5)), "compile-flag-O1") \
+    T(CF_O2, (CF_O0 | (1 << 6)), "compile-flag-O2") \
     T(CF_O3, (CF_O1 | CF_O2), "compile-flag-O3") \
     T(CF_Cache, (1 << 7), "compile-flag-cache") \
 

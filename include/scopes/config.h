@@ -19,7 +19,7 @@
 // turning this on is detrimental to startup time
 // scopes output is typically clean enough to provide fairly good performance
 // on its own.
-#define SCOPES_OPTIMIZE_ASSEMBLY 0
+// #define SCOPES_OPTIMIZE_ASSEMBLY CF_O1
 
 // any location error aborts immediately and can not be caught
 #define SCOPES_EARLY_ABORT 0
@@ -39,9 +39,6 @@
 // that you can then use at compile time isn't the better choice;
 // 100% of the time, the answer is yes because the performance is much better.
 #define SCOPES_MAX_RECURSIONS 64
-
-// maximum number of jump skips permitted
-#define SCOPES_MAX_SKIP_JUMPS 256
 
 // folder name in ~/.cache in which all cache files are stored
 #define SCOPES_CACHE_DIRNAME "scopes"

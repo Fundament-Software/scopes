@@ -3365,13 +3365,6 @@ SCOPES_RESULT(void) compile_object(const String *triple,
     CompilerFileKind kind, const String *path, const Scope *scope, uint64_t flags) {
     SCOPES_RESULT_TYPE(void);
     Timer sum_compile_time(TIMER_Compile);
-#if SCOPES_COMPILE_WITH_DEBUG_INFO
-#else
-    flags |= CF_NoDebugInfo;
-#endif
-#if SCOPES_OPTIMIZE_ASSEMBLY
-    flags |= CF_O3;
-#endif
 
     LLVMIRGenerator ctx;
     ctx.generate_object = true;
@@ -3455,8 +3448,8 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
 #else
     flags |= CF_NoDebugInfo;
 #endif
-#if SCOPES_OPTIMIZE_ASSEMBLY
-    flags |= CF_O3;
+#ifdef SCOPES_OPTIMIZE_ASSEMBLY
+    flags |= SCOPES_OPTIMIZE_ASSEMBLY;
 #endif
 
     /*

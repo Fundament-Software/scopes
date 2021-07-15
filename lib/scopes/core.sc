@@ -4019,9 +4019,9 @@ fn exec-module (expr eval-scope)
             do
                 hide-traceback;
                 sc_compile wrapf
-                    compile-flag-cache
-                    # can't use this flag yet because it breaks code
-                    #| compile-flag-cache compile-flag-O2
+                    | compile-flag-cache
+                        # can't use this flag yet because it breaks code
+                        #compile-flag-O1
         if (('typeof f) == StageFunctionType)
             let fptr = (f as StageFunctionType)
             let result =
@@ -4685,6 +4685,7 @@ let parse-compile-flags =
                         \ " " (repr 'dump-function)
                         \ " " (repr 'dump-time)
                         \ " " (repr 'no-debug-info)
+                        \ " " (repr 'O0)
                         \ " " (repr 'O1)
                         \ " " (repr 'O2)
                         \ " " (repr 'O3)
@@ -4701,6 +4702,7 @@ let parse-compile-flags =
                     case 'dump-function compile-flag-dump-function
                     case 'dump-time compile-flag-dump-time
                     case 'no-debug-info compile-flag-no-debug-info
+                    case 'O0 compile-flag-O0
                     case 'O1 compile-flag-O1
                     case 'O2 compile-flag-O2
                     case 'O3 compile-flag-O3

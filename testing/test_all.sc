@@ -19,6 +19,7 @@ test-modules
     .test_capture
     .test_clang
     .test_closure
+    .test_codegen
     .test_conversion
     .test_convert
     .test_copy
