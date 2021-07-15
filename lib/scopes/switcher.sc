@@ -20,19 +20,26 @@ sugar switcher-default (body...)
 
 run-stage;
 
+fn valid-literal? (value)
+    and ('constant? value)
+        ('kind ('storageof ('typeof value))) == type-kind-integer
 fn valid-case-handler? (value)
     or ('pure? value)
         ('kind value) == value-kind-template
 
 type Switcher
     fn stage-case (cls lit value)
-        if (not ('constant? lit))
+        if (not (valid-literal? lit))
             error "constant literal expected"
         if (not (valid-case-handler? value))
             error "pure callable expected"
         'set-symbols cls
-            literals = (sc_argument_list_join_values ('@ cls 'literals) lit)
-            handlers = (sc_argument_list_join_values ('@ cls 'handlers) value)
+            literals =
+                'tag (sc_argument_list_join_values ('@ cls 'literals) lit)
+                    'anchor lit
+            handlers =
+                'tag (sc_argument_list_join_values ('@ cls 'handlers) value)
+                    'anchor value
         ;
 
     fn stage-default (cls value)
@@ -53,7 +60,7 @@ type Switcher
             let literals = ('@ cls 'literals)
             let handlers = ('@ cls 'handlers)
             let default = ('@ cls 'default)
-            if ('constant? value)
+            if (valid-literal? value)
                 let words = (sc_const_int_word_count value)
                 # find constant
                 for i in (range ('argcount literals))
@@ -73,8 +80,10 @@ type Switcher
             let sw = (sc_switch_new value)
             for i in (range ('argcount literals))
                 let lit handler = ('getarg literals i) ('getarg handlers i)
-                sc_switch_append_case sw lit `(handler value ctx...)
-            sc_switch_append_default sw `(default value ctx...)
+                sc_switch_append_case sw lit
+                    'tag `(handler value ctx...) ('anchor handler)
+            sc_switch_append_default sw
+                'tag `(default value ctx...) ('anchor value)
             sw
 
         let T = (typename.type (name as string) (cls as type))

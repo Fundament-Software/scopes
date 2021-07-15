@@ -6125,7 +6125,7 @@ spice-quote
 # function overloading
 #-------------------------------------------------------------------------------
 
-fn sc_argument_list_join_values (a b...)
+inline sc_argument_list_join_values (a b...)
     let A = (sc_argcount a)
     let B = (va-countof b...)
     let N = (add A B)
