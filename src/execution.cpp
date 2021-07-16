@@ -180,7 +180,6 @@ void build_and_run_opt_passes(LLVMModuleRef module, int opt_level) {
 
     passBuilder = LLVMPassManagerBuilderCreate();
     LLVMPassManagerBuilderSetOptLevel(passBuilder, opt_level);
-    //LLVMPassManagerBuilderSetOptLevel(passBuilder, 1);
     LLVMPassManagerBuilderSetSizeLevel(passBuilder, 2);
     if (opt_level == 0) {
         LLVMPassManagerBuilderSetDisableUnrollLoops(passBuilder, true);

@@ -3311,7 +3311,7 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
     flags |= CF_NoDebugInfo;
 #endif
     if (flags & CF_Module) {
-        flags |= CF_O0;
+        //flags |= CF_O0;
         flags |= CF_Cache;
     }
 
