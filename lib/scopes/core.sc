@@ -3323,7 +3323,7 @@ let
             fn "constant?" (args)
                 let value = (extract-single-arg args)
                 `[('constant? value)]
-    writable? =
+    mutable? =
         make-const-type-property-function
             fn (T)
                 if (== ('kind T) type-kind-pointer)
