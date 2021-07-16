@@ -25,10 +25,14 @@
 #include <llvm-c/BitWriter.h>
 #include <llvm-c/LLJIT.h>
 #include <llvm-c/OrcEE.h>
+#include <llvm-c/Disassembler.h>
 
 #include <llvm-c/Transforms/PassManagerBuilder.h>
 #include <llvm-c/Transforms/InstCombine.h>
 #include <llvm-c/Transforms/IPO.h>
+
+#include "llvm/ExecutionEngine/JITEventListener.h"
+#include "llvm/Object/SymbolSize.h"
 
 #include <limits.h>
 
@@ -40,6 +44,7 @@
 #include <zlib.h>
 
 #define SCOPES_CACHE_KEY_BITCODE 1
+#define SCOPES_LLVM_SUPPORT_DISASSEMBLY 1
 
 #if SCOPES_MACOS
 #define SCOPES_JIT_SYMBOL_PREFIX '_'
@@ -48,6 +53,125 @@
 #endif
 
 namespace scopes {
+
+////////////////////////////////////////////////////////////////////////////////
+
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
+static void pprint(int pos, unsigned char *buf, int len, const char *disasm) {
+  int i;
+  printf("%04x:  ", pos);
+  for (i = 0; i < 8; i++) {
+    if (i < len) {
+      printf("%02x ", buf[i]);
+    } else {
+      printf("   ");
+    }
+  }
+
+  printf("   %s\n", disasm);
+}
+
+static void do_disassemble(LLVMTargetMachineRef tm, void *fptr, int siz) {
+
+    unsigned char *buf = (unsigned char *)fptr;
+
+  LLVMDisasmContextRef D = LLVMCreateDisasmCPUFeatures(
+    LLVMGetTargetMachineTriple(tm),
+    LLVMGetTargetMachineCPU(tm),
+    LLVMGetTargetMachineFeatureString(tm),
+    NULL, 0, NULL, NULL);
+    LLVMSetDisasmOptions(D,
+        LLVMDisassembler_Option_PrintImmHex);
+  char outline[1024];
+  int pos;
+
+  if (!D) {
+    printf("ERROR: Couldn't create disassembler\n");
+    return;
+  }
+
+  pos = 0;
+  while (pos < siz) {
+    size_t l = LLVMDisasmInstruction(D, buf + pos, siz - pos, 0, outline,
+                                     sizeof(outline));
+    if (!l) {
+      pprint(pos, buf + pos, 1, "\t???");
+      pos++;
+        break;
+    } else {
+      pprint(pos, buf + pos, l, outline);
+      pos += l;
+    }
+  }
+
+  LLVMDisasmDispose(D);
+}
+
+class DisassemblyListener : public llvm::JITEventListener {
+public:
+    bool enabled = false;
+
+    DisassemblyListener() {}
+
+    std::unordered_map<std::string, size_t> sizes;
+
+    void InitializeDebugData(
+        llvm::StringRef name,
+        llvm::object::SymbolRef::Type type, uint64_t sz) {
+        if(type == llvm::object::SymbolRef::ST_Function) {
+            sizes[name.data()] = sz;
+        }
+    }
+
+    virtual void notifyObjectLoaded(
+        ObjectKey K,
+        const llvm::object::ObjectFile &Obj,
+        const llvm::RuntimeDyld::LoadedObjectInfo &L) {
+        if (!enabled)
+            return;
+        #if 0
+        StyledStream ss;
+        ss << "object emitted!" << std::endl;
+        #endif
+        auto size_map = llvm::object::computeSymbolSizes(Obj);
+        for(auto & S : size_map) {
+            llvm::object::SymbolRef sym = S.first;
+            auto name = sym.getName();
+            auto type = sym.getType();
+            if(name && type)
+                InitializeDebugData(name.get(),type.get(),S.second);
+        }
+    }
+};
+#endif
+
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
+static DisassemblyListener *disassembly_listener = nullptr;
+#endif
+
+void enable_disassembly(bool enable) {
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
+    assert(disassembly_listener);
+    disassembly_listener->enabled = enable;
+#endif
+}
+
+void print_disassembly(std::string symbol, void *pfunc) {
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
+    assert(disassembly_listener);
+    //auto td = LLVMGetExecutionEngineTargetData(ee);
+    auto it = disassembly_listener->sizes.find(symbol);
+    if (it != disassembly_listener->sizes.end()) {
+        std::cout << "disassembly:\n";
+        auto target_machine = get_jit_target_machine();
+        do_disassemble(target_machine, pfunc, it->second);
+        return;
+    }
+    std::cout << "no disassembly available\n";
+#else
+    std::cout << "disassembly is unsupported\n";
+#endif
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -177,12 +301,6 @@ LLVMTargetMachineRef get_object_target_machine() {
     return object_target_machine;
 }
 
-void add_jit_event_listener(LLVMJITEventListenerRef listener) {
-    //LLVMOrcRegisterJITEventListener(orc, listener);
-    assert(object_layer);
-    LLVMOrcRTDyldObjectLinkingLayerRegisterJITEventListener(object_layer, listener);
-}
-
 #if 0
 uint64_t lazy_compile_callback(LLVMOrcJITStackRef orc, void *ctx) {
     printf("lazy_compile_callback ???\n");
@@ -213,6 +331,24 @@ static LLVMErrorRef definition_generator(
 
     auto mu = LLVMOrcAbsoluteSymbols(&symbolpairs[0], symbolpairs.size());
     return LLVMOrcJITDylibDefine(jit_dylib, mu);
+}
+
+static LLVMOrcObjectLayerRef llvm_create_object_layer(
+    void *Ctx, LLVMOrcExecutionSessionRef ES, const char *Triple) {
+
+    object_layer = LLVMOrcCreateRTDyldObjectLinkingLayerWithSectionMemoryManager(ES);
+    LLVMOrcRTDyldObjectLinkingLayerRegisterJITEventListener(object_layer, LLVMCreateGDBRegistrationListener());
+
+#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
+    if (!disassembly_listener) {
+        disassembly_listener = new DisassemblyListener();
+        llvm::JITEventListener *le = disassembly_listener;
+        LLVMOrcRTDyldObjectLinkingLayerRegisterJITEventListener(object_layer,
+            llvm::wrap(le));
+    }
+#endif
+
+	return object_layer;
 }
 
 SCOPES_RESULT(void) init_execution() {
@@ -267,17 +403,13 @@ SCOPES_RESULT(void) init_execution() {
     auto builder = LLVMOrcCreateLLJITBuilder();
     auto tmb = LLVMOrcJITTargetMachineBuilderCreateFromTargetMachine(jtm);
     LLVMOrcLLJITBuilderSetJITTargetMachineBuilder(builder, tmb);
+    LLVMOrcLLJITBuilderSetObjectLinkingLayerCreator(builder, llvm_create_object_layer, nullptr);
 
     auto err = LLVMOrcCreateLLJIT(&orc, builder);
     if (err) {
         SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
     }
     assert(orc);
-
-    auto ES = LLVMOrcLLJITGetExecutionSession(orc);
-    assert(ES);
-    object_layer = LLVMOrcCreateRTDyldObjectLinkingLayerWithSectionMemoryManager(ES);
-    add_jit_event_listener(LLVMCreateGDBRegistrationListener());
 
     jit_dylib = LLVMOrcLLJITGetMainJITDylib(orc);
 

@@ -34,7 +34,6 @@
 #include <llvm-c/Core.h>
 //#include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Analysis.h>
-#include <llvm-c/Disassembler.h>
 #include <llvm-c/Support.h>
 #include <llvm-c/DebugInfo.h>
 #include <llvm-c/BitWriter.h>
@@ -45,8 +44,6 @@
 //#include "llvm/IR/DIBuilder.h"
 //#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/ExecutionEngine/JITEventListener.h"
-#include "llvm/Object/SymbolSize.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 //#include "llvm/Support/Timer.h"
 //#include "llvm/Support/raw_os_ostream.h"
@@ -58,8 +55,6 @@
 namespace scopes {
 
 #define SCOPES_GEN_TARGET "IR"
-
-#define SCOPES_LLVM_SUPPORT_DISASSEMBLY 1
 
 #define SCOPES_LLVM_EXTENDED_DEBUG_INFO 0
 
@@ -3231,94 +3226,6 @@ unsigned LLVMIRGenerator::attr_kind_byval = 0;
 // IL COMPILER
 //------------------------------------------------------------------------------
 
-#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
-static void pprint(int pos, unsigned char *buf, int len, const char *disasm) {
-  int i;
-  printf("%04x:  ", pos);
-  for (i = 0; i < 8; i++) {
-    if (i < len) {
-      printf("%02x ", buf[i]);
-    } else {
-      printf("   ");
-    }
-  }
-
-  printf("   %s\n", disasm);
-}
-
-static void do_disassemble(LLVMTargetMachineRef tm, void *fptr, int siz) {
-
-    unsigned char *buf = (unsigned char *)fptr;
-
-  LLVMDisasmContextRef D = LLVMCreateDisasmCPUFeatures(
-    LLVMGetTargetMachineTriple(tm),
-    LLVMGetTargetMachineCPU(tm),
-    LLVMGetTargetMachineFeatureString(tm),
-    NULL, 0, NULL, NULL);
-    LLVMSetDisasmOptions(D,
-        LLVMDisassembler_Option_PrintImmHex);
-  char outline[1024];
-  int pos;
-
-  if (!D) {
-    printf("ERROR: Couldn't create disassembler\n");
-    return;
-  }
-
-  pos = 0;
-  while (pos < siz) {
-    size_t l = LLVMDisasmInstruction(D, buf + pos, siz - pos, 0, outline,
-                                     sizeof(outline));
-    if (!l) {
-      pprint(pos, buf + pos, 1, "\t???");
-      pos++;
-        break;
-    } else {
-      pprint(pos, buf + pos, l, outline);
-      pos += l;
-    }
-  }
-
-  LLVMDisasmDispose(D);
-}
-
-class DisassemblyListener : public llvm::JITEventListener {
-public:
-    DisassemblyListener() {}
-
-    std::unordered_map<void *, size_t> sizes;
-
-    void InitializeDebugData(
-        llvm::StringRef name,
-        llvm::object::SymbolRef::Type type, uint64_t sz) {
-        if(type == llvm::object::SymbolRef::ST_Function) {
-            #if !defined(__arm__) && !defined(__linux__)
-            name = name.substr(1);
-            #endif
-            void * addr = (void *)get_address(name.data()).assert_ok();
-            if(addr) {
-                assert(addr);
-                sizes[addr] = sz;
-            }
-        }
-    }
-
-    virtual void NotifyObjectEmitted(
-        const llvm::object::ObjectFile &Obj,
-        const llvm::RuntimeDyld::LoadedObjectInfo &L) {
-        StyledStream ss;
-        ss << "object emitted!" << std::endl;
-        auto size_map = llvm::object::computeSymbolSizes(Obj);
-        for(auto & S : size_map) {
-            llvm::object::SymbolRef sym = S.first;
-            auto name = sym.getName();
-            auto type = sym.getType();
-            if(name && type)
-                InitializeDebugData(name.get(),type.get(),S.second);
-        }
-    }
-};
-#endif
 
 SCOPES_RESULT(void) compile_object(const String *triple,
     CompilerFileKind kind, const String *path, const Scope *scope, uint64_t flags) {
@@ -3396,10 +3303,6 @@ SCOPES_RESULT(void) compile_object(const String *triple,
     return {};
 }
 
-#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
-static DisassemblyListener *disassembly_listener = nullptr;
-#endif
-
 SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
     SCOPES_RESULT_TYPE(ConstPointerRef);
     Timer sum_compile_time(TIMER_Compile);
@@ -3453,14 +3356,6 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
 
     SCOPES_CHECK_RESULT(init_execution());
 
-#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
-    if (!disassembly_listener && (flags & CF_DumpDisassembly)) {
-        disassembly_listener = new DisassemblyListener();
-        llvm::JITEventListener *le = disassembly_listener;
-        add_jit_event_listener(reinterpret_cast<LLVMJITEventListenerRef>(le));
-    }
-#endif
-
     std::string funcname;
     {
         size_t length = 0;
@@ -3476,6 +3371,10 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
         bindsyms.push_back(std::string(name, length));
     }
 #endif
+
+    if (flags & CF_DumpDisassembly) {
+        enable_disassembly(true);
+    }
 
     SCOPES_CHECK_RESULT(add_module(module, ctx.pointer_map, flags));
 
@@ -3494,20 +3393,9 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
 
     //LLVMDumpModule(module);
     void *pfunc = (void *)SCOPES_GET_RESULT(get_address(funcname.c_str()));
-#if SCOPES_LLVM_SUPPORT_DISASSEMBLY
     if (flags & CF_DumpDisassembly) {
-        assert(disassembly_listener);
-        //auto td = LLVMGetExecutionEngineTargetData(ee);
-        auto it = disassembly_listener->sizes.find(pfunc);
-        if (it != disassembly_listener->sizes.end()) {
-            std::cout << "disassembly:\n";
-            auto target_machine = get_jit_target_machine();
-            do_disassemble(target_machine, pfunc, it->second);
-        } else {
-            std::cout << "no disassembly available\n";
-        }
+        print_disassembly(funcname, pfunc);
     }
-#endif
 
     return ref(fn.anchor(), ConstPointer::from(functype, pfunc));
 }
