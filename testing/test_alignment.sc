@@ -1,11 +1,13 @@
 
 using import testing
 
+fn unconst (x) x
+
 # test alignment
 inline test-alignment (T verbose?)
     let size alignment =
-        ptrtoint (getelementptr (nullof (mutable pointer T)) 1) u64
-        ptrtoint (getelementptr (nullof (mutable pointer (tuple bool T))) 0 1) u64
+        ptrtoint (getelementptr (unconst (nullof (mutable pointer T))) 1) u64
+        ptrtoint (getelementptr (unconst (nullof (mutable pointer (tuple bool T)))) 0 1) u64
     static-if verbose?
         print T "size =" size "alignment =" alignment
     if (size != (sizeof T))

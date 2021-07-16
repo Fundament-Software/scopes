@@ -34,8 +34,6 @@
 #include <llvm-c/Core.h>
 //#include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Analysis.h>
-#include <llvm-c/Transforms/PassManagerBuilder.h>
-#include <llvm-c/Transforms/InstCombine.h>
 #include <llvm-c/Disassembler.h>
 #include <llvm-c/Support.h>
 #include <llvm-c/DebugInfo.h>
@@ -78,45 +76,6 @@ LLVMAttributeRef LLVMCreateTypeAttribute(LLVMContextRef C, unsigned KindID,
 //------------------------------------------------------------------------------
 // IL->LLVM IR GENERATOR
 //------------------------------------------------------------------------------
-
-static void build_and_run_opt_passes(LLVMModuleRef module, int opt_level) {
-    LLVMPassManagerBuilderRef passBuilder;
-
-    passBuilder = LLVMPassManagerBuilderCreate();
-    LLVMPassManagerBuilderSetOptLevel(passBuilder, opt_level);
-    //LLVMPassManagerBuilderSetOptLevel(passBuilder, 1);
-    LLVMPassManagerBuilderSetSizeLevel(passBuilder, 2);
-    //LLVMPassManagerBuilderSetDisableUnrollLoops(passBuilder, true);
-    //LLVMAddInstructionCombiningPass(passBuilder);
-    #if 1
-    if (opt_level >= 2) {
-        LLVMPassManagerBuilderUseInlinerWithThreshold(passBuilder, 225);
-    }
-    #endif
-
-    LLVMPassManagerRef functionPasses =
-      LLVMCreateFunctionPassManagerForModule(module);
-    LLVMPassManagerRef modulePasses =
-      LLVMCreatePassManager();
-    //LLVMAddAnalysisPasses(LLVMGetExecutionEngineTargetMachine(ee), functionPasses);
-
-    LLVMPassManagerBuilderPopulateFunctionPassManager(passBuilder,
-                                                      functionPasses);
-    LLVMPassManagerBuilderPopulateModulePassManager(passBuilder, modulePasses);
-
-    LLVMPassManagerBuilderDispose(passBuilder);
-
-    LLVMInitializeFunctionPassManager(functionPasses);
-    for (LLVMValueRef value = LLVMGetFirstFunction(module);
-         value; value = LLVMGetNextFunction(value))
-      LLVMRunFunctionPassManager(functionPasses, value);
-    LLVMFinalizeFunctionPassManager(functionPasses);
-
-    LLVMRunPassManager(modulePasses, module);
-
-    LLVMDisposePassManager(functionPasses);
-    LLVMDisposePassManager(modulePasses);
-}
 
 const double deg2rad = 0.017453292519943295;
 const double rad2deg = 57.29577951308232;
@@ -3501,23 +3460,6 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
     }
 #endif
 
-    if (flags & CF_O3) {
-        Timer optimize_timer(TIMER_Optimize);
-        int level = 0;
-        if ((flags & CF_O3) == CF_O1)
-            level = 1;
-        else if ((flags & CF_O3) == CF_O2)
-            level = 2;
-        else if ((flags & CF_O3) == CF_O3)
-            level = 3;
-        build_and_run_opt_passes(module, level);
-    }
-    if (flags & CF_DumpModule) {
-        LLVMDumpModule(module);
-    } else if (flags & CF_DumpFunction) {
-        LLVMDumpValue(func);
-    }
-
     std::string funcname;
     {
         size_t length = 0;
@@ -3535,6 +3477,12 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
 #endif
 
     SCOPES_CHECK_RESULT(add_module(module, ctx.pointer_map, flags));
+
+    if (flags & CF_DumpModule) {
+        LLVMDumpModule(module);
+    } else if (flags & CF_DumpFunction) {
+        LLVMDumpValue(func);
+    }
 
 #if 1
     for (auto sym : bindsyms) {

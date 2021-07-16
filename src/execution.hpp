@@ -38,6 +38,7 @@ LLVMTargetMachineRef get_jit_target_machine();
 LLVMTargetMachineRef get_object_target_machine();
 void add_jit_event_listener(LLVMJITEventListenerRef listener);
 SCOPES_RESULT(void) add_object(const char *path);
+void build_and_run_opt_passes(LLVMModuleRef module, int opt_level);
 
 void init_llvm();
 

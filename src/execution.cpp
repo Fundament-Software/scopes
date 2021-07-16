@@ -10,6 +10,7 @@
 #include "symbol.hpp"
 #include "cache.hpp"
 #include "compiler_flags.hpp"
+#include "timer.hpp"
 
 #ifdef SCOPES_WIN32
 #include "dlfcn.h"
@@ -24,6 +25,10 @@
 #include <llvm-c/BitWriter.h>
 #include <llvm-c/LLJIT.h>
 #include <llvm-c/OrcEE.h>
+
+#include <llvm-c/Transforms/PassManagerBuilder.h>
+#include <llvm-c/Transforms/InstCombine.h>
+#include <llvm-c/Transforms/IPO.h>
 
 #include <limits.h>
 
@@ -43,6 +48,55 @@
 #endif
 
 namespace scopes {
+
+////////////////////////////////////////////////////////////////////////////////
+
+void build_and_run_opt_passes(LLVMModuleRef module, int opt_level) {
+    LLVMPassManagerBuilderRef passBuilder;
+
+    passBuilder = LLVMPassManagerBuilderCreate();
+    LLVMPassManagerBuilderSetOptLevel(passBuilder, opt_level);
+    //LLVMPassManagerBuilderSetOptLevel(passBuilder, 1);
+    LLVMPassManagerBuilderSetSizeLevel(passBuilder, 2);
+    if (opt_level == 0) {
+        LLVMPassManagerBuilderSetDisableUnrollLoops(passBuilder, true);
+    }
+    //LLVMAddInstructionCombiningPass(passBuilder);
+    #if 1
+    if (opt_level >= 2) {
+        LLVMPassManagerBuilderUseInlinerWithThreshold(passBuilder, 225);
+    }
+    #endif
+
+    LLVMPassManagerRef functionPasses =
+      LLVMCreateFunctionPassManagerForModule(module);
+    LLVMPassManagerRef modulePasses =
+      LLVMCreatePassManager();
+    //LLVMAddAnalysisPasses(LLVMGetExecutionEngineTargetMachine(ee), functionPasses);
+
+    LLVMPassManagerBuilderPopulateFunctionPassManager(passBuilder,
+                                                      functionPasses);
+    LLVMPassManagerBuilderPopulateModulePassManager(passBuilder, modulePasses);
+
+    LLVMPassManagerBuilderDispose(passBuilder);
+    if (opt_level == 0) {
+        LLVMAddDeadArgEliminationPass(modulePasses);
+        LLVMAddInstructionCombiningPass(modulePasses);
+    }
+
+    LLVMInitializeFunctionPassManager(functionPasses);
+    for (LLVMValueRef value = LLVMGetFirstFunction(module);
+         value; value = LLVMGetNextFunction(value))
+      LLVMRunFunctionPassManager(functionPasses, value);
+    LLVMFinalizeFunctionPassManager(functionPasses);
+
+    LLVMRunPassManager(modulePasses, module);
+
+    LLVMDisposePassManager(functionPasses);
+    LLVMDisposePassManager(modulePasses);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 static void *global_c_namespace = nullptr;
 //static LLVMOrcJITStackRef orc = nullptr;
@@ -249,6 +303,19 @@ SCOPES_RESULT(void) init_execution() {
 
 static std::vector<const PointerMap *> pointer_maps;
 
+static LLVMMemoryBufferRef module_to_membuffer(LLVMModuleRef module) {
+    LLVMMemoryBufferRef irbuf = nullptr;
+#if SCOPES_CACHE_KEY_BITCODE
+        irbuf = LLVMWriteBitcodeToMemoryBuffer(module);
+#else
+        char *s = LLVMPrintModuleToString(module);
+        irbuf = LLVMCreateMemoryBufferWithMemoryRangeCopy(s, strlen(s),
+            "irbuf");
+        LLVMDisposeMessage(s);
+#endif
+    return irbuf;
+}
+
 SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     uint64_t compiler_flags) {
     SCOPES_RESULT_TYPE(void);
@@ -258,14 +325,7 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     LLVMMemoryBufferRef irbuf = nullptr;
     LLVMMemoryBufferRef membuf = nullptr;
     if (cache) {
-#if SCOPES_CACHE_KEY_BITCODE
-        irbuf = LLVMWriteBitcodeToMemoryBuffer(module);
-#else
-        char *s = LLVMPrintModuleToString(module);
-        irbuf = LLVMCreateMemoryBufferWithMemoryRangeCopy(s, strlen(s),
-            "irbuf");
-        LLVMDisposeMessage(s);
-#endif
+        irbuf = module_to_membuffer(module);
     }
 
     const String *key = nullptr;
@@ -375,6 +435,18 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     }
 skip_cache:
     {
+        if (compiler_flags & CF_O3) {
+            Timer optimize_timer(TIMER_Optimize);
+            int level = 0;
+            if ((compiler_flags & CF_O3) == CF_O1)
+                level = 1;
+            else if ((compiler_flags & CF_O3) == CF_O2)
+                level = 2;
+            else if ((compiler_flags & CF_O3) == CF_O3)
+                level = 3;
+            build_and_run_opt_passes(module, level);
+        }
+
         auto target_machine = get_jit_target_machine();
         assert(target_machine);
 

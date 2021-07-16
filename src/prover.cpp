@@ -2842,6 +2842,17 @@ repeat:
                 return op;
             } else {
                 assert(iidx != -1ull);
+                /*
+                // search for a prior matching insertion
+                TypedValueRef v = _T;
+                while (v.isa<InsertValue>() && !is_unique(v->get_type())) {
+                    auto iv = v.cast<InsertValue>();
+                    if (iv->index == iidx) {
+                        return TypedValueRef(call.anchor(), iv->element);
+                    }
+                    v = iv->value;
+                }
+                */
                 auto op = ExtractValue::from(_T, iidx);
                 op->hack_change_value(VIEWTYPE1(op->get_type(), _T));
                 return TypedValueRef(call.anchor(), op);
