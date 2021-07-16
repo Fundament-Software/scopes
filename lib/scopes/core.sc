@@ -3323,6 +3323,14 @@ let
             fn "constant?" (args)
                 let value = (extract-single-arg args)
                 `[('constant? value)]
+    writable? =
+        make-const-type-property-function
+            fn (T)
+                if (== ('kind T) type-kind-pointer)
+                    'writable? T
+                else
+                    hide-traceback;
+                    error "pointer type expected"
     signed? =
         make-const-type-property-function
             fn (T)
