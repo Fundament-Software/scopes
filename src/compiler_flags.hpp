@@ -29,6 +29,9 @@ SCOPES_COMPILER_FLAGS()
 #undef T
 };
 
+// which flags are going to be effecting cache invalidation
+#define SCOPES_CACHE_COMPILER_FLAGS (CF_O3 | CF_NoDebugInfo)
+
 } // namespace scopes
 
 #endif // SCOPES_COMPILER_FLAGS_HPP

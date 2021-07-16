@@ -332,7 +332,8 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     const char *filepath = nullptr;
     if (cache) {
         assert(irbuf);
-        key = get_cache_key(compiler_flags, LLVMGetBufferStart(irbuf), LLVMGetBufferSize(irbuf));
+        key = get_cache_key(compiler_flags & SCOPES_CACHE_COMPILER_FLAGS,
+            LLVMGetBufferStart(irbuf), LLVMGetBufferSize(irbuf));
         filepath = get_cache_file(key);
 
         const char *keyfilepath = get_cache_key_file(key);
