@@ -15,12 +15,6 @@
 // produces a firehose of information
 #define SCOPES_DEBUG_CODEGEN 0
 
-// run LLVM optimization passes
-// turning this on is detrimental to startup time
-// scopes output is typically clean enough to provide fairly good performance
-// on its own.
-#define SCOPES_OPTIMIZE_ASSEMBLY CF_O0
-
 // any location error aborts immediately and can not be caught
 #define SCOPES_EARLY_ABORT 0
 

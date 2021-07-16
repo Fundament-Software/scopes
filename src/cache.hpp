@@ -8,12 +8,13 @@
 #define SCOPES_CACHE_HPP
 
 #include <stddef.h>
+#include <stdint.h>
 
 namespace scopes {
 
 struct String;
 
-const String *get_cache_key(const char *content, size_t size);
+const String *get_cache_key(uint64_t hash, const char *content, size_t size);
 int get_cache_misses();
 const char *get_cache_dir();
 const char *get_cache_file(const String *key);

@@ -104,8 +104,8 @@ if IS_AARCH64 then
 end
 local LLVM_LIBS = pkg_config(LLVM_CONFIG .. " --link-static --libs orcjit"
     .. " engine passes option objcarcopts coverage support lto coroutines"
-    .. " webassembly frontendopenmp native "
-    .. TARGET_COMPONENTS)
+    .. " webassembly frontendopenmp native orcshared orctargetprocess jitlink"
+    .. " " .. TARGET_COMPONENTS)
 local LLVM_INCLUDEDIR = pkg_config(LLVM_CONFIG .. " --includedir")
 
 local CLANG_DEPS = {

@@ -3407,9 +3407,10 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
 #else
     flags |= CF_NoDebugInfo;
 #endif
-#ifdef SCOPES_OPTIMIZE_ASSEMBLY
-    flags |= SCOPES_OPTIMIZE_ASSEMBLY;
-#endif
+    if (flags & CF_Module) {
+        flags |= CF_O0;
+        flags |= CF_Cache;
+    }
 
     /*
     const Type *functype = pointer_type(

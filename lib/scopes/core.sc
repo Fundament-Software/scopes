@@ -178,7 +178,7 @@ fn build-typify-function (f)
     let types = (alloca-array type 1:usize)
     store Value (getelementptr types 0)
     let types = (bitcast types TypeArrayPointer)
-    let result = (sc_compile (sc_typify f 1 types) compile-flag-cache)
+    let result = (sc_compile (sc_typify f 1 types) compile-flag-module)
     let result-type = (sc_value_type result)
     if (ptrcmp!= result-type SpiceMacroFunction)
         error
@@ -4018,10 +4018,7 @@ fn exec-module (expr eval-scope)
         let f =
             do
                 hide-traceback;
-                sc_compile wrapf
-                    | compile-flag-cache
-                        # can't use this flag yet because it breaks code
-                        #compile-flag-O1
+                sc_compile wrapf compile-flag-module
         if (('typeof f) == StageFunctionType)
             let fptr = (f as StageFunctionType)
             let result =

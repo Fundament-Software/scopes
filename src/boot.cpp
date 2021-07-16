@@ -284,7 +284,7 @@ skip_regular_load:
     auto stage_func_type = native_opaque_pointer_type(raising_function_type(
         arguments_type({TYPE_CompileStage}), {}));
 
-    const int compile_flags = CF_Cache;
+    const int compile_flags = CF_Module;
 
 compile_stage:
     if (fn->get_type() == stage_func_type) {

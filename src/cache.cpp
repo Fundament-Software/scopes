@@ -179,15 +179,15 @@ const char *get_cache_dir() {
     return cache_dir;
 }
 
-const String *get_cache_key(const char *content, size_t size) {
+const String *get_cache_key(uint64_t hash, const char *content, size_t size) {
     // split into four parts, hash each part -> 256 bits
     uint64_t h[4];
     memset(h, 0, sizeof(h));
     if (size < 4) {
-        h[0] = hash_bytes(content, size);
+        h[0] = hash2(hash, hash_bytes(content, size));
     } else {
         size_t part = size / 4;
-        h[0] = hash_bytes(content, part);
+        h[0] = hash2(hash, hash_bytes(content, part));
         h[1] = hash2(h[0], hash_bytes(content + part, part));
         h[2] = hash2(h[1], hash_bytes(content + part * 2, part));
         h[3] = hash2(h[2], hash_bytes(content + part * 3, size - 3 * part));

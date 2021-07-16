@@ -277,6 +277,8 @@ SCOPES_RESULT(void) init_execution() {
     auto ES = LLVMOrcLLJITGetExecutionSession(orc);
     assert(ES);
     object_layer = LLVMOrcCreateRTDyldObjectLinkingLayerWithSectionMemoryManager(ES);
+    add_jit_event_listener(LLVMCreateGDBRegistrationListener());
+
     jit_dylib = LLVMOrcLLJITGetMainJITDylib(orc);
 
     LLVMOrcDefinitionGeneratorRef defgen = 0;
@@ -290,8 +292,6 @@ SCOPES_RESULT(void) init_execution() {
 
     LLVMOrcJITDylibAddGenerator(jit_dylib,
         LLVMOrcCreateCustomCAPIDefinitionGenerator(&definition_generator, nullptr));
-
-    add_jit_event_listener(LLVMCreateGDBRegistrationListener());
 
 #if 0
     LLVMOrcTargetAddress retaddr = 0;
@@ -332,7 +332,7 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     const char *filepath = nullptr;
     if (cache) {
         assert(irbuf);
-        key = get_cache_key(LLVMGetBufferStart(irbuf), LLVMGetBufferSize(irbuf));
+        key = get_cache_key(compiler_flags, LLVMGetBufferStart(irbuf), LLVMGetBufferSize(irbuf));
         filepath = get_cache_file(key);
 
         const char *keyfilepath = get_cache_key_file(key);
@@ -511,7 +511,8 @@ SCOPES_RESULT(void) add_object(const char *path) {
 void init_llvm() {
     global_c_namespace = dlopen(NULL, RTLD_LAZY);
 
-    LLVMEnablePrettyStackTrace();
+    // remove crash message
+    //LLVMEnablePrettyStackTrace();
     LLVMInitializeNativeTarget();
     LLVMInitializeNativeAsmPrinter();
     LLVMInitializeNativeAsmParser();

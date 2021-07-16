@@ -20,7 +20,7 @@ namespace scopes {
     T(CF_O2, (CF_O0 | (1 << 6)), "compile-flag-O2") \
     T(CF_O3, (CF_O1 | CF_O2), "compile-flag-O3") \
     T(CF_Cache, (1 << 7), "compile-flag-cache") \
-
+    T(CF_Module, (1 << 8), "compile-flag-module") \
 
 enum {
 #define T(NAME, VALUE, SNAME) \
