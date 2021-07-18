@@ -133,6 +133,7 @@ SCOPES_TYPEDEF_RESULT_RAISES(sc_string_raises, const sc_string_t *);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_size_raises, size_t);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_scope_raises, const sc_scope_t *);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_int_raises, int32_t);
+SCOPES_TYPEDEF_RESULT_RAISES(sc_uint_raises, uint32_t);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_symbol_raises, sc_symbol_t);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_type_raises, const sc_type_t *);
 SCOPES_TYPEDEF_RESULT_RAISES(sc_bool_raises, bool);
@@ -235,6 +236,8 @@ SCOPES_LIBEXPORT sc_int_raises_t sc_global_location(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_int_raises_t sc_global_binding(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_int_raises_t sc_global_descriptor_set(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_symbol_raises_t sc_global_storage_class(sc_valueref_t value);
+SCOPES_LIBEXPORT sc_symbol_raises_t sc_global_name(sc_valueref_t value);
+SCOPES_LIBEXPORT sc_uint_raises_t sc_global_flags(sc_valueref_t value);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_global_string_new(const char *ptr, size_t count);
 SCOPES_LIBEXPORT sc_valueref_t sc_global_string_new_from_cstr(const char *ptr);

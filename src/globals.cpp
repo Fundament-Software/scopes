@@ -127,6 +127,7 @@ sc_scope_raises_t convert_result(const Result<const Scope *> &_result) CRESULT;
 
 sc_bool_raises_t convert_result(const Result<bool> &_result) CRESULT;
 sc_int_raises_t convert_result(const Result<int> &_result) CRESULT;
+sc_uint_raises_t convert_result(const Result<uint32_t> &_result) CRESULT;
 sc_size_raises_t convert_result(const Result<size_t> &_result) CRESULT;
 
 sc_symbol_raises_t convert_result(const Result<Symbol> &_result) CRESULT;
@@ -1458,6 +1459,20 @@ sc_symbol_raises_t sc_global_storage_class(sc_valueref_t value) {
     SCOPES_C_RETURN(glob->storage_class);
 }
 
+sc_symbol_raises_t sc_global_name(sc_valueref_t value) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(Symbol);
+    auto glob = SCOPES_C_GET_RESULT(extract_global_constant(value));
+    SCOPES_C_RETURN(glob->name);
+}
+
+sc_uint_raises_t sc_global_flags(sc_valueref_t value) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(uint32_t);
+    auto glob = SCOPES_C_GET_RESULT(extract_global_constant(value));
+    SCOPES_C_RETURN((uint32_t)glob->flags);
+}
+
 sc_valueref_t sc_global_string_new(const char *ptr, size_t count) {
     using namespace scopes;
     return GlobalString::from(ptr, count);
@@ -2433,6 +2448,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_binding, TYPE_I32, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_descriptor_set, TYPE_I32, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_storage_class, TYPE_Symbol, TYPE_ValueRef);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_name, TYPE_Symbol, TYPE_ValueRef);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_flags, TYPE_U32, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_global_string_new, TYPE_ValueRef, rawstring, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_global_string_new_from_cstr, TYPE_ValueRef, rawstring);
     DEFINE_EXTERN_C_FUNCTION(sc_cond_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
