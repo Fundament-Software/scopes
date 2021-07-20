@@ -168,13 +168,14 @@ sugar capture (head body...)
     capture-parser "capture" head body...
         inline (namestr argnames unreflist argvalues params body)
             qq [pack-capture] ([tupleof] (unquote-splice argvalues))
-                [fn] [namestr] (self (unquote-splice params))
+                [fn] [namestr] (this-capture (unquote-splice params))
                     unquote-splice
                         if (empty? argnames) '()
                         else
                             qq (([let] (unquote-splice argnames) =
-                                ([unpack-capture] self)))
+                                ([unpack-capture] this-capture)))
                     unquote-splice unreflist
+                    ;
                     unquote-splice body
 
 #-------------------------------------------------------------------------------
@@ -210,13 +211,14 @@ sugar spice-capture (head body...)
                 [let] [payload] [payload-type] =
                     [pack-capture-spice] ([tupleof] (unquote-splice argvalues))
                 [finalize-capture-spice] [payload]
-                    [spice] [namestr] (self (unquote-splice params))
+                    [spice] [namestr] (this-capture (unquote-splice params))
                         unquote-splice
                             if (empty? argnames) '()
                             else
                                 qq (([let] (unquote-splice argnames) =
-                                    ([unpack-capture-spice] self [payload-type])))
+                                    ([unpack-capture-spice] this-capture [payload-type])))
                         unquote-splice unreflist
+                        ;
                         unquote-splice body
 
 #-------------------------------------------------------------------------------
