@@ -116,11 +116,11 @@ inline capture-parser (macroname head body genf)
                     let namestr = (name as string)
                     let k = (decons args)
                     if ((lslice namestr 1) == "&")
-                        # reference
                         let anchor = ('anchor k)
+                        # reference
                         let k =
                             'tag `[(Symbol (rslice namestr 1))] anchor
-                        let expr = (qq [&] ([view] [k]))
+                        let expr = ('tag `[(qq [&] ([view] [k]))] anchor)
                         let unreflist =
                             cons
                                 qq [let] [k] = ([@] [k])
