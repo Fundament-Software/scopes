@@ -7241,11 +7241,11 @@ sugar typedef (name body...)
         case ('<: storagetype rest...)
             _ rest... `[(list superof storagetype)] true true
                 list
-                    list set-storage 'this-type storagetype typename-flag-plain
+                    list set-storage 'this-type (list storageof storagetype) typename-flag-plain
         case ('<:: storagetype rest...)
             _ rest... `[(list superof storagetype)] true true
                 list
-                    list set-storage 'this-type storagetype 0:u32
+                    list set-storage 'this-type (list storageof storagetype) 0:u32
         default
             _ body... `typename false false '()
 
