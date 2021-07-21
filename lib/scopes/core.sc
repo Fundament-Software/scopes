@@ -8236,6 +8236,9 @@ sugar typematch (...)
 # extensions to intrinsics
 #-------------------------------------------------------------------------------
 
+let trap = (extern 'llvm.trap (function noreturn))
+let debugtrap = (extern 'llvm.debugtrap (function void))
+
 inline distance (a b)
     length (a - b)
 
