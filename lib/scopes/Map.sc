@@ -363,6 +363,12 @@ typedef Map < Struct
         free self._keys
         free self._values
 
+    fn __copy (self)
+        local other : (typeof self)
+        for k v in self
+            'set other (copy k) (copy v)
+        other
+
     inline __typecall (cls opts...)
         static-if (cls == this-type)
             let key-type value-type function-type = opts...
