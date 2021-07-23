@@ -3839,7 +3839,9 @@ define for
             let generator-expr _next subscope = (sc_expand generator-expr '() subscope)
             spice-quote
                 let start valid? at next =
-                    (as generator-expr Generator);
+                    call
+                        spice-unquote
+                            'tag `(as generator-expr Generator) ('anchor generator-expr)
             let result =
                 cons
                     spice-quote start valid? at next # order expressions
@@ -6403,7 +6405,7 @@ sugar fn... (name...)
         else
             let at = (decons inlined-case)
             cons
-                cons ('tag `'case ('anchor at)) inlined-case
+                'tag `[(cons ('tag `'case ('anchor at)) inlined-case)] ('anchor at)
                 next-expr
     loop (next outargs = next-expr (sc_argument_list_new 0 null))
         let next-anchor =
