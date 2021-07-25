@@ -3966,10 +3966,16 @@ let hash-storage =
     __hash =
         inline "Nothing.__hash" (self) (nullof hash)
 
+'set-symbols Value
+    __hash =
+        inline "Value.__hash" (self)
+            hash (extractvalue self 0)
+
 va-lfold none
     inline (key T)
         'set-symbol T '__hash hash-storage
-    \ integer pointer real type Closure Builtin Symbol string Scope
+    \ integer pointer real type Closure Builtin Symbol string Scope _Value
+    \ Anchor
 
 #---------------------------------------------------------------------------
 # module loading
