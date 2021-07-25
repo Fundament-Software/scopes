@@ -515,6 +515,8 @@ do
         gl_InstanceID = (ptrtoref (extern 'spirv.InstanceId i32 (storage-class = 'Input)))
         gl_InstanceIndex = (ptrtoref (extern 'spirv.InstanceIndex i32 (storage-class = 'Input)))
 
+        gl_PrimitiveID = (ptrtoref (extern 'spirv.PrimitiveId i32 (storage-class = 'Input)))
+
         gl_NumWorkGroups = (ptrtoref (extern 'spirv.NumWorkgroups uvec3 (storage-class = 'Input)))
         gl_WorkGroupID = (ptrtoref (extern 'spirv.WorkgroupId uvec3 (storage-class = 'Input)))
         gl_WorkGroupSize = (ptrtoref (extern 'spirv.WorkgroupSize uvec3 (storage-class = 'Input)))

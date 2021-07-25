@@ -2040,7 +2040,8 @@ struct SPIRVGenerator {
         case spv::BuiltInCullDistance:
             builder.addCapability(spv::CapabilityCullDistance); break;
         case spv::BuiltInPrimitiveId:
-            builder.addCapability(spv::CapabilityRayTracingNV); break;
+            //builder.addCapability(spv::CapabilityRayTracingNV); break;
+            builder.addCapability(spv::CapabilityGeometry); break;
         case spv::BuiltInLayer:
             builder.addCapability(spv::CapabilityShaderViewportIndexLayerEXT);
             break;
