@@ -5751,6 +5751,8 @@ fn uncomma (l)
             if ((('typeof at) == Symbol) and ((at as Symbol) == ',))
                 if (empty? next)
                     return anchor '() total
+                let nextat = (decons next)
+                let anchor = ('anchor nextat)
                 return anchor '() (merge-lists anchor current total)
             else
                 return anchor (cons at current) total
@@ -6022,6 +6024,15 @@ define va-unnamed
                     let arg = ('getarg args i)
                     let k = (sc_type_key ('qualified-typeof arg))
                     _ (k == unnamed) arg
+
+'set-symbols list
+    first-anchor =
+        fn "anchor" (self)
+            loop (it = self)
+                if (empty? it)
+                    break unknown-anchor
+                let sxat it = (decons it)
+                break ('anchor sxat)
 
 run-stage; # 8
 
@@ -6437,9 +6448,10 @@ sugar fn... (name...)
                         sc_argument_list_new 0 null
                         sc_argument_list_new 0 null
                         scope
+                    let anchor = ('first-anchor expr)
                     inline append-parameter (rest arg T def)
                         let T = (sc_expand T '() sugar-scope)
-                        let param = (sc_parameter_new arg)
+                        let param = ('tag (sc_parameter_new arg) anchor)
                         sc_template_append_parameter tmpl param
                         let def =
                             static-branch (none? def)
@@ -6594,13 +6606,6 @@ inline memo (f) (memocall _memo f)
                 if (at == token)
                     break params it
                 _ it (cons sxat params)
-    first-anchor =
-        fn "anchor" (self)
-            loop (it = self)
-                if (empty? it)
-                    break unknown-anchor
-                let sxat it = (decons it)
-                break ('anchor sxat)
 
 define-sugar-block-scope-macro static-if
     fn process (anchor body next-expr)
