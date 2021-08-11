@@ -47,13 +47,6 @@ local function flatten(t)
     return result
 end
 
-local ARCH = "unknown"
-if os.is("windows") then
-else
-    ARCH = os.outputof("uname -m")
-end
-local IS_AARCH64 = (ARCH == "aarch64\n")
-
 local function pkg_config(cmd)
     local args = os.outputof(cmd)
     --print(cmd, "=>", args)
@@ -99,9 +92,6 @@ local LLVM_CONFIG = toolpath("llvm-config", CLANG_PATH)
 local LLVM_LDFLAGS = pkg_config(LLVM_CONFIG .. " --ldflags")
 local LLVM_CXXFLAGS = pkg_config(LLVM_CONFIG .. " --cxxflags")
 local TARGET_COMPONENTS = ""
-if IS_AARCH64 then
-    TARGET_COMPONENTS = "aarch64 aarch64asmparser aarch64codegen aarch64desc aarch64disassembler aarch64info aarch64utils"
-end
 local LLVM_LIBS = pkg_config(LLVM_CONFIG .. " --link-static --libs orcjit"
     .. " engine passes option objcarcopts coverage support lto coroutines"
     .. " webassembly frontendopenmp native orcshared orctargetprocess jitlink"
