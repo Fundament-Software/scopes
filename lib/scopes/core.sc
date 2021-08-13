@@ -7533,6 +7533,16 @@ spice in-tuple? (element collection)
                         expr
         deref expr
 
+#-------------------------------------------------------------------------------
+# static-try spice
+#-------------------------------------------------------------------------------
+
+spice static-try-closure (f1 f2)
+    try
+        sc_prove `(f1)
+    else
+        `(f2)
+
 run-stage; # 11
 
 #-------------------------------------------------------------------------------
@@ -8148,6 +8158,24 @@ inline typeinit (...)
         inline (T)
             T ...
         typedef "typeinit" < TypeInitializer : (storageof Closure)
+
+#-------------------------------------------------------------------------------
+# static-try sugar
+#-------------------------------------------------------------------------------
+
+sugar static-try (body...)
+    sugar-match next-expr
+    case (('else else-body...) rest...)
+        return
+            qq [static-try-closure]
+                [inline] "#hidden" ()
+                    unquote-splice body...
+                [inline] "#hidden" ()
+                    unquote-splice else-body...
+            rest...
+    default
+        error@ ('first-anchor next-expr) "while parsing sugar"
+            "else block expected after static-try"
 
 #-------------------------------------------------------------------------------
 # Accessors

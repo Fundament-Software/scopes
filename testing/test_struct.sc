@@ -263,4 +263,38 @@ fn make-struct ()
 
 make-struct;
 
+# test implicit struct composition
+do
+    struct Entity
+        origin : (vector f32 3)
+
+        inline chain (T field)
+            field 'entity this-type
+            let super-type = (superof T)
+            let super-getattr = super-type.__getattr
+            'define-symbol T '__getattr
+                inline (self key)
+                    static-try
+                        super-getattr self key
+                    else
+                        getattr self.entity key
+
+    struct Player
+        Entity.chain this-type field
+        index : i32
+
+    struct Monster
+        Entity.chain this-type field
+        state : i32
+
+    local player : Player
+    local monster : Monster
+
+    test (player.index == 0)
+    test (all? (player.origin == player.entity.origin))
+    test (monster.state == 0)
+    test (all? (monster.origin == monster.entity.origin))
+
+    ;
+
 none
