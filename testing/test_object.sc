@@ -2,17 +2,7 @@
 #let x = (unconst true)
 #global y = x
 
-let C = (include "stdio.h")
-let C =
-    do
-        using C.extern
-        locals;
-
-let printf =
-    static-if (operating-system == 'windows)
-        C.printf_s
-    else
-        C.printf
+using import C.stdio
 
 let i32x10 = (array i32 10)
 
