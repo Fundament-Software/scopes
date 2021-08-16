@@ -558,7 +558,7 @@ void init_types() {
     DEFINE_OPAQUE_HANDLE_TYPE("SourceFile", SourceFile, TYPE_SourceFile, nullptr);
     DEFINE_OPAQUE_HANDLE_TYPE("Closure", Closure, TYPE_Closure, nullptr);
     DEFINE_OPAQUE_HANDLE_TYPE("Scope", Scope, TYPE_Scope, nullptr);
-    DEFINE_OPAQUE_HANDLE_TYPE("String", String, TYPE_String, TYPE_OpaquePointer);
+    DEFINE_OPAQUE_HANDLE_TYPE("string", String, TYPE_String, TYPE_OpaquePointer);
     DEFINE_OPAQUE_HANDLE_TYPE("List", List, TYPE_List, nullptr);
     DEFINE_OPAQUE_HANDLE_TYPE("Error", Error, TYPE_Error, nullptr);
 
