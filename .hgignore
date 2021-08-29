@@ -23,6 +23,8 @@ syntax: regexp
 ^libffi
 ^scopes$
 ^testing/myscopes$
+^testing/test_genso$
+^testing/test_genso\.c$
 ^testing/test$
 ^testing/test\.o$
 ^testing/(_)?test\.wasm$
