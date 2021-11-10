@@ -139,7 +139,11 @@ do
     let a = (A)
     ;
 
-
+do
+    # ensure keys coerce correctly and don't hash in surprising ways, leading
+    # to unexpected "key not found" situations
+    local m : (Map i32 i32)
+    'set m 10 1
+    if (not ('in? m 10:u8))
+        error "key hashed incorrectly"
 ;
-
-
