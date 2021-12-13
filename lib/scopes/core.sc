@@ -6536,6 +6536,21 @@ sugar fn... (name...)
 let inline... = fn...
 
 sugar from (src 'let params...)
+    let keyparams valueparams =
+        loop (params keyparams valueparams = params... '() '())
+            sugar-match params
+            case ((key is Symbol) rest...)
+                repeat rest... (cons key keyparams) (cons key valueparams)
+            case (((key is Symbol) '= (value is Symbol)) rest...)
+                repeat rest... (cons key keyparams) (cons value valueparams)
+            case ()
+                break keyparams valueparams
+            default
+                hide-traceback;
+                error@ ('first-anchor params) "while parsing pattern"
+                    "syntax: from <value> let source-name | (target-name = source-name) ..."
+
+
     spice load-from (src keys...)
         let count = ('argcount keys...)
         sc_argument_list_map_new count
@@ -6554,11 +6569,11 @@ sugar from (src 'let params...)
 
     let load-from-expr =
         cons load-from src
-            quotify params...
+            quotify valueparams
 
     let anchor = ('anchor src)
     cons let
-        .. params...
+        .. keyparams
             list '=
                 'tag `load-from-expr anchor
 

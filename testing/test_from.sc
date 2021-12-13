@@ -11,10 +11,12 @@ let T =
 
 run-stage;
 
-from T let A B test
-assert (A == i32)
-assert (B == u32)
-assert ((test) == 303)
+do
+    from T let A (M = B) B test
+    assert (A == i32)
+    assert (B == u32)
+    assert (M == B)
+    assert ((test) == 303)
 
 do
     using import struct
