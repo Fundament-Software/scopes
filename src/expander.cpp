@@ -257,7 +257,7 @@ struct Expander {
         }
 
         func->value = SCOPES_GET_RESULT(subexpr.expand_expression(
-            ref(anchor, it), setup.inlined));
+            ref(anchor, it), setup.inlined && !func->is_hidden()));
         if (bind_name != SYM_Unnamed) {
             bind(ConstInt::symbol_from(bind_name), func);
         }
