@@ -11,6 +11,22 @@
 
 using import spicetools
 
+spice va-ordered-insert (item fcmp vars...)
+    let argc = ('argcount vars...)
+    spice-quote
+        let v = (va-split (argc - 1) vars...)
+        let v... = (v)
+        spice-unquote
+            fold (expr = vars...) for i in (rrange argc)
+                let arg = ('getarg vars... i)
+                sc_cond_new `(fcmp item arg)
+                    spice-quote
+                        let v1 v2 = (va-split i v...)
+                        va-append-va (inline () (_ item (v2))) (v1)
+                    expr
+
+run-stage;
+
 #---------------------------------------------------------------------------
 # generators
 #---------------------------------------------------------------------------
@@ -246,6 +262,32 @@ inline... iterbits (value : integer)
             pos := pos + bit
             ofs := (findlsb (lshr value pos))
             ? (ofs == eob) ofs (pos + ofs)
+
+""""return the n closest elements in gen using comparison operator fcmp
+inline closest (gen n fcmp)
+    let init valid? at next = ((gen as Generator))
+    let it... = (init)
+    assert (valid? it...) "must at least have one item"
+    let first = (at it...)
+    let n... = (va-range n)
+    let best... =
+        va-map
+            inline () first
+            n...
+    let it... = (next it...)
+    let lsize = (va-countof it...)
+    let state... =
+        va-append-va (inline () best...) it...
+    loop (state...)
+        let v1 v2 = (va-split lsize state...)
+        let it... = (v1)
+        let best... = (v2)
+        if (not (valid? it...))
+            break best...
+        let item = (at it...)
+        let best... = (va-ordered-insert item fcmp best...)
+        repeat
+            va-append-va (inline () best...) (next it...)
 
 #---------------------------------------------------------------------------
 # collectors
@@ -636,6 +678,6 @@ unlet cascade1 retain1
 do
     let span dim bitdim imap ipair join zip span join collect each compose cat
         \ ->> flatten map reduce drain limit gate filter take cascade mux
-        \ demux retain permutate-range iterbits
+        \ demux retain permutate-range iterbits closest
 
     locals;
