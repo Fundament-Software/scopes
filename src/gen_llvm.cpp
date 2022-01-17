@@ -59,14 +59,15 @@ namespace scopes {
 #define SCOPES_LLVM_EXTENDED_DEBUG_INFO 0
 
 
-// TODO: remove this when LLVM 13 drops
-
+#if 0
+// available in LLVM 12.0.1
 LLVMAttributeRef LLVMCreateTypeAttribute(LLVMContextRef C, unsigned KindID,
                                          LLVMTypeRef type_ref) {
     auto &Ctx = *llvm::unwrap(C);
     auto AttrKind = (llvm::Attribute::AttrKind)KindID;
     return llvm::wrap(llvm::Attribute::get(Ctx, AttrKind, llvm::unwrap(type_ref)));
 }
+#endif
 
 //------------------------------------------------------------------------------
 // IL->LLVM IR GENERATOR
