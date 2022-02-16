@@ -678,6 +678,6 @@ unlet cascade1 retain1
 do
     let span dim bitdim imap ipair join zip span join collect each compose cat
         \ ->> flatten map reduce drain limit gate filter take cascade mux
-        \ demux retain permutate-range iterbits closest
+        \ demux retain permutate-range iterbits closest va-ordered-insert
 
     locals;

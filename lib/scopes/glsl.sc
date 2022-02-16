@@ -563,6 +563,10 @@ do
     inline imageStore (image coord data)
         Image-write (image as Image) coord data
 
+    inline imageSize (image)
+        vector->vec-type
+            Image-query-size (image as Image)
+
     # compute shader layout
     inline local_size (x y z)
         set-execution-mode 'LocalSize x y z
