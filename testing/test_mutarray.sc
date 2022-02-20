@@ -246,13 +246,18 @@ do
 fn test-copy ()
     One.test-refcount-balanced;
 
-    local a : (Array One)
-    'insert a (One 0)
-    'insert a (One 1)
-    'insert a (One 2)
-    'insert a (One 3)
-    'insert a (One 4)
-    'insert a (One 5)
+    #
+        local a : (Array One)
+        'insert a (One 0)
+        'insert a (One 1)
+        'insert a (One 2)
+        'insert a (One 3)
+        'insert a (One 4)
+        'insert a (One 5)
+    local a =
+        (Array One)
+            One 0; One 1; One 2; One 3; One 4; One 5
+
     test ((One.refcount) == 6)
     local b = (copy a)
     test ((One.refcount) == 12)

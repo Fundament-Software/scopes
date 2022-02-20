@@ -313,6 +313,25 @@ typedef+ Array
 
     unlet gen-sort append-slots
 
+################################################################################
+
+inline filter-items (opts...)
+    """"from option list, filter unnamed arguments as items and return count
+        and item list.
+    va-map
+        inline (k...) (static-if ((keyof k...) == unnamed) k...)
+        opts...
+
+inline assign-items (cls count dest items...)
+    """"insert `count` items into uninitialized array `dest`
+    va-map
+        inline (i)
+            let value = (va@ i items...)
+            assign (imply value cls.ElementType) (dest @ i)
+        va-range count
+
+################################################################################
+
 """"The supertype and constructor for arrays of fixed size.
 
     To construct a new fixed array type:
@@ -353,9 +372,14 @@ typedef+ FixedArray
             let element-type capacity = opts...
             gen-fixed-array-type element-type (capacity as i32)
         else
+            let items... = (filter-items opts...)
+            let count = (va-countof items...)
+            static-assert (count <= cls.Capacity) "capacity exceeded"
+            let items = (malloc-array cls.ElementType cls.Capacity)
+            assign-items cls count items items...
             Struct.__typecall cls
-                _items = (malloc-array cls.ElementType cls.Capacity)
-                _count = 0:usize
+                _items = items
+                _count = count
 
     """"Implements support for the `repr` operation.
     fn __repr (self)
@@ -379,8 +403,6 @@ typedef+ FixedArray
 
 
     unlet gen-fixed-array-type parent-type
-
-
 
 let DEFAULT_CAPACITY = (1:usize << 2:usize)
 
@@ -430,10 +452,16 @@ typedef+ GrowingArray
             let capacity =
                 nearest-capacity DEFAULT_CAPACITY
                     (va-option capacity opts... DEFAULT_CAPACITY) as usize
+            let items... = (filter-items opts...)
+            let count = (va-countof items...)
+            let capacity = (nearest-capacity capacity count)
+            let items = (malloc-array cls.ElementType capacity)
+            assign-items cls count items items...
             Struct.__typecall cls
-                _items = (malloc-array cls.ElementType capacity)
-                _count = 0:usize
+                _items = items
+                _count = count
                 _capacity = capacity
+
 
     """"Implements support for the `repr` operation.
     fn __repr (self)
