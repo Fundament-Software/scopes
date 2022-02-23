@@ -9,6 +9,21 @@
     Implements the read-eval-print loop for Scopes' console.
 
 #-------------------------------------------------------------------------------
+# Utility functions
+#-------------------------------------------------------------------------------
+
+fn parse-number (str)
+    let expr = (sc_parse_from_string str)
+    let at next = (decons (expr as list))
+    let T = ('typeof at)
+    if (T < integer)
+        (sc_const_int_extract at) as f64
+    elseif (T < real)
+        sc_const_real_extract at
+    else
+        error "number expected"
+
+#-------------------------------------------------------------------------------
 # Scopes Console
 #-------------------------------------------------------------------------------
 
@@ -393,5 +408,6 @@ if main-module?
 
 do
     let read-eval-print-loop
+    let parse-number
     locals;
 
