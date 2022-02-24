@@ -4208,8 +4208,13 @@ let import =
                             repeat (add i 1:usize) (add i 1:usize)
                     repeat (add i 1:usize) start
             let sxname rest = (decons args)
-            let name = (sxname as Symbol)
-            let namestr = (name as string)
+            let name namestr bind? =
+                if (('typeof sxname) == string)
+                    let name = (sxname as string)
+                    _ (Symbol name) name false
+                else
+                    let sym = (sxname as Symbol)
+                    _ sym (sym as string) true
             let module-dir = (('@ scope 'module-dir) as string)
             let key = (resolve-scope scope namestr 0:usize)
             let module =
@@ -4217,7 +4222,9 @@ let import =
                     hide-traceback;
                     require-from module-dir name
             _ module
-                'bind scope key module
+                if bind?
+                    'bind scope key module
+                else scope
 
 #---------------------------------------------------------------------------
 # using
