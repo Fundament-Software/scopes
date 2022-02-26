@@ -6,6 +6,7 @@ test-modules
     .test_abs
     .test_alignment
     .test_anchor
+    .test_and_or
     .test_ansi_colors
     .test_array
     .test_ast_quote

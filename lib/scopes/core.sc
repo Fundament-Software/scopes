@@ -2097,6 +2097,9 @@ fn dispatch-and-or (args flip)
         return call-elsef
     else
         return thenargs
+    # ensure both arguments are dereferenced
+    let call-elsef = `(deref call-elsef)
+    let thenargs = `(deref thenargs)
     sc_cond_new condbool
         if flip
             _ call-elsef thenargs
