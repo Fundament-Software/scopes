@@ -65,12 +65,17 @@ std::unique_ptr<SourceFile> SourceFile::from_file(Symbol _path) {
     file->fd = ::open(_path.name()->data, O_RDONLY);
     if (file->fd >= 0) {
         file->length = lseek(file->fd, 0, SEEK_END);
-        file->ptr = mmap(nullptr,
-            file->length, PROT_READ, MAP_PRIVATE, file->fd, 0);
-        if (file->ptr != MAP_FAILED) {
+        if (file->length) {
+            file->ptr = mmap(nullptr,
+                file->length, PROT_READ, MAP_PRIVATE, file->fd, 0);
+            if (file->ptr != MAP_FAILED) {
+                return file;
+            }
+        } else {
+            file->ptr = nullptr;
+            file->_str = Symbol(SYM_Unnamed).name();
             return file;
         }
-        file->close();
     }
     file->close();
     return nullptr;
