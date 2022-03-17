@@ -3282,7 +3282,6 @@ let package = (sc_typename_type "scopes.package" typename)
         Value
             list
                 .. compiler-dir "/lib/clang/include"
-                .. compiler-dir "/include"
     modules = `[(Scope)]
 
 fn clone-scope-contents (a b)
@@ -7648,18 +7647,7 @@ sugar include (args...)
         `scope
 
     let modulename = (('@ sugar-scope 'module-path) as string)
-    let include-path = (('@ package 'include-path) as list)
-    let opts =
-        loop (opts include-path = '() include-path)
-            if (empty? include-path)
-                break ('reverse opts)
-            else
-                let at next = (decons include-path)
-                repeat
-                    cons at "-I" opts
-                    next
-
-    loop (args modulename ext opts includestr scope = args... modulename ".c" opts "" (nullof Scope))
+    loop (args modulename ext opts includestr scope = args... modulename ".c" '() "" (nullof Scope))
         sugar-match args
         case (('using name) rest...)
             let value = ((sc_expand name '() sugar-scope) as Scope)
@@ -7700,6 +7688,16 @@ sugar include (args...)
                     # code block
                     includestr
                 else (.. "#include \"" includestr "\"")
+            let include-path = ('reverse (('@ package 'include-path) as list))
+            let opts =
+                loop (opts include-path = opts include-path)
+                    if (empty? include-path)
+                        break opts
+                    else
+                        let at next = (decons include-path)
+                        repeat
+                            cons "-I" at opts
+                            next
             return
                 gen-code (.. modulename ext) includestr opts scope
                 next-expr
@@ -8453,10 +8451,28 @@ fn print-help (exename)
 
             Options:
             -h, --help                  print this text and exit.
-            -v, --version               print program version and exit.
+            -v, --version               print runtime version and exit.
+            -p, --project               run program as part of a project.
             -s, --signal-abort          raise SIGABRT when calling `abort!`.
             --                          terminate option list.
     exit 0
+
+fn set-project-dir (path)
+    set-globals!
+        'bind-symbols (globals)
+            project-dir = path
+    # add default paths to package
+    'set-symbols package
+        path =
+            cons
+                .. path "/lib/scopes/packages/?.sc"
+                .. path "/lib/scopes/packages/?/init.sc"
+                ('@ package 'path) as list
+        include-path =
+            cons
+                .. path "/include"
+                ('@ package 'include-path) as list
+    ;
 
 fn print-version ()
     print
@@ -8465,12 +8481,15 @@ fn print-version ()
     exit 0
 
 let minus-char = 45:char # "-"
+let project-filename-pattern = "/_project.sc"
+let project-module-name = "_project"
 fn run-main ()
     let argc argv = (launch-args)
     let exename = (load (getelementptr argv 0))
     let exename = (sc_string_new_from_cstr exename)
     let sourcepath = (alloca string)
     let parse-options = (alloca bool)
+    local project? = false
     store "" sourcepath
     store true parse-options
     let start-offset =
@@ -8487,13 +8506,15 @@ fn run-main ()
                     print-version;
                 elseif ((== arg "--signal-abort") or (== arg "-s"))
                     set-signal-abort! true
+                elseif ((== arg "--project") or (== arg "-p"))
+                    project? = true
                 elseif (== arg "--")
                     store false parse-options
                 else
                     print
                         .. "unrecognized option: " arg
                             \ ". Try --help for help."
-                    exit 1
+                    exit 255
             elseif ((load sourcepath) == "")
                 store arg sourcepath
                 # remainder is passed on to script
@@ -8504,6 +8525,30 @@ fn run-main ()
         if (sourcepath == "")
             .. compiler-dir "/lib/scopes/console.sc"
         else sourcepath
+    if project?
+        let path = (sc_realpath sourcepath)
+        let path =
+            if (sc_is_file path)
+                sc_dirname path
+            else (sc_realpath ".")
+        let path filepath =
+            loop (path = path)
+                let nextpath = (sc_dirname path)
+                if ((not (sc_is_directory path)) | (path == nextpath))
+                    print
+                        .. "could not find project script (?" project-filename-pattern
+                            ") in any current working directory."
+                    exit 255
+                let filepath = (.. path project-filename-pattern)
+                if (sc_is_file filepath)
+                    break path filepath
+                repeat nextpath
+        set-project-dir path
+        do
+            hide-traceback;
+            load-module project-module-name filepath
+    else
+        set-project-dir compiler-dir
     let argc = (argc - start-offset)
     let argv = (& (@ argv start-offset))
     @@ spice-quote
