@@ -3282,6 +3282,9 @@ let package = (sc_typename_type "scopes.package" typename)
         Value
             list
                 .. compiler-dir "/lib/clang/include"
+    library-path =
+        Value
+            list;
     modules = `[(Scope)]
 
 fn clone-scope-contents (a b)
@@ -8404,6 +8407,27 @@ sc_set_typecast_handler
                 .. "can't coerce value of type " ('__repr `vT) " to type " ('__repr `cls)
 
 #-------------------------------------------------------------------------------
+# library finder
+#-------------------------------------------------------------------------------
+
+fn find-library (name)
+    let paths = (('@ package 'library-path) as list)
+    for path in paths
+        let filename = (.. (path as string) "/" name)
+        if (sc_is_file filename)
+            return filename
+    hide-traceback;
+    error
+        .. "failed to find library '" name "' in paths:"
+            loop (paths str = paths "")
+                if (empty? paths)
+                    break str
+                let at rest = (decons paths)
+                let path = (at as string)
+                repeat rest
+                    .. str "\n"  "    " path
+
+#-------------------------------------------------------------------------------
 
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
@@ -8457,21 +8481,26 @@ fn print-help (exename)
             --                          terminate option list.
     exit 0
 
-fn set-project-dir (path)
+fn set-project-dir (path set-paths?)
     set-globals!
         'bind-symbols (globals)
             project-dir = path
-    # add default paths to package
-    'set-symbols package
-        path =
-            cons
-                .. path "/lib/scopes/packages/?.sc"
-                .. path "/lib/scopes/packages/?/init.sc"
-                ('@ package 'path) as list
-        include-path =
-            cons
-                .. path "/include"
-                ('@ package 'include-path) as list
+    if set-paths?
+        # add default paths to package
+        'set-symbols package
+            path =
+                cons
+                    .. path "/lib/scopes/packages/?.sc"
+                    .. path "/lib/scopes/packages/?/init.sc"
+                    ('@ package 'path) as list
+            include-path =
+                cons
+                    .. path "/include"
+                    ('@ package 'include-path) as list
+            library-path =
+                cons
+                    .. path "/lib"
+                    ('@ package 'library-path) as list
     ;
 
 fn print-version ()
@@ -8521,16 +8550,23 @@ fn run-main ()
                 break k
             k
     let sourcepath = (load sourcepath)
+    let console? = (sourcepath == "")
     let sourcepath =
-        if (sourcepath == "")
+        if console?
             .. compiler-dir "/lib/scopes/console.sc"
         else sourcepath
+    set-project-dir compiler-dir true
     if project?
         let path = (sc_realpath sourcepath)
         let path =
-            if (sc_is_file path)
+            if console?
+                print "cannot launch console with option -p"
+                exit 255
+            elseif (sc_is_file path)
                 sc_dirname path
-            else (sc_realpath ".")
+            else
+                print "invalid program path passed along with option -p"
+                exit 255
         let path filepath =
             loop (path = path)
                 let nextpath = (sc_dirname path)
@@ -8544,11 +8580,10 @@ fn run-main ()
                     break path filepath
                 repeat nextpath
         set-project-dir path
+            path != (sc_realpath compiler-dir)
         do
             hide-traceback;
             load-module project-module-name filepath
-    else
-        set-project-dir compiler-dir
     let argc = (argc - start-offset)
     let argv = (& (@ argv start-offset))
     @@ spice-quote
