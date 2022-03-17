@@ -3278,6 +3278,11 @@ let package = (sc_typename_type "scopes.package" typename)
             list
                 .. compiler-dir "/lib/scopes/?.sc"
                 .. compiler-dir "/lib/scopes/?/init.sc"
+    include-path =
+        Value
+            list
+                .. compiler-dir "/lib/clang/include"
+                .. compiler-dir "/include"
     modules = `[(Scope)]
 
 fn clone-scope-contents (a b)
@@ -7643,10 +7648,16 @@ sugar include (args...)
         `scope
 
     let modulename = (('@ sugar-scope 'module-path) as string)
+    let include-path = (('@ package 'include-path) as list)
     let opts =
-        list
-            \ "-I" (.. compiler-dir "/lib/clang/include")
-            \ "-I" (.. compiler-dir "/include")
+        loop (opts include-path = '() include-path)
+            if (empty? include-path)
+                break ('reverse opts)
+            else
+                let at next = (decons include-path)
+                repeat
+                    cons at "-I" opts
+                    next
 
     loop (args modulename ext opts includestr scope = args... modulename ".c" opts "" (nullof Scope))
         sugar-match args
