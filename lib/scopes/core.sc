@@ -7643,7 +7643,12 @@ sugar include (args...)
         `scope
 
     let modulename = (('@ sugar-scope 'module-path) as string)
-    loop (args modulename ext opts includestr scope = args... modulename ".c" '() "" (nullof Scope))
+    let opts =
+        list
+            \ "-I" (.. compiler-dir "/lib/clang/include")
+            \ "-I" (.. compiler-dir "/include")
+
+    loop (args modulename ext opts includestr scope = args... modulename ".c" opts "" (nullof Scope))
         sugar-match args
         case (('using name) rest...)
             let value = ((sc_expand name '() sugar-scope) as Scope)

@@ -995,10 +995,6 @@ SCOPES_RESULT(const Scope *) import_c_module (
     std::vector<const char *> aargs;
     aargs.push_back("clang");
     aargs.push_back(path.c_str());
-    aargs.push_back("-I");
-    aargs.push_back(scopes_clang_include_dir);
-    aargs.push_back("-I");
-    aargs.push_back(scopes_include_dir);
     aargs.push_back("-fno-common");
     auto argcount = args.size();
     std::string object_file;
