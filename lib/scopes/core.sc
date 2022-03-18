@@ -8427,6 +8427,15 @@ fn find-library (name)
                 repeat rest
                     .. str "\n"  "    " path
 
+inline project-library (name)
+    load-library
+        find-library name
+
+spice static-project-library (name)
+    name as:= string
+    project-library name
+    ;
+
 #-------------------------------------------------------------------------------
 
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
