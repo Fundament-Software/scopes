@@ -30,6 +30,7 @@ extern "C" {
 
 SCOPES_LIBEXPORT extern const char *scopes_compiler_path;
 SCOPES_LIBEXPORT extern const char *scopes_compiler_dir;
+SCOPES_LIBEXPORT extern const char *scopes_working_dir;
 SCOPES_LIBEXPORT extern size_t scopes_argc;
 SCOPES_LIBEXPORT extern char **scopes_argv;
 

@@ -201,19 +201,25 @@ static void setup_stdio() {
 
 void init(void *c_main, int argc, char *argv[]) {
     using namespace scopes;
+    scopes_compiler_path = nullptr;
+    scopes_compiler_dir = nullptr;
+    scopes_working_dir = nullptr;
+    scopes_argc = argc;
+    scopes_argv = argv;
+    {
+        char *path = get_current_dir_name();
+        scopes_working_dir = String::from_cstr(path)->data;
+        free(path);
+    }
+
     on_startup();
 
     Symbol::_init_symbols();
     init_llvm();
 
     setup_stdio();
-    scopes_argc = argc;
-    scopes_argv = argv;
 
     std::string exepath = llvm::sys::fs::getMainExecutable(argv[0], c_main);
-
-    scopes_compiler_path = nullptr;
-    scopes_compiler_dir = nullptr;
     if (argv) {
         if (argv[0]) {
             std::string loader = exepath;

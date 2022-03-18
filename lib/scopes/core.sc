@@ -8568,9 +8568,7 @@ fn run-main ()
     if project?
         let path = (sc_realpath sourcepath)
         let path =
-            if console?
-                print "cannot launch console with option -p"
-                exit 255
+            if console? working-dir
             elseif (sc_is_file path)
                 sc_dirname path
             else

@@ -2699,6 +2699,9 @@ void init_globals(int argc, char *argv[]) {
     bind_new_value(SYM_CompilerPath,
         ConstPointer::string_from(
             String::from(scopes_compiler_path, strlen(scopes_compiler_path))));
+    bind_new_value(SYM_WorkingDir,
+        ConstPointer::string_from(
+            String::from(scopes_working_dir, strlen(scopes_working_dir))));
 
     bind_new_value(SYM_DebugBuild,
         ConstInt::from(TYPE_Bool, scopes_is_debug()));
