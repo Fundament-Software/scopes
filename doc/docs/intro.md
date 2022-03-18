@@ -88,7 +88,7 @@ Scopes only supports the `mingw64` toolchain for the foreseeable future.
 
 ### Building Scopes on macOS ###
 
-* Scopes builds on macOS Mojave (10.14) using LLVM 12.0.
+* Scopes builds on macOS Mojave (10.14) using LLVM 12.0.x.
 * You'll need the following packages from [brew](https://brew.sh/): `llvm`
   and `cmake`. Scopes' build system respects `brew`'s standard installation
   paths.
