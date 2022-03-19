@@ -8565,6 +8565,15 @@ fn run-main ()
             .. compiler-dir "/lib/scopes/console.sc"
         else sourcepath
     set-project-dir compiler-dir true
+    let argc = (argc - start-offset)
+    let argv = (& (@ argv start-offset))
+    @@ spice-quote
+    fn script-launch-args ()
+        return sourcepath argc argv
+    let scope =
+        'bind-symbols
+            sc_scope_new_subscope_with_docstring (globals) ""
+            script-launch-args = script-launch-args
     if project?
         let path = (sc_realpath sourcepath)
         let path =
@@ -8589,17 +8598,12 @@ fn run-main ()
         set-project-dir path
             path != (sc_realpath compiler-dir)
         do
+            let scope =
+                'bind-symbols scope
+                    console? = console?
             hide-traceback;
             load-module project-module-name filepath
-    let argc = (argc - start-offset)
-    let argv = (& (@ argv start-offset))
-    @@ spice-quote
-    fn script-launch-args ()
-        return sourcepath argc argv
-    let scope =
-        'bind-symbols
-            sc_scope_new_subscope_with_docstring (globals) ""
-            script-launch-args = script-launch-args
+                scope = scope
     do
         hide-traceback;
         load-module "" sourcepath
