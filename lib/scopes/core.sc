@@ -4089,16 +4089,27 @@ fn dots-to-slashes (pattern)
                 .. result (rslice (lslice pattern i) start) "/"
 
 fn load-module (module-name module-path opts...)
-    if (not (sc_is_file module-path))
+    let command = (va-option command opts...)
+    let command? = (not (none? command))
+    if ((not command?) and (not (sc_is_file module-path)))
         hide-traceback;
         error
             .. "no such module: " module-path
-    let module-path = (sc_realpath module-path)
+    let module-path =
+        if command? module-path
+        else (sc_realpath module-path)
     let module-dir = (sc_dirname module-path)
+    let module-dir =
+        if command? (sc_realpath module-dir)
+        else module-dir
     let expr =
-        do
-            hide-traceback;
-            sc_parse_from_path module-path
+        static-branch command?
+            inline ()
+                hide-traceback;
+                sc_parse_from_string command
+            inline ()
+                hide-traceback;
+                sc_parse_from_path module-path
     let eval-scope =
         'bind-symbols
             va-option scope opts...
@@ -4115,7 +4126,9 @@ fn load-module (module-name module-path opts...)
     except (err)
         hide-traceback;
         error@+ err unknown-anchor
-            "while loading module " .. module-path
+            if command? "while executing command"
+            else
+                "while loading module " .. module-path
 
 fn patterns-from-namestr (base-dir namestr)
     # if namestr starts with a slash (because it started with a dot),
@@ -8483,13 +8496,14 @@ fn print-help (exename)
         """"[option] ... [-m module | filename] [arg] ...
 
             Options:
-            -h, --help                  print this text and exit.
-            -v, --version               print runtime version and exit.
-            -p, --project               run program as part of a project.
-            -s, --signal-abort          raise SIGABRT when calling `abort!`.
-            -m module                   run module on path (terminates option list)
-            filename                    program read from scopes file.
-            arg ...                     arguments passed to program.
+            -h, --help              print this text and exit.
+            -v, --version           print runtime version and exit.
+            -p, --project           run program as part of a project.
+            -s, --signal-abort      raise SIGABRT when calling `abort!`.
+            -c command              program passed in as string (terminates option list)
+            -m module               run module on path (terminates option list)
+            filename                program read from scopes file.
+            arg ...                 arguments passed to program.
     exit 0
 
 fn set-project-dir (path set-paths?)
@@ -8527,8 +8541,9 @@ fn run-main ()
     let argc argv = (launch-args)
     let exename = (load (getelementptr argv 0))
     let exename = (sc_string_new_from_cstr exename)
-    local sourcepath = ""
+    local sourcearg = ""
     local module? = false
+    local command? = false
     local project? = false
     let start-offset =
         loop (i = 1)
@@ -8546,45 +8561,53 @@ fn run-main ()
                     set-signal-abort! true
                 elseif ((== arg "--project") or (== arg "-p"))
                     project? = true
+                elseif (== arg "-c")
+                    command? = true
+                    if (k == argc)
+                        print "Argument expected for the -c option"
+                            \ ". Try --help for help."
+                        exit 255
+                    sourcearg = (string (argv @ k))
+                    break (k + 1)
                 elseif (== arg "-m")
                     module? = true
                     if (k == argc)
                         print "Argument expected for the -m option"
                             \ ". Try --help for help."
                         exit 255
-                    sourcepath = (string (argv @ k))
+                    sourcearg = (string (argv @ k))
                     break (k + 1)
                 else
                     print
                         .. "unrecognized option: " arg
                             \ ". Try --help for help."
                     exit 255
-            elseif (sourcepath == "")
-                sourcepath = arg
+            else
+                sourcearg = arg
                 # remainder is passed on to script
                 break k
             k
-    let sourcepath module? =
-        if (sourcepath == "")
+    let sourcearg module? =
+        if ((not command?) & (sourcearg == ""))
             _ "console" true
         else
-            _ (deref sourcepath) (deref module?)
-    let console? = (sourcepath == "console")
+            _ (deref sourcearg) (deref module?)
+    let console? = (module? & (sourcearg == "console"))
     set-project-dir compiler-dir true
     let argc = (argc - start-offset)
     let argv = (& (@ argv start-offset))
     @@ spice-quote
     fn script-launch-args ()
-        return sourcepath argc argv
+        return sourcearg argc argv
     let scope =
         'bind-symbols
             sc_scope_new_subscope_with_docstring (globals) ""
             script-launch-args = script-launch-args
     let base-dir =
         if project?
-            let path = (sc_realpath sourcepath)
+            let path = (sc_realpath sourcearg)
             let path =
-                if module? working-dir
+                if (command? | module?) working-dir
                 elseif (sc_is_file path)
                     sc_dirname path
                 else
@@ -8613,17 +8636,30 @@ fn run-main ()
                     scope = scope
             project-dir
         else working-dir
-    let sourcepath =
-        if module?
-            hide-traceback;
-            find-module-path base-dir sourcepath
-        else sourcepath
-    do
+    # globals might have since been updated with project-dir
+    let scope =
+        'bind-symbols
+            sc_scope_new_subscope_with_docstring (globals) ""
+            script-launch-args = script-launch-args
+    if command?
         hide-traceback;
-        load-module "" sourcepath
+        load-module "" (.. base-dir "/<command>")
             scope = scope
             main-module? = true
+            command = sourcearg
         ;
+    else
+        let sourcearg =
+            if module?
+                hide-traceback;
+                find-module-path base-dir sourcearg
+            else sourcearg
+        do
+            hide-traceback;
+            load-module "" sourcearg
+                scope = scope
+                main-module? = true
+            ;
     exit 0
 
 raising Error
