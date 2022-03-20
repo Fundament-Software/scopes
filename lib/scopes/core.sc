@@ -8480,14 +8480,16 @@ set-globals! (__this-scope)
 
 fn print-help (exename)
     print "usage:" exename
-        """"[option [...]] [filename]
+        """"[option] ... [-m module | filename] [arg] ...
 
             Options:
             -h, --help                  print this text and exit.
             -v, --version               print runtime version and exit.
             -p, --project               run program as part of a project.
             -s, --signal-abort          raise SIGABRT when calling `abort!`.
-            --                          terminate option list.
+            -m module                   run module on path (terminates option list)
+            filename                    program read from scopes file.
+            arg ...                     arguments passed to program.
     exit 0
 
 fn set-project-dir (path set-paths?)
@@ -8525,11 +8527,9 @@ fn run-main ()
     let argc argv = (launch-args)
     let exename = (load (getelementptr argv 0))
     let exename = (sc_string_new_from_cstr exename)
-    let sourcepath = (alloca string)
-    let parse-options = (alloca bool)
+    local sourcepath = ""
+    local module? = false
     local project? = false
-    store "" sourcepath
-    store true parse-options
     let start-offset =
         loop (i = 1)
             if (i >= argc)
@@ -8537,7 +8537,7 @@ fn run-main ()
             let k = (i + 1)
             let arg = (load (getelementptr argv i))
             let arg = (sc_string_new_from_cstr arg)
-            if ((load parse-options) and ((@ arg 0:usize) == minus-char))
+            if ((@ arg 0:usize) == minus-char)
                 if ((arg == "--help") or (arg == "-h"))
                     print-help exename
                 elseif ((== arg "--version") or (== arg "-v"))
@@ -8546,24 +8546,30 @@ fn run-main ()
                     set-signal-abort! true
                 elseif ((== arg "--project") or (== arg "-p"))
                     project? = true
-                elseif (== arg "--")
-                    store false parse-options
+                elseif (== arg "-m")
+                    module? = true
+                    if (k == argc)
+                        print "Argument expected for the -m option"
+                            \ ". Try --help for help."
+                        exit 255
+                    sourcepath = (string (argv @ k))
+                    break (k + 1)
                 else
                     print
                         .. "unrecognized option: " arg
                             \ ". Try --help for help."
                     exit 255
-            elseif ((load sourcepath) == "")
-                store arg sourcepath
+            elseif (sourcepath == "")
+                sourcepath = arg
                 # remainder is passed on to script
                 break k
             k
-    let sourcepath = (load sourcepath)
-    let console? = (sourcepath == "")
-    let sourcepath =
-        if console?
-            .. compiler-dir "/lib/scopes/console.sc"
-        else sourcepath
+    let sourcepath module? =
+        if (sourcepath == "")
+            _ "console" true
+        else
+            _ (deref sourcepath) (deref module?)
+    let console? = (sourcepath == "console")
     set-project-dir compiler-dir true
     let argc = (argc - start-offset)
     let argv = (& (@ argv start-offset))
@@ -8574,36 +8580,44 @@ fn run-main ()
         'bind-symbols
             sc_scope_new_subscope_with_docstring (globals) ""
             script-launch-args = script-launch-args
-    if project?
-        let path = (sc_realpath sourcepath)
-        let path =
-            if console? working-dir
-            elseif (sc_is_file path)
-                sc_dirname path
-            else
-                print "invalid program path passed along with option -p"
-                exit 255
-        let path filepath =
-            loop (path = path)
-                let nextpath = (sc_dirname path)
-                if ((not (sc_is_directory path)) | (path == nextpath))
-                    print
-                        .. "could not find project script (?" project-filename-pattern
-                            ") in any current working directory."
+    let base-dir =
+        if project?
+            let path = (sc_realpath sourcepath)
+            let path =
+                if module? working-dir
+                elseif (sc_is_file path)
+                    sc_dirname path
+                else
+                    print "invalid program path passed along with option -p"
                     exit 255
-                let filepath = (.. path project-filename-pattern)
-                if (sc_is_file filepath)
-                    break path filepath
-                repeat nextpath
-        set-project-dir path
-            path != (sc_realpath compiler-dir)
-        do
-            let scope =
-                'bind-symbols scope
-                    console? = console?
+            let project-dir filepath =
+                loop (path = path)
+                    let nextpath = (sc_dirname path)
+                    if ((not (sc_is_directory path)) | (path == nextpath))
+                        print
+                            .. "could not find project script (?" project-filename-pattern
+                                ") in any current working directory."
+                        exit 255
+                    let filepath = (.. path project-filename-pattern)
+                    if (sc_is_file filepath)
+                        break path filepath
+                    repeat nextpath
+            set-project-dir project-dir
+                project-dir != (sc_realpath compiler-dir)
+            do
+                let scope =
+                    'bind-symbols scope
+                        console? = console?
+                hide-traceback;
+                load-module project-module-name filepath
+                    scope = scope
+            project-dir
+        else working-dir
+    let sourcepath =
+        if module?
             hide-traceback;
-            load-module project-module-name filepath
-                scope = scope
+            find-module-path base-dir sourcepath
+        else sourcepath
     do
         hide-traceback;
         load-module "" sourcepath
