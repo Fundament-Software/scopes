@@ -229,9 +229,13 @@ void init(void *c_main, int argc, char *argv[]) {
             scopes_compiler_path = strdup("");
         }
 
-        char *path_copy = strdup(scopes_compiler_path);
-        scopes_compiler_dir = format("%s/..", dirname(path_copy))->data;
-        free(path_copy);
+        char compiler_dir[PATH_MAX];
+        strncpy(compiler_dir, scopes_compiler_path, PATH_MAX);
+        dirname(compiler_dir);
+        strncat(compiler_dir, "/..", PATH_MAX);
+        char real_compiler_dir[PATH_MAX];
+        char *result = realpath(compiler_dir, real_compiler_dir);
+        scopes_compiler_dir = String::from_cstr(result?result:compiler_dir)->data;
     }
 
     init_types();
