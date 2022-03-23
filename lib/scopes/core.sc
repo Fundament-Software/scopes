@@ -8498,7 +8498,7 @@ fn print-help (exename)
             Options:
             -h, --help              print this text and exit.
             -v, --version           print runtime version and exit.
-            -p, --project           run program as part of a project.
+            -e, --env               run program from project environment.
             -s, --signal-abort      raise SIGABRT when calling `abort!`.
             -c command              program passed in as string (terminates option list)
             -m module               run module on path (terminates option list)
@@ -8535,8 +8535,8 @@ fn print-version ()
     exit 0
 
 let minus-char = 45:char # "-"
-let project-filename-pattern = "/_project.sc"
-let project-module-name = "_project"
+let project-filename-pattern = "/__env.sc"
+let project-module-name = "__env"
 fn run-main ()
     let argc argv = (launch-args)
     let exename = (load (getelementptr argv 0))
@@ -8559,7 +8559,7 @@ fn run-main ()
                     print-version;
                 elseif ((== arg "--signal-abort") or (== arg "-s"))
                     set-signal-abort! true
-                elseif ((== arg "--project") or (== arg "-p"))
+                elseif ((== arg "--env") or (== arg "-e"))
                     project? = true
                 elseif (== arg "-c")
                     command? = true
