@@ -3260,17 +3260,28 @@ fn va-option-branch (args)
 # modules
 ####
 
-""""A symbol table of type `Scope` which holds configuration options and module
-    contents. It is managed by the module import system.
+""""`modules` is a global symbol table mapping full module
+    paths to their contents. When a module is first imported, its contents
+    are cached in this table. Subsequent imports of the same module will be
+    resolved to these cached contents.
+
+    this symbol is private to core.
+let modules = (sc_global_new 'modules Scope 0:u32 'Private)
+sc_global_set_initializer modules `[(Scope)]
+let modules = `(ptrtoref modules)
+
+""""A mutable symbol table of type `type` which holds environment configuration
+    for the module import system.
 
     `package.path` holds a list of all search paths in the form of simple
     string patterns. Changing it alters the way modules are searched for in
     the next run stage.
 
-    `package.modules` is another scope symbol table mapping full module
-    paths to their contents. When a module is first imported, its contents
-    are cached in this table. Subsequent imports of the same module will be
-    resolved to these cached contents.
+    `package.include-path` holds the search paths for include files used through
+    `include`.
+
+    `package.library-path` holds the search paths for shared libraries loaded
+    by `project-library` and `static-project-library`.
 let package = (sc_typename_type "scopes.package" typename)
 'set-symbols package
     path =
@@ -3285,7 +3296,6 @@ let package = (sc_typename_type "scopes.package" typename)
     library-path =
         Value
             list;
-    modules = `[(Scope)]
 
 fn clone-scope-contents (a b)
     """"Join two scopes `a` and `b` into a new scope so that the
@@ -4194,10 +4204,10 @@ fn require-from (base-dir name)
         if (empty? module-path)
             repeat patterns
         let module-path-sym = (Symbol module-path)
-        fn get-modules () (('@ package 'modules) as Scope)
+        fn get-modules () (deref modules)
         fn get-modules-path (symbol) ('@ (get-modules) symbol)
         fn set-modules-path (symbol value)
-            'set-symbol package 'modules
+            modules =
                 'bind (get-modules) symbol value
         let content =
             try (get-modules-path module-path-sym)
@@ -8453,7 +8463,7 @@ spice static-project-library (name)
 
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
-    \ tuple-comparison gen-arrayof MethodsAccessor-typeattr floorf
+    \ tuple-comparison gen-arrayof MethodsAccessor-typeattr floorf modules
 
 run-stage; # 12
 
