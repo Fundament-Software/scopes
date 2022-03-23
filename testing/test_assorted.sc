@@ -16,8 +16,8 @@ run-stage;
 
 assert
     ==
-        require-from module-dir '.module2
-        require-from module-dir '.module2
+        require-from module-dir '.module2 __env
+        require-from module-dir '.module2 __env
 
 do
     using import .module2

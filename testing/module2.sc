@@ -1,7 +1,8 @@
 print
     .. "test module 2 loaded from " module-path
 
-assert
+# as package has been removed, we can't use it to test double loads
+#assert
     do
         try
             '@ package 'test_module2
@@ -9,8 +10,7 @@ assert
         except (err)
             true
     "module loaded twice"
-
-'set-symbol package 'test_module2 true
+#'set-symbol package 'test_module2 true
 
 let env =
     'bind (Scope) 'compute

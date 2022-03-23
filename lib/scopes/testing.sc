@@ -33,7 +33,7 @@ fn __test-modules (module-dir modules)
         print "***********************************************"
         let ok =
             try
-                require-from module-dir module
+                require-from module-dir module __env
                 true
             except (err)
                 io-write!

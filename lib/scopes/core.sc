@@ -3270,32 +3270,39 @@ let modules = (sc_global_new 'modules Scope 0:u32 'Private)
 sc_global_set_initializer modules `[(Scope)]
 let modules = `(ptrtoref modules)
 
-""""A mutable symbol table of type `type` which holds environment configuration
-    for the module import system.
+""""`__env` is a special symbol table of type `Scope` describing the module
+    environment. `import`, `include` and `shared-library` depend on its
+    contents. Modules imported with `import` inherit the environment presently
+    bound to `__env`.
 
-    `package.path` holds a list of all search paths in the form of simple
-    string patterns. Changing it alters the way modules are searched for in
-    the next run stage.
+    `module-search-path` holds a list of scopes module search paths in the form
+    of simple string patterns. Changing it alters the way modules are searched
+    for by `import`. If you update this list dynamically, subsequent imports can
+    only be executed in the next run stage.
 
-    `package.include-path` holds the search paths for include files used through
-    `include`.
+    `include-search-path` holds a list of all search directories for C/C++
+    include files. Changing it alters the way includes are searched for by
+    `include`. If you update this list dynamically, subsequent includes can only
+    be executed in the next run stage.
 
-    `package.library-path` holds the search paths for shared libraries loaded
-    by `project-library` and `static-project-library`.
-let package = (sc_typename_type "scopes.package" typename)
-'set-symbols package
-    path =
-        Value
-            list
-                .. compiler-dir "/lib/scopes/?.sc"
-                .. compiler-dir "/lib/scopes/?/init.sc"
-    include-path =
-        Value
-            list
-                .. compiler-dir "/lib/clang/include"
-    library-path =
-        Value
-            list;
+    `library-search-path` holds a list of all search directories for shared
+    libraries. Changing it alters the way includes are searched for by
+    `shared-library`. If you update this list dynamically, subsequent loads
+    can only be executed in the next run stage.
+let __env =
+    'bind-symbols (Scope)
+        module-search-path =
+            Value
+                list
+                    .. compiler-dir "/lib/scopes/?.sc"
+                    .. compiler-dir "/lib/scopes/?/init.sc"
+        include-search-path =
+            Value
+                list
+                    .. compiler-dir "/lib/clang/include"
+        library-search-path =
+            Value
+                list;
 
 fn clone-scope-contents (a b)
     """"Join two scopes `a` and `b` into a new scope so that the
@@ -4098,7 +4105,7 @@ fn dots-to-slashes (pattern)
             repeat (i + 1:usize) (i + 1:usize)
                 .. result (rslice (lslice pattern i) start) "/"
 
-fn load-module (module-name module-path opts...)
+fn load-module (module-name module-path env opts...)
     let command = (va-option command opts...)
     let command? = (not (none? command))
     if ((not command?) and (not (sc_is_file module-path)))
@@ -4125,6 +4132,7 @@ fn load-module (module-name module-path opts...)
             va-option scope opts...
                 do
                     sc_scope_new_subscope_with_docstring (sc_get_globals) ""
+            __env = env
             main-module? =
                 va-option main-module? opts... false
             module-path = module-path
@@ -4140,7 +4148,7 @@ fn load-module (module-name module-path opts...)
             else
                 "while loading module " .. module-path
 
-fn patterns-from-namestr (base-dir namestr)
+fn patterns-from-namestr (base-dir namestr env)
     # if namestr starts with a slash (because it started with a dot),
         we only search base-dir
     if ((@ namestr 0:usize) == slash-char)
@@ -4148,15 +4156,15 @@ fn patterns-from-namestr (base-dir namestr)
             .. base-dir "?.sc"
             .. base-dir "?/init.sc"
     else
-        ('@ package 'path) as list
+        ('@ env 'module-search-path) as list
 
 inline slice (value start end)
     rslice (lslice value end) start
 
-fn find-module-path (base-dir name)
+fn find-module-path (base-dir name env)
     #assert-typeof name Symbol
     let namestr = (dots-to-slashes (name as string))
-    let all-patterns = (patterns-from-namestr base-dir namestr)
+    let all-patterns = (patterns-from-namestr base-dir namestr env)
     loop (patterns = all-patterns)
         if (empty? patterns)
             hide-traceback;
@@ -4180,10 +4188,10 @@ fn find-module-path (base-dir name)
             repeat patterns
         return module-path
 
-fn require-from (base-dir name)
+fn require-from (base-dir name env)
     #assert-typeof name Symbol
     let namestr = (dots-to-slashes (name as string))
-    let all-patterns = (patterns-from-namestr base-dir namestr)
+    let all-patterns = (patterns-from-namestr base-dir namestr env)
     loop (patterns = all-patterns)
         if (empty? patterns)
             hide-traceback;
@@ -4218,7 +4226,7 @@ fn require-from (base-dir name)
                 let content =
                     do
                         hide-traceback;
-                        load-module (name as string) module-path
+                        load-module (name as string) module-path env
                 set-modules-path module-path-sym content
                 return content
         if (('typeof content) == type)
@@ -4249,11 +4257,12 @@ let import =
                     let sym = (sxname as Symbol)
                     _ sym (sym as string) true
             let module-dir = (('@ scope 'module-dir) as string)
+            let env = (('@ scope '__env) as Scope)
             let key = (resolve-scope scope namestr 0:usize)
             let module =
                 do
                     hide-traceback;
-                    require-from module-dir name
+                    require-from module-dir name env
             _ module
                 if bind?
                     'bind scope key module
@@ -4299,10 +4308,11 @@ let using =
             let nameval = name
             if ((('typeof nameval) == Symbol) and ((nameval as Symbol) == 'import))
                 let module-dir = (('@ sugar-scope 'module-dir) as string)
+                let env = (('@ sugar-scope '__env) as Scope)
                 let name rest = (decons rest)
                 let name = (name as Symbol)
                 hide-traceback;
-                let module = ((require-from module-dir name) as Scope)
+                let module = ((require-from module-dir name env) as Scope)
                 return (list)
                     .. module sugar-scope
 
@@ -7673,6 +7683,7 @@ sugar include (args...)
         `scope
 
     let modulename = (('@ sugar-scope 'module-path) as string)
+    let env = (('@ sugar-scope '__env) as Scope)
     loop (args modulename ext opts includestr scope = args... modulename ".c" '() "" (nullof Scope))
         sugar-match args
         case (('using name) rest...)
@@ -7714,7 +7725,7 @@ sugar include (args...)
                     # code block
                     includestr
                 else (.. "#include \"" includestr "\"")
-            let include-path = ('reverse (('@ package 'include-path) as list))
+            let include-path = (('@ env 'include-search-path) as list)
             let opts =
                 loop (opts include-path = opts include-path)
                     if (empty? include-path)
@@ -8433,16 +8444,15 @@ sc_set_typecast_handler
 # library finder
 #-------------------------------------------------------------------------------
 
-fn find-library (name)
-    let paths = (('@ package 'library-path) as list)
-    for path in paths
+fn find-library (name library-search-path)
+    for path in library-search-path
         let filename = (.. (path as string) "/" name)
         if (sc_is_file filename)
             return filename
     hide-traceback;
     error
         .. "failed to find library '" name "' in paths:"
-            loop (paths str = paths "")
+            loop (paths str = library-search-path "")
                 if (empty? paths)
                     break str
                 let at rest = (decons paths)
@@ -8450,13 +8460,26 @@ fn find-library (name)
                 repeat rest
                     .. str "\n"  "    " path
 
-inline project-library (name)
-    load-library
-        find-library name
+sugar shared-library (name...)
+    let expr rest = (decons name...)
+    let name = (sc_expand expr rest sugar-scope)
+    let env = (('@ sugar-scope '__env) as Scope)
+    let search-path = ('@ env 'library-search-path)
+    spice-quote
+        load-library
+            find-library name search-path
 
-spice static-project-library (name)
-    name as:= string
-    project-library name
+sugar static-shared-library (name...)
+    spice __static-shared-library (name library-search-path)
+        load-library
+            find-library (name as string) (library-search-path as list)
+        ;
+    let expr rest = (decons name...)
+    let name = (sc_expand expr rest sugar-scope)
+    let env = (('@ sugar-scope '__env) as Scope)
+    let search-path = ('@ env 'library-search-path)
+    spice-quote
+        __static-shared-library name search-path
     ;
 
 #-------------------------------------------------------------------------------
@@ -8516,27 +8539,27 @@ fn print-help (exename)
             arg ...                 arguments passed to program.
     exit 0
 
-fn set-project-dir (path set-paths?)
+fn set-project-dir (env path set-paths?)
     set-globals!
         'bind-symbols (globals)
             project-dir = path
     if set-paths?
         # add default paths to package
-        'set-symbols package
-            path =
+        'bind-symbols env
+            module-search-path =
                 cons
                     .. path "/lib/scopes/packages/?.sc"
                     .. path "/lib/scopes/packages/?/init.sc"
-                    ('@ package 'path) as list
-            include-path =
+                    ('@ env 'module-search-path) as list
+            include-search-path =
                 cons
                     .. path "/include"
-                    ('@ package 'include-path) as list
-            library-path =
+                    ('@ env 'include-search-path) as list
+            library-search-path =
                 cons
                     .. path "/lib"
-                    ('@ package 'library-path) as list
-    ;
+                    ('@ env 'library-search-path) as list
+    else env
 
 fn print-version ()
     print
@@ -8603,7 +8626,7 @@ fn run-main ()
         else
             _ (deref sourcearg) (deref module?)
     let console? = (module? & (sourcearg == "console"))
-    set-project-dir compiler-dir true
+    let core-module-env = (set-project-dir __env compiler-dir true)
     let argc = (argc - start-offset)
     let argv = (& (@ argv start-offset))
     @@ spice-quote
@@ -8613,7 +8636,7 @@ fn run-main ()
         'bind-symbols
             sc_scope_new_subscope_with_docstring (globals) ""
             script-launch-args = script-launch-args
-    let base-dir =
+    let base-dir env =
         if project?
             let path = (sc_realpath sourcearg)
             let path =
@@ -8635,17 +8658,28 @@ fn run-main ()
                     if (sc_is_file filepath)
                         break path filepath
                     repeat nextpath
-            set-project-dir project-dir
-                project-dir != (sc_realpath compiler-dir)
-            do
-                let scope =
-                    'bind-symbols scope
-                        console? = console?
-                hide-traceback;
-                load-module project-module-name filepath
-                    scope = scope
-            project-dir
-        else working-dir
+            let env =
+                set-project-dir core-module-env project-dir
+                    project-dir != (sc_realpath compiler-dir)
+            let env =
+                do
+                    let scope =
+                        'bind-symbols scope
+                            console? = console?
+                            core-module-env = core-module-env
+                    hide-traceback;
+                    let result =
+                        load-module project-module-name filepath env
+                            scope = scope
+                    if (('typeof result) == void) env
+                    elseif (('typeof result) != Scope)
+                        hide-traceback;
+                        error
+                            .. "environment module must return environment or void, not "
+                                repr ('typeof result)
+                    else (result as Scope)
+            _ project-dir env
+        else (_ working-dir core-module-env)
     # globals might have since been updated with project-dir
     let scope =
         'bind-symbols
@@ -8653,7 +8687,7 @@ fn run-main ()
             script-launch-args = script-launch-args
     if command?
         hide-traceback;
-        load-module "" (.. base-dir "/<command>")
+        load-module "" (.. base-dir "/<command>") env
             scope = scope
             main-module? = true
             command = sourcearg
@@ -8662,11 +8696,11 @@ fn run-main ()
         let sourcearg =
             if module?
                 hide-traceback;
-                find-module-path base-dir sourcearg
+                find-module-path base-dir sourcearg env
             else sourcearg
         do
             hide-traceback;
-            load-module "" sourcearg
+            load-module "" sourcearg env
                 scope = scope
                 main-module? = true
             ;

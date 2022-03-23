@@ -123,6 +123,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
 
     let eval-scope =
         'bind-symbols eval-scope
+            __env = __env
             module-dir = cwd
             module-path = (cwd .. "/<console>.sc")
             module-name = "<console>"
