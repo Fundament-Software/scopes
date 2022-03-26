@@ -1,0 +1,59 @@
+{
+  "nodes": {
+    "genie-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1639236213,
+        "narHash": "sha256-+6xlyWlBJOt/RTx36UrqO0e8tyuX90UKyzFHSAJeCY4=",
+        "owner": "bkaradzic",
+        "repo": "genie",
+        "rev": "7860ea4ae5b2e398276dcdd138032c979301348e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "bkaradzic",
+        "repo": "genie",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1648097358,
+        "narHash": "sha256-GMoTKP/po2Nbkh1tvPvP8Ww6NyFW8FFst1Z3nfzffZc=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "4d60081494259c0785f7e228518fee74e0792c1b",
+        "type": "github"
+      },
+      "original": {
+        "id": "nixpkgs",
+        "type": "indirect"
+      }
+    },
+    "root": {
+      "inputs": {
+        "genie-src": "genie-src",
+        "nixpkgs": "nixpkgs",
+        "spirv-cross-src": "spirv-cross-src"
+      }
+    },
+    "spirv-cross-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1648146442,
+        "narHash": "sha256-OluTxOEfDIGMdrXhvIifjpMgZBvyh9ofLKxKt0dX5ZU=",
+        "owner": "KhronosGroup",
+        "repo": "SPIRV-Cross",
+        "rev": "0d4ce028bf8b8a94d325dc1e1c20446153ba19c4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "KhronosGroup",
+        "repo": "SPIRV-Cross",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

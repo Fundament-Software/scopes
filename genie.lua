@@ -13,7 +13,7 @@ end
 local MINGW_BASE_PATH = MSYS_BASE_PATH .. "/mingw64"
 local MSYS_BIN_PATH = MSYS_BASE_PATH .. "/usr/bin"
 if os.is("linux") then
-    CLANG_PATH = THISDIR .. "/clang/bin:/usr/local/bin:/usr/bin"
+    CLANG_PATH = THISDIR .. "/clang/bin:" .. os.getenv("PATH")
 elseif os.is("windows") then
     CLANG_PATH = MINGW_BASE_PATH .. "/bin"
 elseif os.is("macosx") then
@@ -113,9 +113,9 @@ local CLANG_DEPS = {
     "-lclangBasic",
 }
 local POLLY_DEPS = {
-    "-lPolly",
-    "-lPollyISL",
-}
+    -- "-lPolly",
+    -- "-lPollyISL",
+} -- Polly is no longer a distinct library as of llvm 12
 
 if not os.is("windows") then
     premake.gcc.cxx = CLANG_CXX
