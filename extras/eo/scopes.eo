@@ -1,0 +1,8 @@
+# Major EO installer for http://scopes.rocks
+version := "tip"
+archive-url := "https://hg.sr.ht/~duangle/scopes/archive/{version}.tar.gz"
+rootdir := (commonpath (extract (download archive-url)))
+package scopes
+    summary "The Scopes Programming Language & Infrastructure"
+    version version
+    alias "/" rootdir
