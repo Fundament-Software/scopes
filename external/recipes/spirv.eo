@@ -1,0 +1,32 @@
+version := "sdk-1.3.204.1"
+package spirv-tools
+    summary "SPIR-V Tools is a collection of tools for working with the SPIR-V binary format"
+    version version
+    platform linux unknown
+
+    headers-url := "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/{version}.tar.gz"
+    headersdir := (commonpath (extract (download headers-url)))
+    url := "https://github.com/KhronosGroup/SPIRV-Tools/archive/refs/tags/{version}.tar.gz"
+    rootdir := (commonpath (extract (download url)))
+    targetheadersdir := (mkdir "{rootdir}/external/spirv-headers")
+    builddir := (mkdir "{rootdir}/build")
+    rootdir :=
+        then
+            cmd := (shell rootdir (dict))
+            cmd "cp -r {headersdir}/* {targetheadersdir}"
+            cmd := (shell builddir (dict))
+            cmd "cmake .. -DCMAKE_BUILD_TYPE=Release"
+            cmd "make -j {cpu-core-count}"
+            rootdir
+    alias "/SPIRV-Tools" rootdir
+#
+    mkdir build && cd build && cmake .. -G "MSYS Makefiles"
+  -DCMAKE_BUILD_TYPE=Release && make in scopes-repo/SPIRV-Tools/build.
+package spirv-cross
+    summary "SPIRV-Cross is a tool for compiling SPIR-V to GLSL"
+    version version
+    platform linux unknown
+
+    url := "https://github.com/KhronosGroup/SPIRV-Cross/archive/refs/tags/{version}.tar.gz"
+    rootdir := (commonpath (extract (download url)))
+    alias "/SPIRV-Cross" rootdir

@@ -4,5 +4,7 @@ rootdir := (commonpath (extract (download url)))
 package clang
     summary "LLVM and clang distribution"
     version version
+    platform linux unknown
+
     alias "/clang" rootdir
     alias "/lib/clang/include" "{rootdir}/lib/clang/{version}/include"
