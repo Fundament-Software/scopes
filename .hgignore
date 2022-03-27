@@ -38,3 +38,7 @@ syntax: regexp
 ^build/
 ^lib/clang/
 ^[.]vscode/
+^\.eo/dlcache
+^\.eo/archive
+^\.eo/installed
+
