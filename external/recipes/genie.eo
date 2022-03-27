@@ -1,0 +1,14 @@
+version := "1160"
+url := "https://github.com/bkaradzic/bx/raw/master/tools/bin/linux/genie"
+binary := (download url)
+package genie
+    summary "GENie - Project generator tool"
+    version version
+    platform linux unknown
+
+    binary :=
+        then
+            cmd := (shell "." (dict))
+            cmd "chmod a+x {binary}"
+            binary
+    alias "/bin/genie" binary
