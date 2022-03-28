@@ -40,6 +40,8 @@ import shutil
 import hashlib
 import configparser
 
+VERSION = "0.1"
+
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
 PROJECT_INSTALL_STATE_DIR = PROJECT_CONFIG_DIR + "/installed"
@@ -48,6 +50,18 @@ PROJECT_INSTALL_STATE_DIR = PROJECT_CONFIG_DIR + "/installed"
 PRESET_IMPORT_URLS = {
     "scopes" : "https://hg.sr.ht/~duangle/scopes/raw/extras/eo/scopes.eo?rev=tip"
 }
+
+RECIPE_WARNING = \
+"""Warning: you're importing a recipe from an unknown source. The recipe may
+potentially be malicious and will be able to execute system commands with user
+privileges. Only continue if you trust the source of this recipe.
+"""
+
+def print_program_header():
+    print("Major EO - Project Oriented Package Management")
+    print("Version",VERSION)
+    print("https://hg.sr.ht/~duangle/majoreo")
+    print()
 
 ################################################################################
 
@@ -1510,6 +1524,11 @@ class Project:
             print("recipe directory {} not found.".format(self.recipe_dir))
 
     def import_recipe(self, url):
+        if url not in PRESET_IMPORT_URLS:
+            print(RECIPE_WARNING)
+            confirm = input("continue? [y/N] ").lower()
+            if confirm != "y":
+                return
         url = PRESET_IMPORT_URLS.get(url, url)
         filename = url_filename(url)
         if not filename.endswith(".eo"):
@@ -1697,6 +1716,7 @@ def cmd_import(args):
     project.import_recipe(args.url)
 
 def cmd_status(args):
+    print_program_header()
     project = Project.find(".")
     project.show_status()
 
@@ -1786,4 +1806,5 @@ if __name__ == '__main__':
     if args.subcommand:
         args.func(args)
     else:
+        print_program_header()
         print("Major EO reporting for duty.")
