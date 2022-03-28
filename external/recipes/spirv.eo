@@ -4,6 +4,9 @@ package spirv-tools
     version version
     platform linux unknown
 
+    cmake-url := "https://github.com/Kitware/CMake/releases/download/v3.23.0-rc5/cmake-3.23.0-rc5-linux-x86_64.tar.gz"
+    cmakedir := (commonpath (extract (download cmake-url)))
+
     headers-url := "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/{version}.tar.gz"
     headersdir := (commonpath (extract (download headers-url)))
     url := "https://github.com/KhronosGroup/SPIRV-Tools/archive/refs/tags/{version}.tar.gz"
@@ -15,7 +18,7 @@ package spirv-tools
             cmd := (shell rootdir (dict))
             cmd "cp -r {headersdir}/* {targetheadersdir}"
             cmd := (shell builddir (dict))
-            cmd "cmake .. -DCMAKE_BUILD_TYPE=Release"
+            cmd "{cmakedir}/bin/cmake .. -DCMAKE_BUILD_TYPE=Release"
             cmd "make -j {cpu-core-count}"
             rootdir
     alias "/SPIRV-Tools" rootdir
