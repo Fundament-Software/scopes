@@ -13,18 +13,16 @@ rootdir :=
 package scopes
     summary "The Scopes Programming Language & Infrastructure"
     platform linux unknown
-    version version
+    # force fresh rebuild
+    #version version
+    alias "/doc/scopes/html" "{rootdir}/doc/site"
     in "/bin"
         "{rootdir}/bin/libscopesrt.so"
         "{rootdir}/bin/scopes"
-    alias "/doc/scopes/html" "{rootdir}/doc/site"
     in "/include"
         "{rootdir}/include/scopes"
-    in "/lib"
-        "{rootdir}/lib/clang"
-        "{rootdir}/lib/scopes"
-    in "/testing"
-        "{rootdir}/testing"
     in "/"
+        "{rootdir}/lib"
+        "{rootdir}/testing"
         "{rootdir}/CREDITS.md"
         "{rootdir}/LICENSE.md"

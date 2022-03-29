@@ -1043,8 +1043,23 @@ class Recipe:
         with open(self.statepath, 'r') as statefile:
             return statefile.readline().strip()
 
+    def get_version_string(self, full = False):
+        if self.is_version_set():
+            MAX_L = 8
+            if not full and len(self.version) > (MAX_L + 3):
+                return self.version[:MAX_L] + "..."
+            else:
+                return self.version
+        elif full:
+            return "unknown"
+        else:
+            return ""
+
+    def is_version_set(self):
+        return self.version and (self.version != NO_VERSION)
+
     def always_sync(self):
-        return (self.version == "unknown")
+        return self.is_version_set()
 
     def needs_sync(self):
         if not self.is_installed():
@@ -1072,6 +1087,7 @@ class Recipe:
 
     def show(self):
         print("name:",self.name)
+        print("version:",self.get_version_string(full=True))
         print("full name:",self.fullname)
         print("summary:", self.summary)
         print()
@@ -1088,7 +1104,11 @@ class Recipe:
             print("files in package:")
             shell("tar -ztf {}".format(self.archivepath), silent=True)
 
-    def build(self):
+    def build(self,for_sync=False,force=False):
+        if self.is_built() and not self.always_sync() and not force:
+            if not for_sync:
+                print("{} is already built, skipping".format(self.name))
+            return
         ee = ExecutionEnv(self)
         tempdir = tempfile.mkdtemp("_eo_recipe_" + self.name.string)
         for k,v in self.aliases.items():
@@ -1109,8 +1129,8 @@ class Recipe:
                     print("copying",srcpath,"=>",dstpath)
                     shutil.copy2(srcpath, dstpath)
                 else: # directory
-                    dstpath = os.path.join(dstpath, os.path.basename(srcpath))
-                    copytree(srcpath, dstpath)
+                    subdstpath = os.path.join(dstpath, os.path.basename(srcpath))
+                    copytree(srcpath, subdstpath)
         print("cleaning up temporary files...")
         ee.cleanup()
         install_state_dir = tempdir + PROJECT_INSTALL_STATE_DIR
@@ -1169,6 +1189,7 @@ class Recipe:
             print("package {} is already at the latest version.".format(self.name))
             return
         print_r("synchronizing package {}...".format(self.name))
+        self.build()
         self.remove(for_sync = True)
         self.install(for_sync = True)
         print_r("{} synchronized.".format(self.name))
@@ -1178,9 +1199,8 @@ class Recipe:
         if self.is_installed():
             print("package {} is already installed.".format(self.name))
             return
-        if not self.is_built():
-            self.build()
         if not for_sync:
+            self.build(for_sync = True)
             print_r("installing {}...".format(self.name))
         shell("tar -xf {} -C {}".format(self.archivepath, self.project.path),
             silent=True)
@@ -1509,10 +1529,11 @@ class Project:
             print()
             for name,recipe in installed:
                 status = recipe.get_status_string()
+                var = recipe.get_version_string(full = True)
                 if recipe.needs_sync():
-                    print(name + ": " + status)
+                    print(name + " " + var + ": " + status)
                 else:
-                    print(name)
+                    print(name + " " + var)
         print()
 
     def read_recipes (self):
@@ -1569,7 +1590,7 @@ class Project:
             for name,recipe in self.recipes.items():
                 if re.match(pattern, name):
                     matches += 1
-                    print(name)
+                    print(name,recipe.get_version_string())
                     print("  " + recipe.summary)
                     print()
             print("{} matching recipes found.".format(matches))
@@ -1738,7 +1759,7 @@ def cmd_show(args):
 
 def cmd_build(args):
     project = Project.find(".")
-    project.build(args.name)
+    project.build(args.name,force=args.force)
 
 def cmd_install(args):
     project = Project.find(".")
@@ -1789,10 +1810,12 @@ cmd = subcommands.add_parser("build", help="build package from recipe")
 cmd.set_defaults(func=cmd_build)
 cmd.add_argument("name",nargs="*",
     help="name of package to build")
+cmd.add_argument("--force",action="store_true",
+    help="force building even if package is already built")
 
 cmd = subcommands.add_parser("install", help="install package from recipe")
 cmd.set_defaults(func=cmd_install)
-cmd.add_argument("-y, --yes",action="store_true",dest="yes",
+cmd.add_argument("-y","--yes",action="store_true",dest="yes",
     help="always confirm package installation")
 cmd.add_argument("name",nargs="*",
     help="name of package to install")
