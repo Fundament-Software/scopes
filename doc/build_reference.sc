@@ -3,7 +3,7 @@ using import Array
 using import Map
 using import Set
 import UTF-8
-let char = UTF-8.char
+let char = UTF-8.char32
 
 let argc argv = (launch-args)
 assert (argc >= 3)
@@ -16,7 +16,7 @@ let modulepath module =
         let modulepath =
             string (argv @ 2)
         _ modulepath
-            (require-from module-dir modulepath) as Scope
+            (require-from module-dir modulepath __env) as Scope
 let chapter = (string (argv @ 3))
 
 let module = (module as Scope)

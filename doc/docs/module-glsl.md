@@ -50,6 +50,10 @@ and access external variables for shader programs.
 
 :   A constant of type `vec4`.
 
+*define*{.property} `gl_PrimitiveID`{.descname} [](#scopes.define.gl_PrimitiveID "Permalink to this definition"){.headerlink} {#scopes.define.gl_PrimitiveID}
+
+:   A constant of type `i32`.
+
 *define*{.property} `gl_VertexID`{.descname} [](#scopes.define.gl_VertexID "Permalink to this definition"){.headerlink} {#scopes.define.gl_VertexID}
 
 :   A constant of type `i32`.
@@ -923,6 +927,10 @@ and access external variables for shader programs.
 :   
 
 *inline*{.property} `imageLoad`{.descname} (*&ensp;image coord&ensp;*)[](#scopes.inline.imageLoad "Permalink to this definition"){.headerlink} {#scopes.inline.imageLoad}
+
+:   
+
+*inline*{.property} `imageSize`{.descname} (*&ensp;image&ensp;*)[](#scopes.inline.imageSize "Permalink to this definition"){.headerlink} {#scopes.inline.imageSize}
 
 :   
 

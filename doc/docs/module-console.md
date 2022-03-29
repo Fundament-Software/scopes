@@ -17,3 +17,7 @@ Implements the read-eval-print loop for Scopes' console.
 
     :   
 
+*fn*{.property} `parse-number`{.descname} (*&ensp;str&ensp;*)[](#scopes.fn.parse-number "Permalink to this definition"){.headerlink} {#scopes.fn.parse-number}
+
+:   
+

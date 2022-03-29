@@ -10,6 +10,18 @@ generators and collectors.
 
 :   A constant of type `Collector`.
 
+*type*{.property} `iterbits`{.descname} [](#scopes.type.iterbits "Permalink to this definition"){.headerlink} {#scopes.type.iterbits}
+
+:   An opaque type of supertype `OverloadedFunction`.
+
+    *inline*{.property} `parameter-defaults`{.descname} ()[](#scopes.iterbits.inline.parameter-defaults "Permalink to this definition"){.headerlink} {#scopes.iterbits.inline.parameter-defaults}
+
+    :   
+
+    *inline*{.property} `templates`{.descname} (*&ensp;value&ensp;*)[](#scopes.iterbits.inline.templates "Permalink to this definition"){.headerlink} {#scopes.iterbits.inline.templates}
+
+    :   
+
 *inline*{.property} `->>`{.descname} (*&ensp;generator collector...&ensp;*)[](#scopes.inline.->> "Permalink to this definition"){.headerlink} {#scopes.inline.->>}
 
 :   
@@ -29,6 +41,10 @@ generators and collectors.
 *inline*{.property} `cat`{.descname} (*&ensp;coll&ensp;*)[](#scopes.inline.cat "Permalink to this definition"){.headerlink} {#scopes.inline.cat}
 
 :   Treat input as a generator and forward its arguments individually.
+
+*inline*{.property} `closest`{.descname} (*&ensp;gen n fcmp&ensp;*)[](#scopes.inline.closest "Permalink to this definition"){.headerlink} {#scopes.inline.closest}
+
+:   return the n closest elements in gen using comparison operator fcmp
 
 *inline*{.property} `collect`{.descname} (*&ensp;coll&ensp;*)[](#scopes.inline.collect "Permalink to this definition"){.headerlink} {#scopes.inline.collect}
 
@@ -113,6 +129,10 @@ generators and collectors.
 :   
 
 *spice*{.property} `span`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.span "Permalink to this definition"){.headerlink} {#scopes.spice.span}
+
+:   
+
+*spice*{.property} `va-ordered-insert`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.va-ordered-insert "Permalink to this definition"){.headerlink} {#scopes.spice.va-ordered-insert}
 
 :   
 

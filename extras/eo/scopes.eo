@@ -1,8 +1,30 @@
-# Major EO installer for http://scopes.rocks
+# Major EO installer for http://scopes.rocks distro image
+# pip3 must be installed
 version := "tip"
 archive-url := "https://hg.sr.ht/~duangle/scopes/archive/{version}.tar.gz"
 rootdir := (commonpath (extract (download archive-url)))
+rootdir :=
+    then
+        cmd := (shell rootdir)
+        doc-cmd := (shell "{rootdir}/doc")
+        doc-cmd "./update_docs"
+        cmd "./build.sh"
+        rootdir
 package scopes
     summary "The Scopes Programming Language & Infrastructure"
+    platform linux unknown
     version version
-    alias "/" rootdir
+    in "/bin"
+        "{rootdir}/bin/libscopesrt.so"
+        "{rootdir}/bin/scopes"
+    alias "/doc/scopes/html" "{rootdir}/doc/site"
+    in "/include"
+        "{rootdir}/scopes"
+    in "/lib"
+        "{rootdir}/lib/clang"
+        "{rootdir}/lib/include"
+    in "/testing"
+        "{rootdir}/testing"
+    in "/"
+        "{rootdir}/CREDITS.md"
+        "{rootdir}/LICENSE.md"

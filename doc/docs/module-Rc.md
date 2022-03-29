@@ -55,6 +55,10 @@ type `Weak`.
 
     :   
 
+    *inline*{.property} `__r==`{.descname} (*&ensp;...&ensp;*)[](#scopes.Rc.inline.__r== "Permalink to this definition"){.headerlink} {#scopes.Rc.inline.__r==}
+
+    :   
+
     *inline*{.property} `__repr`{.descname} (*&ensp;self&ensp;*)[](#scopes.Rc.inline.__repr "Permalink to this definition"){.headerlink} {#scopes.Rc.inline.__repr}
 
     :   

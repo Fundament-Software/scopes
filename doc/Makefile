@@ -24,11 +24,13 @@ clean:
 	rm -rf $(BUILDDIR)/* $(PYBUILDDIR)/*
 
 html:
-	pip install --upgrade -I ./ScopesLexer -t $(PYBUILDDIR)
-	PYTHONPATH="$(PYBUILDDIR);$(PYTHONPATH)" python -B -m mkdocs build -d "$(BUILDDIR)"
+	pip3 install --upgrade mkdocs -t $(PYBUILDDIR)
+	pip3 install --upgrade -I ./ScopesLexer -t $(PYBUILDDIR)
+	PYTHONPATH="$(PYBUILDDIR);$(PYTHONPATH)" python3 -B -m mkdocs build -d "$(BUILDDIR)"
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/."
 
 serve:
-	pip install --upgrade -I ./ScopesLexer -t $(PYBUILDDIR)
-	PYTHONPATH="$(PYBUILDDIR);$(PYTHONPATH)" python -B -m mkdocs serve
+	pip3 install --upgrade mkdocs -t $(PYBUILDDIR)
+	pip3 install --upgrade -I ./ScopesLexer -t $(PYBUILDDIR)
+	PYTHONPATH="$(PYBUILDDIR);$(PYTHONPATH)" python3 -B -m mkdocs serve

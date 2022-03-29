@@ -7,7 +7,7 @@ echo "generating core..." \
     && echo "generating Capture..." \
     && ./build_reference.sc Capture 9 > ./docs/module-Capture.md \
     && echo "generating Chaining..." \
-    && ./build_reference.sc chaining 10 > ./docs/module-Chaining.md \
+    && ./build_reference.sc chaining 10 > ./docs/module-chaining.md \
     && echo "generating console..." \
     && ./build_reference.sc console 11 > ./docs/module-console.md \
     && echo "generating enum..." \

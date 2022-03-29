@@ -40,7 +40,7 @@ import shutil
 import hashlib
 import configparser
 
-VERSION = "0.1"
+VERSION = "0.2"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -1024,7 +1024,7 @@ class Recipe:
             self.version, self.project.platform.name)
         self.archivepath = os.path.join(self.project.archive_dir,
             self.fullname + ".tar.gz")
-        self.dlcachepath = os.path.join(self.project.dlcache_dir, self.fullname)
+        self.dlcachepath = self.project.dlcache_dir
         self.statepath = os.path.join(self.project.install_state_dir,
             self.name.string)
 
@@ -1040,7 +1040,7 @@ class Recipe:
         with open(self.statepath, 'r') as statefile:
             return statefile.readline().strip()
 
-    def needs_upgrade(self):
+    def needs_sync(self):
         if not self.is_installed():
             return False
         return self.get_installed_version() != self.version
@@ -1052,8 +1052,8 @@ class Recipe:
 
     def get_status_string(self):
         if self.is_installed():
-            if self.needs_upgrade():
-                status = "needs upgrade ({} != {})".format(
+            if self.needs_sync():
+                status = "needs sync ({} != {})".format(
                     self.get_installed_version(), self.version)
             else:
                 status = "installed ({})".format(self.get_installed_version())
@@ -1126,11 +1126,11 @@ class Recipe:
         shutil.rmtree(tempdir)
         print("package built.")
 
-    def remove(self, for_upgrade = False):
+    def remove(self, for_sync = False):
         if not self.is_installed():
             print("package {} is not installed.".format(self.name))
             return
-        if not for_upgrade:
+        if not for_sync:
             print_r("removing package {}...".format(self.name))
         # read list of all recursively installed files from install state path
         install_state_path = self.statepath
@@ -1150,34 +1150,34 @@ class Recipe:
             if not os.listdir(filedir):
                 #print("removing empty directory",filedir)
                 os.rmdir(filedir)
-        if not for_upgrade:
+        if not for_sync:
             print_r("{} removed.".format(self.name))
             print()
 
-    def upgrade(self, force = False):
+    def sync(self, force = False):
         if not self.is_installed():
             print("package {} is not installed.".format(self.name))
             return
-        if not self.needs_upgrade() and not force:
+        if not self.needs_sync() and not force:
             print("package {} is already at the latest version.".format(self.name))
             return
-        print_r("upgrading package {}...".format(self.name))
-        self.remove(for_upgrade = True)
-        self.install(for_upgrade = True)
-        print_r("{} upgraded.".format(self.name))
+        print_r("synchronizing package {}...".format(self.name))
+        self.remove(for_sync = True)
+        self.install(for_sync = True)
+        print_r("{} synchronized.".format(self.name))
         print()
 
-    def install(self, for_upgrade = False):
+    def install(self, for_sync = False):
         if self.is_installed():
             print("package {} is already installed.".format(self.name))
             return
         if not self.is_built():
             self.build()
-        if not for_upgrade:
+        if not for_sync:
             print_r("installing {}...".format(self.name))
         shell("tar -xf {} -C {}".format(self.archivepath, self.project.path),
             silent=True)
-        if not for_upgrade:
+        if not for_sync:
             print_r("{} installed.".format(self.name))
             print()
 
@@ -1443,7 +1443,7 @@ class MissingProject:
     show = stub
     build = stub
     install = stub
-    upgrade = stub
+    sync = stub
     remove = stub
     show_status = stub
     search = stub
@@ -1502,7 +1502,7 @@ class Project:
             print()
             for name,recipe in installed:
                 status = recipe.get_status_string()
-                if recipe.needs_upgrade():
+                if recipe.needs_sync():
                     print(name + ": " + status)
                 else:
                     print(name)
@@ -1631,7 +1631,7 @@ class Project:
             dep.install(**kwargs)
         print("done.")
 
-    def upgrade (self, recipenames, force=False, **kwargs):
+    def sync (self, recipenames, force=False, **kwargs):
         self.read_recipes()
         if not recipenames:
             recipenames = [recipe.name.string for recipe in self.recipes.values()
@@ -1641,12 +1641,12 @@ class Project:
                 return True
         else:
             def pred(recipe, level):
-                return (not recipe.is_installed()) or recipe.needs_upgrade()
+                return (not recipe.is_installed()) or recipe.needs_sync()
         deps = self.compute_deps(recipenames, predicate = pred)
         if not deps:
-            print("nothing to upgrade.")
+            print("nothing to synchronize.")
             return
-        print("the following packages will be upgraded:")
+        print("the following packages will be synchronized:")
         for line in wrap_words([dep.name.string for dep in deps]):
             print(line)
         print()
@@ -1654,7 +1654,7 @@ class Project:
         if confirm != "y":
             return
         for dep in deps:
-            dep.upgrade(force=force, **kwargs)
+            dep.sync(force=force, **kwargs)
         print("done.")
 
     def remove (self, recipenames, keep_deps = False, **kwargs):
@@ -1736,9 +1736,9 @@ def cmd_install(args):
     project = Project.find(".")
     project.install(args.name)
 
-def cmd_upgrade(args):
+def cmd_sync(args):
     project = Project.find(".")
-    project.upgrade(args.name, force=args.force)
+    project.sync(args.name, force=args.force)
 
 def cmd_remove(args):
     project = Project.find(".")
@@ -1773,24 +1773,24 @@ cmd.add_argument("pattern",nargs="?",default=".*",
 cmd = subcommands.add_parser("show", help="show recipe details")
 cmd.set_defaults(func=cmd_show)
 cmd.add_argument("name",nargs="*",
-    help="name of recipe to inspect")
+    help="name of package to inspect")
 
 cmd = subcommands.add_parser("build", help="build package from recipe")
 cmd.set_defaults(func=cmd_build)
 cmd.add_argument("name",nargs="*",
-    help="name of recipe to build")
+    help="name of package to build")
 
 cmd = subcommands.add_parser("install", help="install package from recipe")
 cmd.set_defaults(func=cmd_install)
 cmd.add_argument("name",nargs="*",
-    help="name of recipe to install")
+    help="name of package to install")
 
-cmd = subcommands.add_parser("upgrade", help="upgrade package from recipe")
-cmd.set_defaults(func=cmd_upgrade)
+cmd = subcommands.add_parser("sync", help="synchronize package with recipe")
+cmd.set_defaults(func=cmd_sync)
 cmd.add_argument("name",nargs="*",
-    help="name of recipe to upgrade")
+    help="name of package to synchronize")
 cmd.add_argument("--force",action="store_true",
-    help="force upgrade even if package is already installed")
+    help="force synchronization even if package is already current")
 
 cmd = subcommands.add_parser("remove", help="remove package from recipe")
 cmd.set_defaults(func=cmd_remove)
@@ -1807,4 +1807,4 @@ if __name__ == '__main__':
         args.func(args)
     else:
         print_program_header()
-        print("Major EO reporting for duty.")
+        print("Major EO reporting for duty. Try `eo --help` for more info.")

@@ -40,7 +40,11 @@ parses the command-line and optionally enters the REPL.
 
 *define*{.property} `cache-dir`{.descname} [](#scopes.define.cache-dir "Permalink to this definition"){.headerlink} {#scopes.define.cache-dir}
 
-:   A constant of type `String`.
+:   A constant of type `string`.
+
+*define*{.property} `compile-flag-O0`{.descname} [](#scopes.define.compile-flag-O0 "Permalink to this definition"){.headerlink} {#scopes.define.compile-flag-O0}
+
+:   A constant of type `u64`.
 
 *define*{.property} `compile-flag-O1`{.descname} [](#scopes.define.compile-flag-O1 "Permalink to this definition"){.headerlink} {#scopes.define.compile-flag-O1}
 
@@ -71,6 +75,10 @@ parses the command-line and optionally enters the REPL.
 :   A constant of type `u64`.
 
 *define*{.property} `compile-flag-dump-time`{.descname} [](#scopes.define.compile-flag-dump-time "Permalink to this definition"){.headerlink} {#scopes.define.compile-flag-dump-time}
+
+:   A constant of type `u64`.
+
+*define*{.property} `compile-flag-module`{.descname} [](#scopes.define.compile-flag-module "Permalink to this definition"){.headerlink} {#scopes.define.compile-flag-module}
 
 :   A constant of type `u64`.
 
@@ -114,7 +122,7 @@ parses the command-line and optionally enters the REPL.
 
 *define*{.property} `default-target-triple`{.descname} [](#scopes.define.default-target-triple "Permalink to this definition"){.headerlink} {#scopes.define.default-target-triple}
 
-:   A constant of type `String`.
+:   A constant of type `string`.
 
 *define*{.property} `e`{.descname} [](#scopes.define.e "Permalink to this definition"){.headerlink} {#scopes.define.e}
 
@@ -161,6 +169,10 @@ parses the command-line and optionally enters the REPL.
 
 :   A constant of type `u32`.
 
+*define*{.property} `global-flag-thread-local`{.descname} [](#scopes.define.global-flag-thread-local "Permalink to this definition"){.headerlink} {#scopes.define.global-flag-thread-local}
+
+:   A constant of type `u32`.
+
 *define*{.property} `global-flag-volatile`{.descname} [](#scopes.define.global-flag-volatile "Permalink to this definition"){.headerlink} {#scopes.define.global-flag-volatile}
 
 :   A constant of type `u32`.
@@ -204,6 +216,10 @@ parses the command-line and optionally enters the REPL.
 *define*{.property} `pointer-flag-non-writable`{.descname} [](#scopes.define.pointer-flag-non-writable "Permalink to this definition"){.headerlink} {#scopes.define.pointer-flag-non-writable}
 
 :   A constant of type `u64`.
+
+*define*{.property} `project-dir`{.descname} [](#scopes.define.project-dir "Permalink to this definition"){.headerlink} {#scopes.define.project-dir}
+
+:   A constant of type `string`.
 
 *define*{.property} `question-mark-char`{.descname} [](#scopes.define.question-mark-char "Permalink to this definition"){.headerlink} {#scopes.define.question-mark-char}
 
@@ -272,6 +288,20 @@ parses the command-line and optionally enters the REPL.
 *define*{.property} `symbol-handler-symbol`{.descname} [](#scopes.define.symbol-handler-symbol "Permalink to this definition"){.headerlink} {#scopes.define.symbol-handler-symbol}
 
 :   A constant of type `Symbol`.
+
+*define*{.property} `tau`{.descname} [](#scopes.define.tau "Permalink to this definition"){.headerlink} {#scopes.define.tau}
+
+:   The number τ, the ratio of a circle's circumference C to its radius r.
+    Explicitly type-annotated versions of the constant are available as `tau:f32`
+    and `tau:f64`.
+
+*define*{.property} `tau:f32`{.descname} [](#scopes.define.tau:f32 "Permalink to this definition"){.headerlink} {#scopes.define.tau:f32}
+
+:   See `tau`.
+
+*define*{.property} `tau:f64`{.descname} [](#scopes.define.tau:f64 "Permalink to this definition"){.headerlink} {#scopes.define.tau:f64}
+
+:   See `tau`.
 
 *define*{.property} `true`{.descname} [](#scopes.define.true "Permalink to this definition"){.headerlink} {#scopes.define.true}
 
@@ -390,6 +420,10 @@ parses the command-line and optionally enters the REPL.
 :   A constant of type `i32`.
 
 *define*{.property} `value-kind-call-template`{.descname} [](#scopes.define.value-kind-call-template "Permalink to this definition"){.headerlink} {#scopes.define.value-kind-call-template}
+
+:   A constant of type `i32`.
+
+*define*{.property} `value-kind-case-template`{.descname} [](#scopes.define.value-kind-case-template "Permalink to this definition"){.headerlink} {#scopes.define.value-kind-case-template}
 
 :   A constant of type `i32`.
 
@@ -645,9 +679,17 @@ parses the command-line and optionally enters the REPL.
 
 :   A constant of type `i32`.
 
+*define*{.property} `working-dir`{.descname} [](#scopes.define.working-dir "Permalink to this definition"){.headerlink} {#scopes.define.working-dir}
+
+:   A constant of type `string`.
+
 *type*{.property} `_:`{.descname} [](#scopes.type._: "Permalink to this definition"){.headerlink} {#scopes.type._:}
 
 :   An opaque type labeled `Arguments`.
+
+    *spice*{.property} `__call`{.descname} (*&ensp;...&ensp;*)[](#scopes._:.spice.__call "Permalink to this definition"){.headerlink} {#scopes._:.spice.__call}
+
+    :   
 
     *spice*{.property} `__typecall`{.descname} (*&ensp;...&ensp;*)[](#scopes._:.spice.__typecall "Permalink to this definition"){.headerlink} {#scopes._:.spice.__typecall}
 
@@ -665,9 +707,17 @@ parses the command-line and optionally enters the REPL.
 
 :   A plain type of storage type `(opaque@ _Anchor)`.
 
+    *spice*{.property} `__hash`{.descname} (*&ensp;...&ensp;*)[](#scopes.Anchor.spice.__hash "Permalink to this definition"){.headerlink} {#scopes.Anchor.spice.__hash}
+
+    :   
+
 *type*{.property} `Arguments`{.descname} [](#scopes.type.Arguments "Permalink to this definition"){.headerlink} {#scopes.type.Arguments}
 
 :   An opaque type.
+
+    *spice*{.property} `__call`{.descname} (*&ensp;...&ensp;*)[](#scopes.Arguments.spice.__call "Permalink to this definition"){.headerlink} {#scopes.Arguments.spice.__call}
+
+    :   
 
     *spice*{.property} `__typecall`{.descname} (*&ensp;...&ensp;*)[](#scopes.Arguments.spice.__typecall "Permalink to this definition"){.headerlink} {#scopes.Arguments.spice.__typecall}
 
@@ -734,6 +784,10 @@ parses the command-line and optionally enters the REPL.
     :   
 
     *spice*{.property} `__^`{.descname} (*&ensp;...&ensp;*)[](#scopes.CEnum.spice.__^ "Permalink to this definition"){.headerlink} {#scopes.CEnum.spice.__^}
+
+    :   
+
+    *inline*{.property} `__hash`{.descname} (*&ensp;self&ensp;*)[](#scopes.CEnum.inline.__hash "Permalink to this definition"){.headerlink} {#scopes.CEnum.inline.__hash}
 
     :   
 
@@ -815,7 +869,7 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.Closure.compiledfn.docstring "Permalink to this definition"){.headerlink} {#scopes.Closure.compiledfn.docstring}
 
-    :   An external function of type `(String <-: (Closure))`.
+    :   An external function of type `(string <-: (Closure))`.
 
 *type*{.property} `Collector`{.descname} [](#scopes.type.Collector "Permalink to this definition"){.headerlink} {#scopes.type.Collector}
 
@@ -851,7 +905,7 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `format`{.descname} (*&ensp;...&ensp;*)[](#scopes.Error.compiledfn.format "Permalink to this definition"){.headerlink} {#scopes.Error.compiledfn.format}
 
-    :   An external function of type `(String <-: (Error))`.
+    :   An external function of type `(string <-: (Error))`.
 
 *type*{.property} `Generator`{.descname} [](#scopes.type.Generator "Permalink to this definition"){.headerlink} {#scopes.type.Generator}
 
@@ -930,6 +984,10 @@ parses the command-line and optionally enters the REPL.
         `init` and `next` which are required to enumerate generator
         `self`.
 
+    *inline*{.property} `__countof`{.descname} (*&ensp;self&ensp;*)[](#scopes.Generator.inline.__countof "Permalink to this definition"){.headerlink} {#scopes.Generator.inline.__countof}
+
+    :   
+
     *inline*{.property} `__typecall`{.descname} (*&ensp;cls start valid? at next&ensp;*)[](#scopes.Generator.inline.__typecall "Permalink to this definition"){.headerlink} {#scopes.Generator.inline.__typecall}
 
     :   Takes four functions `start`, `valid?`, `at` and `next`
@@ -960,6 +1018,10 @@ parses the command-line and optionally enters the REPL.
 :   A plain type of storage type `(tuple )`.
 
     *spice*{.property} `__==`{.descname} (*&ensp;...&ensp;*)[](#scopes.Nothing.spice.__== "Permalink to this definition"){.headerlink} {#scopes.Nothing.spice.__==}
+
+    :   
+
+    *spice*{.property} `__copy`{.descname} (*&ensp;...&ensp;*)[](#scopes.Nothing.spice.__copy "Permalink to this definition"){.headerlink} {#scopes.Nothing.spice.__copy}
 
     :   
 
@@ -1069,7 +1131,7 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `bind-with-docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.Scope.compiledfn.bind-with-docstring "Permalink to this definition"){.headerlink} {#scopes.Scope.compiledfn.bind-with-docstring}
 
-    :   An external function of type `(Scope <-: (Scope Value Value String))`.
+    :   An external function of type `(Scope <-: (Scope Value Value string))`.
 
     *spice*{.property} `define`{.descname} (*&ensp;...&ensp;*)[](#scopes.Scope.spice.define "Permalink to this definition"){.headerlink} {#scopes.Scope.spice.define}
 
@@ -1085,7 +1147,7 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.Scope.compiledfn.docstring "Permalink to this definition"){.headerlink} {#scopes.Scope.compiledfn.docstring}
 
-    :   An external function of type `(String <-: (Scope Value))`.
+    :   An external function of type `(string <-: (Scope Value))`.
 
     *inline*{.property} `lineage`{.descname} (*&ensp;self&ensp;*)[](#scopes.Scope.inline.lineage "Permalink to this definition"){.headerlink} {#scopes.Scope.inline.lineage}
 
@@ -1097,7 +1159,7 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `module-docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.Scope.compiledfn.module-docstring "Permalink to this definition"){.headerlink} {#scopes.Scope.compiledfn.module-docstring}
 
-    :   An external function of type `(String <-: (Scope))`.
+    :   An external function of type `(string <-: (Scope))`.
 
     *compiledfn*{.property} `next`{.descname} (*&ensp;...&ensp;*)[](#scopes.Scope.compiledfn.next "Permalink to this definition"){.headerlink} {#scopes.Scope.compiledfn.next}
 
@@ -1231,9 +1293,17 @@ parses the command-line and optionally enters the REPL.
 
     :   
 
+    *spice*{.property} `__copy`{.descname} (*&ensp;...&ensp;*)[](#scopes.Value.spice.__copy "Permalink to this definition"){.headerlink} {#scopes.Value.spice.__copy}
+
+    :   
+
+    *inline*{.property} `__hash`{.descname} (*&ensp;self&ensp;*)[](#scopes.Value.inline.__hash "Permalink to this definition"){.headerlink} {#scopes.Value.inline.__hash}
+
+    :   
+
     *compiledfn*{.property} `__repr`{.descname} (*&ensp;...&ensp;*)[](#scopes.Value.compiledfn.__repr "Permalink to this definition"){.headerlink} {#scopes.Value.compiledfn.__repr}
 
-    :   An external function of type `(String <-: (Value))`.
+    :   An external function of type `(string <-: (Value))`.
 
     *inline*{.property} `__rimply`{.descname} (*&ensp;vT T&ensp;*)[](#scopes.Value.inline.__rimply "Permalink to this definition"){.headerlink} {#scopes.Value.inline.__rimply}
 
@@ -1305,7 +1375,7 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `spice-repr`{.descname} (*&ensp;...&ensp;*)[](#scopes.Value.compiledfn.spice-repr "Permalink to this definition"){.headerlink} {#scopes.Value.compiledfn.spice-repr}
 
-    :   An external function of type `(String <-: (Value))`.
+    :   An external function of type `(string <-: (Value))`.
 
     *inline*{.property} `tag`{.descname} (*&ensp;self anchor&ensp;*)[](#scopes.Value.inline.tag "Permalink to this definition"){.headerlink} {#scopes.Value.inline.tag}
 
@@ -1382,6 +1452,10 @@ parses the command-line and optionally enters the REPL.
 *type*{.property} `bool`{.descname} [](#scopes.type.bool "Permalink to this definition"){.headerlink} {#scopes.type.bool}
 
 :   A plain type of supertype `integer` and of storage type `bool`.
+
+*type*{.property} `char`{.descname} [](#scopes.type.char "Permalink to this definition"){.headerlink} {#scopes.type.char}
+
+:   A plain type labeled `i8` of supertype `integer` and of storage type `i8`.
 
 *type*{.property} `constant`{.descname} [](#scopes.type.constant "Permalink to this definition"){.headerlink} {#scopes.type.constant}
 
@@ -1563,6 +1637,10 @@ parses the command-line and optionally enters the REPL.
 
     :   
 
+    *inline*{.property} `__ln`{.descname} (*&ensp;self&ensp;*)[](#scopes.integer.inline.__ln "Permalink to this definition"){.headerlink} {#scopes.integer.inline.__ln}
+
+    :   
+
     *inline*{.property} `__neg`{.descname} (*&ensp;self&ensp;*)[](#scopes.integer.inline.__neg "Permalink to this definition"){.headerlink} {#scopes.integer.inline.__neg}
 
     :   
@@ -1707,6 +1785,10 @@ parses the command-line and optionally enters the REPL.
 
     :   An external function of type `(List <-: (List))`.
 
+    *fn*{.property} `first-anchor`{.descname} (*&ensp;self&ensp;*)[](#scopes.list.fn.first-anchor "Permalink to this definition"){.headerlink} {#scopes.list.fn.first-anchor}
+
+    :   
+
     *compiledfn*{.property} `join`{.descname} (*&ensp;...&ensp;*)[](#scopes.list.compiledfn.join "Permalink to this definition"){.headerlink} {#scopes.list.compiledfn.join}
 
     :   An external function of type `(List <-: (List List))`.
@@ -1722,6 +1804,10 @@ parses the command-line and optionally enters the REPL.
     *fn*{.property} `rjoin`{.descname} (*&ensp;lside rside&ensp;*)[](#scopes.list.fn.rjoin "Permalink to this definition"){.headerlink} {#scopes.list.fn.rjoin}
 
     :   
+
+    *compiledfn*{.property} `serialize`{.descname} (*&ensp;...&ensp;*)[](#scopes.list.compiledfn.serialize "Permalink to this definition"){.headerlink} {#scopes.list.compiledfn.serialize}
+
+    :   An external function of type `(string <-: (List))`.
 
     *fn*{.property} `token-split`{.descname} (*&ensp;expr token errmsg&ensp;*)[](#scopes.list.fn.token-split "Permalink to this definition"){.headerlink} {#scopes.list.fn.token-split}
 
@@ -1762,20 +1848,6 @@ parses the command-line and optionally enters the REPL.
 *type*{.property} `opaquepointer`{.descname} [](#scopes.type.opaquepointer "Permalink to this definition"){.headerlink} {#scopes.type.opaquepointer}
 
 :   An opaque type.
-
-*type*{.property} `package`{.descname} [](#scopes.type.package "Permalink to this definition"){.headerlink} {#scopes.type.package}
-
-:   A symbol table of type `Scope` which holds configuration options and module
-    contents. It is managed by the module import system.
-    
-    `package.path` holds a list of all search paths in the form of simple
-    string patterns. Changing it alters the way modules are searched for in
-    the next run stage.
-    
-    `package.modules` is another scope symbol table mapping full module
-    paths to their contents. When a module is first imported, its contents
-    are cached in this table. Subsequent imports of the same module will be
-    resolved to these cached contents.
 
 *type*{.property} `pointer`{.descname} [](#scopes.type.pointer "Permalink to this definition"){.headerlink} {#scopes.type.pointer}
 
@@ -1901,7 +1973,11 @@ parses the command-line and optionally enters the REPL.
 
     :   
 
-    *inline*{.property} `__neg`{.descname} (*&ensp;self&ensp;*)[](#scopes.real.inline.__neg "Permalink to this definition"){.headerlink} {#scopes.real.inline.__neg}
+    *builtin*{.property} `__ln`{.descname} (*&ensp;...&ensp;*)[](#scopes.real.builtin.__ln "Permalink to this definition"){.headerlink} {#scopes.real.builtin.__ln}
+
+    :   
+
+    *spice*{.property} `__neg`{.descname} (*&ensp;...&ensp;*)[](#scopes.real.spice.__neg "Permalink to this definition"){.headerlink} {#scopes.real.spice.__neg}
 
     :   
 
@@ -1967,7 +2043,7 @@ parses the command-line and optionally enters the REPL.
 
 *type*{.property} `string`{.descname} [](#scopes.type.string "Permalink to this definition"){.headerlink} {#scopes.type.string}
 
-:   A plain type labeled `String` of supertype `opaquepointer` and of storage type `(opaque@ _String)`.
+:   A plain type of supertype `opaquepointer` and of storage type `(opaque@ _string)`.
 
     *spice*{.property} `__!=`{.descname} (*&ensp;...&ensp;*)[](#scopes.string.spice.__!= "Permalink to this definition"){.headerlink} {#scopes.string.spice.__!=}
 
@@ -2005,9 +2081,9 @@ parses the command-line and optionally enters the REPL.
 
     :   
 
-    *compiledfn*{.property} `__countof`{.descname} (*&ensp;...&ensp;*)[](#scopes.string.compiledfn.__countof "Permalink to this definition"){.headerlink} {#scopes.string.compiledfn.__countof}
+    *spice*{.property} `__countof`{.descname} (*&ensp;...&ensp;*)[](#scopes.string.spice.__countof "Permalink to this definition"){.headerlink} {#scopes.string.spice.__countof}
 
-    :   An external function of type `(usize <-: (String))`.
+    :   
 
     *inline*{.property} `__hash`{.descname} (*&ensp;self&ensp;*)[](#scopes.string.inline.__hash "Permalink to this definition"){.headerlink} {#scopes.string.inline.__hash}
 
@@ -2019,7 +2095,7 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `__lslice`{.descname} (*&ensp;...&ensp;*)[](#scopes.string.compiledfn.__lslice "Permalink to this definition"){.headerlink} {#scopes.string.compiledfn.__lslice}
 
-    :   An external function of type `(String <-: (String usize))`.
+    :   An external function of type `(string <-: (string usize))`.
 
     *spice*{.property} `__ras`{.descname} (*&ensp;...&ensp;*)[](#scopes.string.spice.__ras "Permalink to this definition"){.headerlink} {#scopes.string.spice.__ras}
 
@@ -2027,11 +2103,11 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `__rslice`{.descname} (*&ensp;...&ensp;*)[](#scopes.string.compiledfn.__rslice "Permalink to this definition"){.headerlink} {#scopes.string.compiledfn.__rslice}
 
-    :   An external function of type `(String <-: (String usize))`.
+    :   An external function of type `(string <-: (string usize))`.
 
     *compiledfn*{.property} `buffer`{.descname} (*&ensp;...&ensp;*)[](#scopes.string.compiledfn.buffer "Permalink to this definition"){.headerlink} {#scopes.string.compiledfn.buffer}
 
-    :   An external function of type `((_: (@ i8) usize) <-: (String))`.
+    :   An external function of type `((_: (@ i8) usize) <-: (string))`.
 
     *inline*{.property} `collector`{.descname} (*&ensp;maxsize&ensp;*)[](#scopes.string.inline.collector "Permalink to this definition"){.headerlink} {#scopes.string.inline.collector}
 
@@ -2039,11 +2115,11 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `join`{.descname} (*&ensp;...&ensp;*)[](#scopes.string.compiledfn.join "Permalink to this definition"){.headerlink} {#scopes.string.compiledfn.join}
 
-    :   An external function of type `(String <-: (String String))`.
+    :   An external function of type `(string <-: (string string))`.
 
     *compiledfn*{.property} `match?`{.descname} (*&ensp;...&ensp;*)[](#scopes.string.compiledfn.match? "Permalink to this definition"){.headerlink} {#scopes.string.compiledfn.match?}
 
-    :   An external function of type `((_: bool i32 i32) <-: (String String) raises Error)`.
+    :   An external function of type `((_: bool i32 i32) <-: (string string) raises Error)`.
 
     *inline*{.property} `range`{.descname} (*&ensp;self start end&ensp;*)[](#scopes.string.inline.range "Permalink to this definition"){.headerlink} {#scopes.string.inline.range}
 
@@ -2052,10 +2128,6 @@ parses the command-line and optionally enters the REPL.
 *type*{.property} `tuple`{.descname} [](#scopes.type.tuple "Permalink to this definition"){.headerlink} {#scopes.type.tuple}
 
 :   An opaque type of supertype `aggregate`.
-
-    *inline*{.property} `__==`{.descname} (*&ensp;cls T&ensp;*)[](#scopes.tuple.inline.__== "Permalink to this definition"){.headerlink} {#scopes.tuple.inline.__==}
-
-    :   
 
     *builtin*{.property} `__@`{.descname} (*&ensp;...&ensp;*)[](#scopes.tuple.builtin.__@ "Permalink to this definition"){.headerlink} {#scopes.tuple.builtin.__@}
 
@@ -2082,6 +2154,14 @@ parses the command-line and optionally enters the REPL.
     :   
 
     *spice*{.property} `__unpack`{.descname} (*&ensp;...&ensp;*)[](#scopes.tuple.spice.__unpack "Permalink to this definition"){.headerlink} {#scopes.tuple.spice.__unpack}
+
+    :   
+
+    *inline*{.property} `emit`{.descname} (*&ensp;self keys...&ensp;*)[](#scopes.tuple.inline.emit "Permalink to this definition"){.headerlink} {#scopes.tuple.inline.emit}
+
+    :   
+
+    *spice*{.property} `explode`{.descname} (*&ensp;...&ensp;*)[](#scopes.tuple.spice.explode "Permalink to this definition"){.headerlink} {#scopes.tuple.spice.explode}
 
     :   
 
@@ -2191,7 +2271,7 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.type.compiledfn.docstring "Permalink to this definition"){.headerlink} {#scopes.type.compiledfn.docstring}
 
-    :   An external function of type `(String <-: (type Symbol))`.
+    :   An external function of type `(string <-: (type Symbol))`.
 
     *compiledfn*{.property} `element-count`{.descname} (*&ensp;...&ensp;*)[](#scopes.type.compiledfn.element-count "Permalink to this definition"){.headerlink} {#scopes.type.compiledfn.element-count}
 
@@ -2287,7 +2367,7 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `set-docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.type.compiledfn.set-docstring "Permalink to this definition"){.headerlink} {#scopes.type.compiledfn.set-docstring}
 
-    :   An external function of type `(void <-: (type Symbol String))`.
+    :   An external function of type `(void <-: (type Symbol string))`.
 
     *inline*{.property} `set-opaque`{.descname} (*&ensp;type&ensp;*)[](#scopes.type.inline.set-opaque "Permalink to this definition"){.headerlink} {#scopes.type.inline.set-opaque}
 
@@ -2323,7 +2403,7 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `string`{.descname} (*&ensp;...&ensp;*)[](#scopes.type.compiledfn.string "Permalink to this definition"){.headerlink} {#scopes.type.compiledfn.string}
 
-    :   An external function of type `(String <-: (type))`.
+    :   An external function of type `(string <-: (type))`.
 
     *fn*{.property} `strip-pointer-storage-class`{.descname} (*&ensp;cls&ensp;*)[](#scopes.type.fn.strip-pointer-storage-class "Permalink to this definition"){.headerlink} {#scopes.type.fn.strip-pointer-storage-class}
 
@@ -2391,7 +2471,7 @@ parses the command-line and optionally enters the REPL.
 
     *compiledfn*{.property} `type`{.descname} (*&ensp;...&ensp;*)[](#scopes.typename.compiledfn.type "Permalink to this definition"){.headerlink} {#scopes.typename.compiledfn.type}
 
-    :   An external function of type `(type <-: (String type) raises Error)`.
+    :   An external function of type `(type <-: (string type) raises Error)`.
 
 *type*{.property} `u16`{.descname} [](#scopes.type.u16 "Permalink to this definition"){.headerlink} {#scopes.type.u16}
 
@@ -2711,7 +2791,7 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
-*inline*{.property} `compile-spirv`{.descname} (*&ensp;target func flags...&ensp;*)[](#scopes.inline.compile-spirv "Permalink to this definition"){.headerlink} {#scopes.inline.compile-spirv}
+*inline*{.property} `compile-spirv`{.descname} (*&ensp;version target func flags...&ensp;*)[](#scopes.inline.compile-spirv "Permalink to this definition"){.headerlink} {#scopes.inline.compile-spirv}
 
 :   
 
@@ -2818,7 +2898,11 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
-*fn*{.property} `find-module-path`{.descname} (*&ensp;base-dir name&ensp;*)[](#scopes.fn.find-module-path "Permalink to this definition"){.headerlink} {#scopes.fn.find-module-path}
+*fn*{.property} `find-library`{.descname} (*&ensp;name library-search-path&ensp;*)[](#scopes.fn.find-library "Permalink to this definition"){.headerlink} {#scopes.fn.find-library}
+
+:   
+
+*fn*{.property} `find-module-path`{.descname} (*&ensp;base-dir name env&ensp;*)[](#scopes.fn.find-module-path "Permalink to this definition"){.headerlink} {#scopes.fn.find-module-path}
 
 :   
 
@@ -2830,7 +2914,7 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
-*inline*{.property} `gen-allocator-sugar`{.descname} (*&ensp;name copyf newf&ensp;*)[](#scopes.inline.gen-allocator-sugar "Permalink to this definition"){.headerlink} {#scopes.inline.gen-allocator-sugar}
+*inline*{.property} `gen-allocator-sugar`{.descname} (*&ensp;copyf newf&ensp;*)[](#scopes.inline.gen-allocator-sugar "Permalink to this definition"){.headerlink} {#scopes.inline.gen-allocator-sugar}
 
 :   
 
@@ -2930,7 +3014,7 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
-*fn*{.property} `load-module`{.descname} (*&ensp;module-name module-path opts...&ensp;*)[](#scopes.fn.load-module "Permalink to this definition"){.headerlink} {#scopes.fn.load-module}
+*fn*{.property} `load-module`{.descname} (*&ensp;module-name module-path env opts...&ensp;*)[](#scopes.fn.load-module "Permalink to this definition"){.headerlink} {#scopes.fn.load-module}
 
 :   
 
@@ -3002,7 +3086,7 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
-*fn*{.property} `patterns-from-namestr`{.descname} (*&ensp;base-dir namestr&ensp;*)[](#scopes.fn.patterns-from-namestr "Permalink to this definition"){.headerlink} {#scopes.fn.patterns-from-namestr}
+*fn*{.property} `patterns-from-namestr`{.descname} (*&ensp;base-dir namestr env&ensp;*)[](#scopes.fn.patterns-from-namestr "Permalink to this definition"){.headerlink} {#scopes.fn.patterns-from-namestr}
 
 :   
 
@@ -3062,7 +3146,7 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
-*fn*{.property} `require-from`{.descname} (*&ensp;base-dir name&ensp;*)[](#scopes.fn.require-from "Permalink to this definition"){.headerlink} {#scopes.fn.require-from}
+*fn*{.property} `require-from`{.descname} (*&ensp;base-dir name env&ensp;*)[](#scopes.fn.require-from "Permalink to this definition"){.headerlink} {#scopes.fn.require-from}
 
 :   
 
@@ -3092,7 +3176,7 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
-*fn*{.property} `sc_argument_list_join_values`{.descname} (*&ensp;a b...&ensp;*)[](#scopes.fn.sc_argument_list_join_values "Permalink to this definition"){.headerlink} {#scopes.fn.sc_argument_list_join_values}
+*inline*{.property} `sc_argument_list_join_values`{.descname} (*&ensp;a b...&ensp;*)[](#scopes.inline.sc_argument_list_join_values "Permalink to this definition"){.headerlink} {#scopes.inline.sc_argument_list_join_values}
 
 :   
 
@@ -3129,6 +3213,10 @@ parses the command-line and optionally enters the REPL.
 :   
 
 *inline*{.property} `simple-folding-signed-binary-op`{.descname} (*&ensp;sf uf unboxer boxer&ensp;*)[](#scopes.inline.simple-folding-signed-binary-op "Permalink to this definition"){.headerlink} {#scopes.inline.simple-folding-signed-binary-op}
+
+:   
+
+*inline*{.property} `simple-folding-unary-op`{.descname} (*&ensp;f unboxer boxer&ensp;*)[](#scopes.inline.simple-folding-unary-op "Permalink to this definition"){.headerlink} {#scopes.inline.simple-folding-unary-op}
 
 :   
 
@@ -3174,7 +3262,7 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
-*inline*{.property} `static-compile-spirv`{.descname} (*&ensp;target func flags...&ensp;*)[](#scopes.inline.static-compile-spirv "Permalink to this definition"){.headerlink} {#scopes.inline.static-compile-spirv}
+*inline*{.property} `static-compile-spirv`{.descname} (*&ensp;version target func flags...&ensp;*)[](#scopes.inline.static-compile-spirv "Permalink to this definition"){.headerlink} {#scopes.inline.static-compile-spirv}
 
 :   
 
@@ -3373,6 +3461,10 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
+*sugar*{.property} (`decorate-type`{.descname} *&ensp;...&ensp;*) [](#scopes.sugar.decorate-type "Permalink to this definition"){.headerlink} {#scopes.sugar.decorate-type}
+
+:   
+
 *sugar*{.property} (`decorate-typedef`{.descname} *&ensp;...&ensp;*) [](#scopes.sugar.decorate-typedef "Permalink to this definition"){.headerlink} {#scopes.sugar.decorate-typedef}
 
 :   
@@ -3522,6 +3614,10 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
+*sugar*{.property} (`shared-library`{.descname} *&ensp;...&ensp;*) [](#scopes.sugar.shared-library "Permalink to this definition"){.headerlink} {#scopes.sugar.shared-library}
+
+:   
+
 *sugar*{.property} (`spice`{.descname} *&ensp;...&ensp;*) [](#scopes.sugar.spice "Permalink to this definition"){.headerlink} {#scopes.sugar.spice}
 
 :   
@@ -3535,6 +3631,14 @@ parses the command-line and optionally enters the REPL.
 :   
 
 *sugar*{.property} (`static-match`{.descname} *&ensp;...&ensp;*) [](#scopes.sugar.static-match "Permalink to this definition"){.headerlink} {#scopes.sugar.static-match}
+
+:   
+
+*sugar*{.property} (`static-shared-library`{.descname} *&ensp;...&ensp;*) [](#scopes.sugar.static-shared-library "Permalink to this definition"){.headerlink} {#scopes.sugar.static-shared-library}
+
+:   
+
+*sugar*{.property} (`static-try`{.descname} *&ensp;...&ensp;*) [](#scopes.sugar.static-try "Permalink to this definition"){.headerlink} {#scopes.sugar.static-try}
 
 :   
 
@@ -3735,10 +3839,6 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
-*builtin*{.property} `ceil`{.descname} (*&ensp;...&ensp;*)[](#scopes.builtin.ceil "Permalink to this definition"){.headerlink} {#scopes.builtin.ceil}
-
-:   
-
 *builtin*{.property} `cmpxchg`{.descname} (*&ensp;...&ensp;*)[](#scopes.builtin.cmpxchg "Permalink to this definition"){.headerlink} {#scopes.builtin.cmpxchg}
 
 :   
@@ -3911,6 +4011,10 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
+*builtin*{.property} `fneg`{.descname} (*&ensp;...&ensp;*)[](#scopes.builtin.fneg "Permalink to this definition"){.headerlink} {#scopes.builtin.fneg}
+
+:   
+
 *builtin*{.property} `fpext`{.descname} (*&ensp;...&ensp;*)[](#scopes.builtin.fpext "Permalink to this definition"){.headerlink} {#scopes.builtin.fpext}
 
 :   
@@ -3924,10 +4028,6 @@ parses the command-line and optionally enters the REPL.
 :   
 
 *builtin*{.property} `fptrunc`{.descname} (*&ensp;...&ensp;*)[](#scopes.builtin.fptrunc "Permalink to this definition"){.headerlink} {#scopes.builtin.fptrunc}
-
-:   
-
-*builtin*{.property} `fract`{.descname} (*&ensp;...&ensp;*)[](#scopes.builtin.fract "Permalink to this definition"){.headerlink} {#scopes.builtin.fract}
 
 :   
 
@@ -4208,10 +4308,6 @@ parses the command-line and optionally enters the REPL.
 :   
 
 *builtin*{.property} `smin`{.descname} (*&ensp;...&ensp;*)[](#scopes.builtin.smin "Permalink to this definition"){.headerlink} {#scopes.builtin.smin}
-
-:   
-
-*builtin*{.property} `smoothstep`{.descname} (*&ensp;...&ensp;*)[](#scopes.builtin.smoothstep "Permalink to this definition"){.headerlink} {#scopes.builtin.smoothstep}
 
 :   
 
@@ -4627,6 +4723,10 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
+*spice*{.property} `ln`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.ln "Permalink to this definition"){.headerlink} {#scopes.spice.ln}
+
+:   
+
 *spice*{.property} `locationof`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.locationof "Permalink to this definition"){.headerlink} {#scopes.spice.locationof}
 
 :   
@@ -4658,6 +4758,10 @@ parses the command-line and optionally enters the REPL.
 :   
 
 *spice*{.property} `mutable`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.mutable "Permalink to this definition"){.headerlink} {#scopes.spice.mutable}
+
+:   
+
+*spice*{.property} `mutable?`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.mutable? "Permalink to this definition"){.headerlink} {#scopes.spice.mutable?}
 
 :   
 
@@ -4693,6 +4797,10 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
+*spice*{.property} `plain?`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.plain? "Permalink to this definition"){.headerlink} {#scopes.spice.plain?}
+
+:   
+
 *spice*{.property} `pow`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.pow "Permalink to this definition"){.headerlink} {#scopes.spice.pow}
 
 :   
@@ -4706,6 +4814,10 @@ parses the command-line and optionally enters the REPL.
 :   
 
 *spice*{.property} `qualifiersof`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.qualifiersof "Permalink to this definition"){.headerlink} {#scopes.spice.qualifiersof}
+
+:   
+
+*spice*{.property} `raiseof`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.raiseof "Permalink to this definition"){.headerlink} {#scopes.spice.raiseof}
 
 :   
 
@@ -4774,6 +4886,14 @@ parses the command-line and optionally enters the REPL.
 :   
 
 *spice*{.property} `static-integer->real`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.static-integer->real "Permalink to this definition"){.headerlink} {#scopes.spice.static-integer->real}
+
+:   
+
+*spice*{.property} `static-library`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.static-library "Permalink to this definition"){.headerlink} {#scopes.spice.static-library}
+
+:   
+
+*spice*{.property} `static-try-closure`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.static-try-closure "Permalink to this definition"){.headerlink} {#scopes.spice.static-try-closure}
 
 :   
 
@@ -4916,6 +5036,10 @@ parses the command-line and optionally enters the REPL.
 
 :   
 
+*spice*{.property} `verify-stepsize`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.verify-stepsize "Permalink to this definition"){.headerlink} {#scopes.spice.verify-stepsize}
+
+:   
+
 *spice*{.property} `viewof`{.descname} (*&ensp;...&ensp;*)[](#scopes.spice.viewof "Permalink to this definition"){.headerlink} {#scopes.spice.viewof}
 
 :   
@@ -4932,9 +5056,13 @@ parses the command-line and optionally enters the REPL.
 
 :   An external function of type `((_: i32 i32 i32) <-: ())`.
 
+*compiledfn*{.property} `debugtrap`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.debugtrap "Permalink to this definition"){.headerlink} {#scopes.compiledfn.debugtrap}
+
+:   An external function of type `(void <-: ())`.
+
 *compiledfn*{.property} `default-styler`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.default-styler "Permalink to this definition"){.headerlink} {#scopes.compiledfn.default-styler}
 
-:   An external function of type `(String <-: (Symbol String))`.
+:   An external function of type `(string <-: (Symbol string))`.
 
 *compiledfn*{.property} `exit`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.exit "Permalink to this definition"){.headerlink} {#scopes.compiledfn.exit}
 
@@ -4950,7 +5078,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `io-write!`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.io-write! "Permalink to this definition"){.headerlink} {#scopes.compiledfn.io-write!}
 
-:   An external function of type `(void <-: (String))`.
+:   An external function of type `(void <-: (string))`.
 
 *compiledfn*{.property} `launch-args`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.launch-args "Permalink to this definition"){.headerlink} {#scopes.compiledfn.launch-args}
 
@@ -4962,19 +5090,19 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `list-load`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.list-load "Permalink to this definition"){.headerlink} {#scopes.compiledfn.list-load}
 
-:   An external function of type `(Value <-: (String) raises Error)`.
+:   An external function of type `(Value <-: (string) raises Error)`.
 
 *compiledfn*{.property} `list-parse`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.list-parse "Permalink to this definition"){.headerlink} {#scopes.compiledfn.list-parse}
 
-:   An external function of type `(Value <-: (String) raises Error)`.
+:   An external function of type `(Value <-: (string) raises Error)`.
 
 *compiledfn*{.property} `load-library`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.load-library "Permalink to this definition"){.headerlink} {#scopes.compiledfn.load-library}
 
-:   An external function of type `(void <-: (String) raises Error)`.
+:   An external function of type `(void <-: (string) raises Error)`.
 
 *compiledfn*{.property} `load-object`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.load-object "Permalink to this definition"){.headerlink} {#scopes.compiledfn.load-object}
 
-:   An external function of type `(void <-: (String) raises Error)`.
+:   An external function of type `(void <-: (string) raises Error)`.
 
 *compiledfn*{.property} `parse-infix-expr`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.parse-infix-expr "Permalink to this definition"){.headerlink} {#scopes.compiledfn.parse-infix-expr}
 
@@ -4982,7 +5110,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `realpath`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.realpath "Permalink to this definition"){.headerlink} {#scopes.compiledfn.realpath}
 
-:   An external function of type `(String <-: (String))`.
+:   An external function of type `(string <-: (string))`.
 
 *compiledfn*{.property} `sc_abort`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_abort "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_abort}
 
@@ -5038,7 +5166,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_basename`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_basename "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_basename}
 
-:   An external function of type `(String <-: (String))`.
+:   An external function of type `(string <-: (string))`.
 
 *compiledfn*{.property} `sc_cache_misses`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_cache_misses "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_cache_misses}
 
@@ -5060,13 +5188,17 @@ parses the command-line and optionally enters the REPL.
 
 :   An external function of type `(void <-: (Value bool))`.
 
+*compiledfn*{.property} `sc_case_new`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_case_new "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_case_new}
+
+:   An external function of type `(Value <-: (Value Value))`.
+
 *compiledfn*{.property} `sc_closure_get_context`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_closure_get_context "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_closure_get_context}
 
 :   An external function of type `(Value <-: (Closure))`.
 
 *compiledfn*{.property} `sc_closure_get_docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_closure_get_docstring "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_closure_get_docstring}
 
-:   An external function of type `(String <-: (Closure))`.
+:   An external function of type `(string <-: (Closure))`.
 
 *compiledfn*{.property} `sc_closure_get_template`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_closure_get_template "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_closure_get_template}
 
@@ -5078,15 +5210,15 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_compile_glsl`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_compile_glsl "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_compile_glsl}
 
-:   An external function of type `(String <-: (i32 Symbol Value u64) raises Error)`.
+:   An external function of type `(string <-: (i32 Symbol Value u64) raises Error)`.
 
 *compiledfn*{.property} `sc_compile_object`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_compile_object "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_compile_object}
 
-:   An external function of type `(void <-: (String i32 String Scope u64) raises Error)`.
+:   An external function of type `(void <-: (string i32 string Scope u64) raises Error)`.
 
 *compiledfn*{.property} `sc_compile_spirv`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_compile_spirv "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_compile_spirv}
 
-:   An external function of type `(String <-: (Symbol Value u64) raises Error)`.
+:   An external function of type `(string <-: (i32 Symbol Value u64) raises Error)`.
 
 *compiledfn*{.property} `sc_compiler_version`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_compiler_version "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_compiler_version}
 
@@ -5116,6 +5248,10 @@ parses the command-line and optionally enters the REPL.
 
 :   An external function of type `(Value <-: (type u64))`.
 
+*compiledfn*{.property} `sc_const_int_word_count`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_const_int_word_count "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_const_int_word_count}
+
+:   An external function of type `(i32 <-: (Value))`.
+
 *compiledfn*{.property} `sc_const_int_words_new`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_const_int_words_new "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_const_int_words_new}
 
 :   An external function of type `(Value <-: (type i32 (@ u64)))`.
@@ -5140,17 +5276,25 @@ parses the command-line and optionally enters the REPL.
 
 :   An external function of type `(Value <-: (type f64))`.
 
+*compiledfn*{.property} `sc_default_case_new`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_default_case_new "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_default_case_new}
+
+:   An external function of type `(Value <-: (Value))`.
+
 *compiledfn*{.property} `sc_default_styler`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_default_styler "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_default_styler}
 
-:   An external function of type `(String <-: (Symbol String))`.
+:   An external function of type `(string <-: (Symbol string))`.
 
 *compiledfn*{.property} `sc_default_target_triple`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_default_target_triple "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_default_target_triple}
 
-:   An external function of type `(String <-: ())`.
+:   An external function of type `(string <-: ())`.
 
 *compiledfn*{.property} `sc_dirname`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_dirname "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_dirname}
 
-:   An external function of type `(String <-: (String))`.
+:   An external function of type `(string <-: (string))`.
+
+*compiledfn*{.property} `sc_do_case_new`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_do_case_new "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_do_case_new}
+
+:   An external function of type `(Value <-: (Value))`.
 
 *compiledfn*{.property} `sc_dump_error`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_dump_error "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_dump_error}
 
@@ -5170,7 +5314,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_error_new`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_error_new "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_error_new}
 
-:   An external function of type `(Error <-: (String))`.
+:   An external function of type `(Error <-: (string))`.
 
 *compiledfn*{.property} `sc_eval`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_eval "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_eval}
 
@@ -5214,11 +5358,11 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_format_error`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_format_error "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_format_error}
 
-:   An external function of type `(String <-: (Error))`.
+:   An external function of type `(string <-: (Error))`.
 
 *compiledfn*{.property} `sc_format_message`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_format_message "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_format_message}
 
-:   An external function of type `(String <-: (Anchor String))`.
+:   An external function of type `(string <-: (Anchor string))`.
 
 *compiledfn*{.property} `sc_function_type`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_function_type "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_function_type}
 
@@ -5260,9 +5404,17 @@ parses the command-line and optionally enters the REPL.
 
 :   An external function of type `(i32 <-: (Value) raises Error)`.
 
+*compiledfn*{.property} `sc_global_flags`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_global_flags "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_global_flags}
+
+:   An external function of type `(u32 <-: (Value) raises Error)`.
+
 *compiledfn*{.property} `sc_global_location`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_global_location "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_global_location}
 
 :   An external function of type `(i32 <-: (Value) raises Error)`.
+
+*compiledfn*{.property} `sc_global_name`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_global_name "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_global_name}
+
+:   An external function of type `(Symbol <-: (Value) raises Error)`.
 
 *compiledfn*{.property} `sc_global_new`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_global_new "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_global_new}
 
@@ -5322,7 +5474,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_import_c`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_import_c "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_import_c}
 
-:   An external function of type `(Scope <-: (String String List Scope) raises Error)`.
+:   An external function of type `(Scope <-: (string string List Scope) raises Error)`.
 
 *compiledfn*{.property} `sc_integer_type`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_integer_type "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_integer_type}
 
@@ -5334,11 +5486,11 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_is_directory`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_is_directory "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_is_directory}
 
-:   An external function of type `(bool <-: (String))`.
+:   An external function of type `(bool <-: (string))`.
 
 *compiledfn*{.property} `sc_is_file`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_is_file "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_is_file}
 
-:   An external function of type `(bool <-: (String))`.
+:   An external function of type `(bool <-: (string))`.
 
 *compiledfn*{.property} `sc_key_type`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_key_type "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_key_type}
 
@@ -5394,7 +5546,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_list_repr`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_list_repr "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_list_repr}
 
-:   An external function of type `(String <-: (List))`.
+:   An external function of type `(string <-: (List))`.
 
 *compiledfn*{.property} `sc_list_reverse`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_list_reverse "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_list_reverse}
 
@@ -5402,15 +5554,15 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_list_serialize`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_list_serialize "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_list_serialize}
 
-:   An external function of type `(String <-: (List))`.
+:   An external function of type `(string <-: (List))`.
 
 *compiledfn*{.property} `sc_load_library`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_load_library "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_load_library}
 
-:   An external function of type `(void <-: (String) raises Error)`.
+:   An external function of type `(void <-: (string) raises Error)`.
 
 *compiledfn*{.property} `sc_load_object`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_load_object "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_load_object}
 
-:   An external function of type `(void <-: (String) raises Error)`.
+:   An external function of type `(void <-: (string) raises Error)`.
 
 *compiledfn*{.property} `sc_loop_arguments`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_loop_arguments "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_loop_arguments}
 
@@ -5462,11 +5614,15 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_parse_from_path`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_parse_from_path "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_parse_from_path}
 
-:   An external function of type `(Value <-: (String) raises Error)`.
+:   An external function of type `(Value <-: (string) raises Error)`.
 
 *compiledfn*{.property} `sc_parse_from_string`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_parse_from_string "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_parse_from_string}
 
-:   An external function of type `(Value <-: (String) raises Error)`.
+:   An external function of type `(Value <-: (string) raises Error)`.
+
+*compiledfn*{.property} `sc_pass_case_new`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_pass_case_new "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_pass_case_new}
+
+:   An external function of type `(Value <-: (Value Value))`.
 
 *compiledfn*{.property} `sc_pointer_type`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_pointer_type "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_pointer_type}
 
@@ -5494,7 +5650,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_prompt`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_prompt "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_prompt}
 
-:   An external function of type `((_: bool String) <-: (String String))`.
+:   An external function of type `((_: bool string) <-: (string string))`.
 
 *compiledfn*{.property} `sc_prompt_add_completion`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_prompt_add_completion "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_prompt_add_completion}
 
@@ -5506,11 +5662,11 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_prompt_load_history`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_prompt_load_history "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_prompt_load_history}
 
-:   An external function of type `(void <-: (String))`.
+:   An external function of type `(void <-: (string))`.
 
 *compiledfn*{.property} `sc_prompt_save_history`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_prompt_save_history "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_prompt_save_history}
 
-:   An external function of type `(void <-: (String))`.
+:   An external function of type `(void <-: (string))`.
 
 *compiledfn*{.property} `sc_prompt_set_autocomplete_handler`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_prompt_set_autocomplete_handler "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_prompt_set_autocomplete_handler}
 
@@ -5526,7 +5682,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_realpath`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_realpath "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_realpath}
 
-:   An external function of type `(String <-: (String))`.
+:   An external function of type `(string <-: (string))`.
 
 *compiledfn*{.property} `sc_refer_flags`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_refer_flags "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_refer_flags}
 
@@ -5554,11 +5710,11 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_scope_bind_with_docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_scope_bind_with_docstring "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_scope_bind_with_docstring}
 
-:   An external function of type `(Scope <-: (Scope Value Value String))`.
+:   An external function of type `(Scope <-: (Scope Value Value string))`.
 
 *compiledfn*{.property} `sc_scope_docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_scope_docstring "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_scope_docstring}
 
-:   An external function of type `(String <-: (Scope Value))`.
+:   An external function of type `(string <-: (Scope Value))`.
 
 *compiledfn*{.property} `sc_scope_get_parent`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_scope_get_parent "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_scope_get_parent}
 
@@ -5570,7 +5726,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_scope_module_docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_scope_module_docstring "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_scope_module_docstring}
 
-:   An external function of type `(String <-: (Scope))`.
+:   An external function of type `(string <-: (Scope))`.
 
 *compiledfn*{.property} `sc_scope_new`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_scope_new "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_scope_new}
 
@@ -5582,11 +5738,11 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_scope_new_subscope_with_docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_scope_new_subscope_with_docstring "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_scope_new_subscope_with_docstring}
 
-:   An external function of type `(Scope <-: (Scope String))`.
+:   An external function of type `(Scope <-: (Scope string))`.
 
 *compiledfn*{.property} `sc_scope_new_with_docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_scope_new_with_docstring "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_scope_new_with_docstring}
 
-:   An external function of type `(Scope <-: (String))`.
+:   An external function of type `(Scope <-: (string))`.
 
 *compiledfn*{.property} `sc_scope_next`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_scope_next "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_scope_next}
 
@@ -5622,47 +5778,51 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_spirv_to_glsl`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_spirv_to_glsl "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_spirv_to_glsl}
 
-:   An external function of type `(String <-: (String))`.
+:   An external function of type `(string <-: (string))`.
 
 *compiledfn*{.property} `sc_string_buffer`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_string_buffer "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_string_buffer}
 
-:   An external function of type `((_: (@ i8) usize) <-: (String))`.
+:   An external function of type `((_: (@ i8) usize) <-: (string))`.
 
 *compiledfn*{.property} `sc_string_compare`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_string_compare "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_string_compare}
 
-:   An external function of type `(i32 <-: (String String))`.
+:   An external function of type `(i32 <-: (string string))`.
 
 *compiledfn*{.property} `sc_string_count`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_string_count "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_string_count}
 
-:   An external function of type `(usize <-: (String))`.
+:   An external function of type `(usize <-: (string))`.
 
 *compiledfn*{.property} `sc_string_join`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_string_join "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_string_join}
 
-:   An external function of type `(String <-: (String String))`.
+:   An external function of type `(string <-: (string string))`.
 
 *compiledfn*{.property} `sc_string_lslice`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_string_lslice "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_string_lslice}
 
-:   An external function of type `(String <-: (String usize))`.
+:   An external function of type `(string <-: (string usize))`.
 
 *compiledfn*{.property} `sc_string_match`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_string_match "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_string_match}
 
-:   An external function of type `((_: bool i32 i32) <-: (String String) raises Error)`.
+:   An external function of type `((_: bool i32 i32) <-: (string string) raises Error)`.
 
 *compiledfn*{.property} `sc_string_new`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_string_new "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_string_new}
 
-:   An external function of type `(String <-: ((@ i8) usize))`.
+:   An external function of type `(string <-: ((@ i8) usize))`.
 
 *compiledfn*{.property} `sc_string_new_from_cstr`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_string_new_from_cstr "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_string_new_from_cstr}
 
-:   An external function of type `(String <-: ((@ i8)))`.
+:   An external function of type `(string <-: ((@ i8)))`.
 
 *compiledfn*{.property} `sc_string_rslice`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_string_rslice "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_string_rslice}
 
-:   An external function of type `(String <-: (String usize))`.
+:   An external function of type `(string <-: (string usize))`.
 
 *compiledfn*{.property} `sc_strip_qualifiers`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_strip_qualifiers "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_strip_qualifiers}
 
 :   An external function of type `(type <-: (type))`.
+
+*compiledfn*{.property} `sc_switch_append`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_switch_append "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_switch_append}
+
+:   An external function of type `(void <-: (Value Value))`.
 
 *compiledfn*{.property} `sc_switch_append_case`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_switch_append_case "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_switch_append_case}
 
@@ -5694,11 +5854,11 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_symbol_new`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_symbol_new "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_symbol_new}
 
-:   An external function of type `(Symbol <-: (String))`.
+:   An external function of type `(Symbol <-: (string))`.
 
 *compiledfn*{.property} `sc_symbol_new_unique`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_symbol_new_unique "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_symbol_new_unique}
 
-:   An external function of type `(Symbol <-: (String))`.
+:   An external function of type `(Symbol <-: (string))`.
 
 *compiledfn*{.property} `sc_symbol_style`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_symbol_style "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_symbol_style}
 
@@ -5706,7 +5866,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_symbol_to_string`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_symbol_to_string "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_symbol_to_string}
 
-:   An external function of type `(String <-: (Symbol))`.
+:   An external function of type `(string <-: (Symbol))`.
 
 *compiledfn*{.property} `sc_template_append_parameter`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_template_append_parameter "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_template_append_parameter}
 
@@ -5772,6 +5932,10 @@ parses the command-line and optionally enters the REPL.
 
 :   An external function of type `(void <-: (type))`.
 
+*compiledfn*{.property} `sc_type_del_symbol`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_type_del_symbol "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_type_del_symbol}
+
+:   An external function of type `(void <-: (type Symbol))`.
+
 *compiledfn*{.property} `sc_type_element_at`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_type_element_at "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_type_element_at}
 
 :   An external function of type `(type <-: (type i32) raises Error)`.
@@ -5786,7 +5950,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_type_get_docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_type_get_docstring "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_type_get_docstring}
 
-:   An external function of type `(String <-: (type Symbol))`.
+:   An external function of type `(string <-: (type Symbol))`.
 
 *compiledfn*{.property} `sc_type_is_default_suffix`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_type_is_default_suffix "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_type_is_default_suffix}
 
@@ -5838,7 +6002,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_type_set_docstring`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_type_set_docstring "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_type_set_docstring}
 
-:   An external function of type `(void <-: (type Symbol String))`.
+:   An external function of type `(void <-: (type Symbol string))`.
 
 *compiledfn*{.property} `sc_type_set_symbol`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_type_set_symbol "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_type_set_symbol}
 
@@ -5854,11 +6018,11 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_type_string`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_type_string "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_type_string}
 
-:   An external function of type `(String <-: (type))`.
+:   An external function of type `(string <-: (type))`.
 
 *compiledfn*{.property} `sc_typename_type`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_typename_type "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_typename_type}
 
-:   An external function of type `(type <-: (String type) raises Error)`.
+:   An external function of type `(type <-: (string type) raises Error)`.
 
 *compiledfn*{.property} `sc_typename_type_get_super`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_typename_type_get_super "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_typename_type_get_super}
 
@@ -5898,7 +6062,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_value_ast_repr`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_value_ast_repr "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_value_ast_repr}
 
-:   An external function of type `(String <-: (Value))`.
+:   An external function of type `(string <-: (Value))`.
 
 *compiledfn*{.property} `sc_value_block_depth`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_value_block_depth "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_value_block_depth}
 
@@ -5910,7 +6074,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_value_content_repr`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_value_content_repr "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_value_content_repr}
 
-:   An external function of type `(String <-: (Value))`.
+:   An external function of type `(string <-: (Value))`.
 
 *compiledfn*{.property} `sc_value_is_constant`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_value_is_constant "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_value_is_constant}
 
@@ -5926,7 +6090,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_value_kind_string`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_value_kind_string "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_value_kind_string}
 
-:   An external function of type `(String <-: (i32))`.
+:   An external function of type `(string <-: (i32))`.
 
 *compiledfn*{.property} `sc_value_qualified_type`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_value_qualified_type "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_value_qualified_type}
 
@@ -5934,11 +6098,11 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_value_repr`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_value_repr "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_value_repr}
 
-:   An external function of type `(String <-: (Value))`.
+:   An external function of type `(string <-: (Value))`.
 
 *compiledfn*{.property} `sc_value_tostring`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_value_tostring "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_value_tostring}
 
-:   An external function of type `(String <-: (Value))`.
+:   An external function of type `(string <-: (Value))`.
 
 *compiledfn*{.property} `sc_value_type`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_value_type "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_value_type}
 
@@ -5966,7 +6130,7 @@ parses the command-line and optionally enters the REPL.
 
 *compiledfn*{.property} `sc_write`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.sc_write "Permalink to this definition"){.headerlink} {#scopes.compiledfn.sc_write}
 
-:   An external function of type `(void <-: (String))`.
+:   An external function of type `(void <-: (string))`.
 
 *compiledfn*{.property} `set-globals!`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.set-globals! "Permalink to this definition"){.headerlink} {#scopes.compiledfn.set-globals!}
 
@@ -5983,4 +6147,8 @@ parses the command-line and optionally enters the REPL.
 *compiledfn*{.property} `symbol-handler`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.symbol-handler "Permalink to this definition"){.headerlink} {#scopes.compiledfn.symbol-handler}
 
 :   A compiled function of type `((_: List Scope) <-: (List Scope) raises Error)`.
+
+*compiledfn*{.property} `trap`{.descname} (*&ensp;...&ensp;*)[](#scopes.compiledfn.trap "Permalink to this definition"){.headerlink} {#scopes.compiledfn.trap}
+
+:   An external function of type `(noreturn <-: ())`.
 

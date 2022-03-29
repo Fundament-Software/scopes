@@ -40,6 +40,10 @@ fashion.
 
     :   
 
+    *fn*{.property} `__copy`{.descname} (*&ensp;self&ensp;*)[](#scopes.One.fn.__copy "Permalink to this definition"){.headerlink} {#scopes.One.fn.__copy}
+
+    :   
+
     *fn*{.property} `__drop`{.descname} (*&ensp;self&ensp;*)[](#scopes.One.fn.__drop "Permalink to this definition"){.headerlink} {#scopes.One.fn.__drop}
 
     :   

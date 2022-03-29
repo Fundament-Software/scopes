@@ -10,6 +10,10 @@ than in registers or the stack.
 
 :   An opaque type of supertype `Struct`.
 
+    *inline*{.property} `__==`{.descname} (*&ensp;...&ensp;*)[](#scopes.Array.inline.__== "Permalink to this definition"){.headerlink} {#scopes.Array.inline.__==}
+
+    :   
+
     *fn*{.property} `__@`{.descname} (*&ensp;self index&ensp;*)[](#scopes.Array.fn.__@ "Permalink to this definition"){.headerlink} {#scopes.Array.fn.__@}
 
     :   Implements support for the `@` operator. Returns a view reference to the
@@ -20,12 +24,16 @@ than in registers or the stack.
     :   Implements support for the `as` operator. Arrays can be cast to
         `Generator`, or directly passed to `for`.
 
+    *fn*{.property} `__copy`{.descname} (*&ensp;self&ensp;*)[](#scopes.Array.fn.__copy "Permalink to this definition"){.headerlink} {#scopes.Array.fn.__copy}
+
+    :   Implements support for the `copy` operation.
+
     *inline*{.property} `__countof`{.descname} (*&ensp;self&ensp;*)[](#scopes.Array.inline.__countof "Permalink to this definition"){.headerlink} {#scopes.Array.inline.__countof}
 
     :   Implements support for the `countof` operator. Returns the current
         number of elements stored in `self` as a value of `usize` type.
 
-    *inline*{.property} `__drop`{.descname} (*&ensp;self&ensp;*)[](#scopes.Array.inline.__drop "Permalink to this definition"){.headerlink} {#scopes.Array.inline.__drop}
+    *fn*{.property} `__drop`{.descname} (*&ensp;self&ensp;*)[](#scopes.Array.fn.__drop "Permalink to this definition"){.headerlink} {#scopes.Array.fn.__drop}
 
     :   Implements support for freeing the array's memory when it goes out
         of scope.
@@ -84,6 +92,14 @@ than in registers or the stack.
 
     :   Remove element with highest index from array `self` and return it.
 
+    *inline*{.property} `predicated-sort`{.descname} (*&ensp;self predicate ...&ensp;*)[](#scopes.Array.inline.predicated-sort "Permalink to this definition"){.headerlink} {#scopes.Array.inline.predicated-sort}
+
+    :   Sort elements of array `self` from smallest to largest, either using
+        the `<` operator supplied by the element type, or by using the predicate
+        supplied by the callable `predicate`, which takes two arguments and
+        is expected to return true if the first argument is smaller than the
+        second one.
+
     *fn*{.property} `remove`{.descname} (*&ensp;self index&ensp;*)[](#scopes.Array.fn.remove "Permalink to this definition"){.headerlink} {#scopes.Array.fn.remove}
 
     :   Remove element at index from array `self` and return it.
@@ -93,10 +109,6 @@ than in registers or the stack.
 
     :   Resize the array to the specified count. Items are appended or removed
         to meet the desired count.
-
-    *inline*{.property} `reverse`{.descname} (*&ensp;self&ensp;*)[](#scopes.Array.inline.reverse "Permalink to this definition"){.headerlink} {#scopes.Array.inline.reverse}
-
-    :   
 
     *inline*{.property} `sort`{.descname} (*&ensp;self key ...&ensp;*)[](#scopes.Array.inline.sort "Permalink to this definition"){.headerlink} {#scopes.Array.inline.sort}
 

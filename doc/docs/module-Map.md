@@ -13,6 +13,10 @@ This module implements a key -> value store using hashtables.
 
     :   
 
+    *fn*{.property} `__copy`{.descname} (*&ensp;self&ensp;*)[](#scopes.Map.fn.__copy "Permalink to this definition"){.headerlink} {#scopes.Map.fn.__copy}
+
+    :   
+
     *inline*{.property} `__countof`{.descname} (*&ensp;self&ensp;*)[](#scopes.Map.inline.__countof "Permalink to this definition"){.headerlink} {#scopes.Map.inline.__countof}
 
     :   
@@ -58,6 +62,10 @@ This module implements a key -> value store using hashtables.
 
     :   
 
+    *fn*{.property} `pop`{.descname} (*&ensp;self key&ensp;*)[](#scopes.Map.fn.pop "Permalink to this definition"){.headerlink} {#scopes.Map.fn.pop}
+
+    :   Erases a key -> value association from the map and pops the old value
+
     *fn*{.property} `set`{.descname} (*&ensp;self key value&ensp;*)[](#scopes.Map.fn.set "Permalink to this definition"){.headerlink} {#scopes.Map.fn.set}
 
     :   Inserts a new key -> value association into map; key can be the
@@ -76,6 +84,10 @@ This module implements a key -> value store using hashtables.
 
     :   
 
+    *fn*{.property} `__copy`{.descname} (*&ensp;self&ensp;*)[](#scopes.MapError.fn.__copy "Permalink to this definition"){.headerlink} {#scopes.MapError.fn.__copy}
+
+    :   
+
     *fn*{.property} `__drop`{.descname} (*&ensp;self&ensp;*)[](#scopes.MapError.fn.__drop "Permalink to this definition"){.headerlink} {#scopes.MapError.fn.__drop}
 
     :   
@@ -84,7 +96,11 @@ This module implements a key -> value store using hashtables.
 
     :   
 
-    *fn*{.property} `__repr`{.descname} (*&ensp;self&ensp;*)[](#scopes.MapError.fn.__repr "Permalink to this definition"){.headerlink} {#scopes.MapError.fn.__repr}
+    *inline*{.property} `__repr`{.descname} (*&ensp;self&ensp;*)[](#scopes.MapError.inline.__repr "Permalink to this definition"){.headerlink} {#scopes.MapError.inline.__repr}
+
+    :   
+
+    *inline*{.property} `__tostring`{.descname} (*&ensp;self&ensp;*)[](#scopes.MapError.inline.__tostring "Permalink to this definition"){.headerlink} {#scopes.MapError.inline.__tostring}
 
     :   
 
