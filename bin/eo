@@ -40,7 +40,7 @@ import shutil
 import hashlib
 import configparser
 
-VERSION = "0.2"
+VERSION = "0.3"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -48,7 +48,8 @@ PROJECT_INSTALL_STATE_DIR = PROJECT_CONFIG_DIR + "/installed"
 
 # some urls to make bootstrapping easier
 PRESET_IMPORT_URLS = {
-    "scopes" : "https://hg.sr.ht/~duangle/scopes/raw/extras/eo/scopes.eo?rev=tip"
+    "scopes" : "https://hg.sr.ht/~duangle/scopes/raw/extras/eo/scopes.eo?rev=tip",
+    "scopes-source" : "https://hg.sr.ht/~duangle/scopes/raw/extras/eo/scopes-source.eo?rev=tip"
 }
 
 RECIPE_WARNING = \
@@ -892,7 +893,9 @@ def builtin_download (ee, url):
     dlcachedir = ee.recipe.dlcachepath
     os.makedirs(dlcachedir, exist_ok=True)
     filepath = os.path.join(dlcachedir, filename)
-    return download_tempfile(url, "", remove_stale = False, filepath = filepath)
+    return download_tempfile(url, "",
+        remove_stale = ee.recipe.always_sync(),
+        filepath = filepath)
 
 def builtin_extract (ee, archivepath):
     print("extracting {}".format(archivepath))
@@ -915,7 +918,7 @@ def builtin_download_svn(ee, url, revision):
     dlcachedir = ee.recipe.dlcachepath
     os.makedirs(dlcachedir, exist_ok=True)
     filepath = os.path.join(dlcachedir, filename)
-    if not os.path.isfile(filepath):
+    if ee.recipe.always_sync() or not os.path.isfile(filepath):
         tempdir = tempfile.mkdtemp("_eo_svn") + "/export"
         shell('svn export -q -r {} {} {}'.format(revision, url, tempdir))
         shell("tar -czf {} -C {} .".format(filepath, tempdir))
@@ -1040,10 +1043,14 @@ class Recipe:
         with open(self.statepath, 'r') as statefile:
             return statefile.readline().strip()
 
+    def always_sync(self):
+        return (self.version == "unknown")
+
     def needs_sync(self):
         if not self.is_installed():
             return False
-        return self.get_installed_version() != self.version
+        return self.always_sync() \
+            or (self.get_installed_version() != self.version)
 
     def supports(self, platform):
         if not self.platforms:
@@ -1523,7 +1530,7 @@ class Project:
         else:
             print("recipe directory {} not found.".format(self.recipe_dir))
 
-    def import_recipe(self, url):
+    def import_recipe(self, url, install = False):
         if url not in PRESET_IMPORT_URLS:
             print(RECIPE_WARNING)
             confirm = input("continue? [y/N] ").lower()
@@ -1549,6 +1556,8 @@ class Project:
         for name,recipe in self.recipes.items():
             print("successfully imported recipe for package {}".format(name))
             names.append(name)
+        if install:
+            self.install(names[0:1])
         return names
 
     def search (self, pattern):
@@ -1612,7 +1621,7 @@ class Project:
                 rdeps[dep].add(recipe.name.string)
         return rdeps
 
-    def install (self, recipenames, **kwargs):
+    def install (self, recipenames, autoconfirm = False, **kwargs):
         self.read_recipes()
         def pred(recipe, level):
             return not recipe.is_installed()
@@ -1624,9 +1633,10 @@ class Project:
         for line in wrap_words([dep.name.string for dep in deps]):
             print(line)
         print()
-        confirm = input("continue? [y/N] ").lower()
-        if confirm != "y":
-            return
+        if not autoconfirm:
+            confirm = input("continue? [y/N] ").lower()
+            if confirm != "y":
+                return
         for dep in deps:
             dep.install(**kwargs)
         print("done.")
@@ -1708,15 +1718,13 @@ def cmd_init(args):
     project = Project.find(args.dest)
     project = project.init()
     if args.url:
-        names = project.import_recipe(args.url)
-        project.install(names)
+        project.import_recipe(args.url, install=True)
 
 def cmd_import(args):
     project = Project.find(".")
-    project.import_recipe(args.url)
+    project.import_recipe(args.url, install=args.install)
 
 def cmd_status(args):
-    print_program_header()
     project = Project.find(".")
     project.show_status()
 
@@ -1734,7 +1742,7 @@ def cmd_build(args):
 
 def cmd_install(args):
     project = Project.find(".")
-    project.install(args.name)
+    project.install(args.name,autoconfirm=args.yes)
 
 def cmd_sync(args):
     project = Project.find(".")
@@ -1755,7 +1763,7 @@ cmd.set_defaults(func=cmd_init)
 cmd.add_argument("--dest",nargs="?",default=".",
     help="path to directory to be initialized")
 cmd.add_argument("url",nargs="?",
-    help="url of recipe file to import and install")
+    help="url of recipe file to install the first package from")
 
 cmd = subcommands.add_parser("status", help="show project environment status")
 cmd.set_defaults(func=cmd_status)
@@ -1764,6 +1772,8 @@ cmd = subcommands.add_parser("import", help="import recipe from URL")
 cmd.set_defaults(func=cmd_import)
 cmd.add_argument("url",
     help="url to recipe file to import")
+cmd.add_argument("--install",action="store_true",
+    help="install first package from recipe")
 
 cmd = subcommands.add_parser("search", help="search recipes available for project")
 cmd.set_defaults(func=cmd_search)
@@ -1782,6 +1792,8 @@ cmd.add_argument("name",nargs="*",
 
 cmd = subcommands.add_parser("install", help="install package from recipe")
 cmd.set_defaults(func=cmd_install)
+cmd.add_argument("-y, --yes",action="store_true",dest="yes",
+    help="always confirm package installation")
 cmd.add_argument("name",nargs="*",
     help="name of package to install")
 

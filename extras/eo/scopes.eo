@@ -22,7 +22,7 @@ package scopes
         "{rootdir}/include/scopes"
     in "/lib"
         "{rootdir}/lib/clang"
-        "{rootdir}/lib/include"
+        "{rootdir}/lib/scopes"
     in "/testing"
         "{rootdir}/testing"
     in "/"
