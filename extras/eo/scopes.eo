@@ -6,7 +6,7 @@ package scopes
     platform linux unknown
     VERSION := "0.16"
     version VERSION
-    archive-url := "https://hg.sr.ht/~duangle/scopes/archive/release-{VERSION}.tar.gz"
+    archive-url := "https://hg.sr.ht/~duangle/scopes-binaries/raw/scopes-0.16-glibc_2.27-linux-x86_64.tar.xz"
     rootdir := (commonpath (extract (download archive-url)))
     alias "/" rootdir
 package scopes-unstable
