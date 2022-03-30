@@ -1,6 +1,14 @@
 # Major EO installer for http://scopes.rocks distro image
 # pip3 must be installed
 update-url "https://hg.sr.ht/~duangle/scopes/raw/extras/eo/scopes.eo?rev=tip"
+package scopes
+    summary "The Scopes Programming Language & Infrastructure"
+    platform linux unknown
+    VERSION := "0.16"
+    version VERSION
+    archive-url := "https://hg.sr.ht/~duangle/scopes/archive/release-{VERSION}.tar.gz"
+    rootdir := (commonpath (extract (download archive-url)))
+    alias "/" rootdir
 package scopes-unstable
     summary "The Scopes Programming Language & Infrastructure"
     platform linux unknown
