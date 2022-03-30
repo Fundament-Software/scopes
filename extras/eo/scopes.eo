@@ -4,9 +4,9 @@ update-url "https://hg.sr.ht/~duangle/scopes/raw/extras/eo/scopes.eo?rev=tip"
 package scopes
     summary "The Scopes Programming Language & Infrastructure"
     platform linux unknown
-    VERSION := "0.16"
+    VERSION := "0.17"
     version VERSION
-    archive-url := "https://hg.sr.ht/~duangle/scopes-binaries/raw/scopes-0.16-glibc_2.27-linux-x86_64.tar.xz"
+    archive-url := "https://hg.sr.ht/~duangle/scopes-binaries/raw/scopes-0.17-glibc_2.31-linux-x86_64.tar.xz"
     rootdir := (commonpath (extract (download archive-url)))
     alias "/" rootdir
 package scopes-unstable
