@@ -996,6 +996,23 @@ SCOPES_RESULT(const Scope *) import_c_module (
     aargs.push_back("clang");
     aargs.push_back(path.c_str());
     aargs.push_back("-fno-common");
+
+    // grab compiler args from the nix wrapper variable
+    std::string nixenv = getenv("NIX_CFLAGS_COMPILE");
+    std::vector<std::string> nixargs;
+    size_t last = 0;
+    size_t pos = 0;
+    while((pos = nixenv.find(" ", last)) != std::string::npos)
+    {
+        if(last != pos)
+        {
+            nixargs.push_back(nixenv.substr(last, pos - last));
+            aargs.push_back(nixargs.back().c_str());
+        }
+        last = pos + 1;
+    }
+    nixargs.push_back(nixenv.substr(last));
+
     auto argcount = args.size();
     std::string object_file;
     for (size_t i = 0; i < argcount; ++i) {
@@ -1006,6 +1023,7 @@ SCOPES_RESULT(const Scope *) import_c_module (
         }
         aargs.push_back(args[i].c_str());
     }
+
 
     CompilerInstance compiler;
     compiler.setInvocation(createInvocationFromCommandLine(aargs));
