@@ -41,4 +41,5 @@ syntax: regexp
 ^\.eo/dlcache
 ^\.eo/archive
 ^\.eo/installed
+^external/recipes/majoreo\.eo
 

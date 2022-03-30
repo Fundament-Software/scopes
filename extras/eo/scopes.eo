@@ -1,20 +1,21 @@
 # Major EO installer for http://scopes.rocks distro image
 # pip3 must be installed
-version := "tip"
-archive-url := "https://hg.sr.ht/~duangle/scopes/archive/{version}.tar.gz"
-rootdir := (commonpath (extract (download archive-url)))
-rootdir :=
-    then
-        cmd := (shell rootdir)
-        doc-cmd := (shell "{rootdir}/doc")
-        doc-cmd "make html"
-        cmd "./build.sh"
-        rootdir
-package scopes
+update-url "https://hg.sr.ht/~duangle/scopes/raw/extras/eo/scopes.eo?rev=tip"
+package scopes-unstable
     summary "The Scopes Programming Language & Infrastructure"
     platform linux unknown
     # force fresh rebuild
     #version version
+    version := "tip"
+    archive-url := "https://hg.sr.ht/~duangle/scopes/archive/{version}.tar.gz"
+    rootdir := (commonpath (extract (download archive-url)))
+    rootdir :=
+        then
+            cmd := (shell rootdir)
+            doc-cmd := (shell "{rootdir}/doc")
+            doc-cmd "make html"
+            cmd "./build.sh"
+            rootdir
     alias "/doc/scopes/html" "{rootdir}/doc/site"
     in "/bin"
         "{rootdir}/bin/libscopesrt.so"
@@ -26,3 +27,10 @@ package scopes
         "{rootdir}/testing"
         "{rootdir}/CREDITS.md"
         "{rootdir}/LICENSE.md"
+package scopes-source-unstable
+    summary "The Scopes Programming Language & Infrastructure (Source)"
+    version := "tip"
+    version version
+    archive-url := "https://hg.sr.ht/~duangle/scopes/archive/{version}.tar.gz"
+    rootdir := (commonpath (extract (download archive-url)))
+    alias "/" rootdir
