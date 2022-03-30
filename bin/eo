@@ -40,7 +40,7 @@ import shutil
 import hashlib
 import configparser
 
-VERSION = "0.4"
+VERSION = "0.5"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -48,8 +48,8 @@ PROJECT_INSTALL_STATE_DIR = PROJECT_CONFIG_DIR + "/installed"
 
 # some urls to make bootstrapping easier
 PRESET_IMPORT_URLS = {
-    "scopes" : "https://hg.sr.ht/~duangle/scopes/raw/extras/eo/scopes.eo?rev=tip",
-    "scopes-source" : "https://hg.sr.ht/~duangle/scopes/raw/extras/eo/scopes-source.eo?rev=tip"
+    "majoreo" : "https://hg.sr.ht/~duangle/majoreo/raw/extras/recipes/majoreo.eo?rev=tip",
+    "scopes" : "https://hg.sr.ht/~duangle/scopes/raw/extras/eo/scopes.eo?rev=tip"
 }
 
 RECIPE_WARNING = \
@@ -1631,7 +1631,7 @@ class Project:
                 print("successfully imported recipe for package {}".format(name))
                 names.append(name)
             if install:
-                self.install(names[0:1])
+                self.install(names[0:1], autoconfirm = True)
 
     def search (self, pattern):
         self.read_packages()
@@ -1842,7 +1842,8 @@ cmd.add_argument("--dest",nargs="?",default=".",
 cmd.add_argument("url",nargs="?",
     help="url of recipe file to install the first package from")
 
-cmd = subcommands.add_parser("status", help="show project environment status")
+cmd = subcommands.add_parser("status", aliases=["stat"],
+    help="show project environment status")
 cmd.set_defaults(func=cmd_status)
 
 cmd = subcommands.add_parser("import", help="import recipe from URL")
