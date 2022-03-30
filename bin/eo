@@ -40,7 +40,7 @@ import shutil
 import hashlib
 import configparser
 
-VERSION = "0.3"
+VERSION = "0.4"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -96,49 +96,54 @@ def shell(cmd, retry=1, silent=False):
     raise OSError("command failed.")
 
 def gen_rotator():
-    T = time.time()
     while True:
-        t = time.time() - T
-        n = ''
-        for c in range(30):
-            p = c / 30.0
-            phase2 = math.sin(p * 2.0 * math.pi)
-            phase = p * phase2 * 2.0 * math.pi
-            f = math.sin(phase + t*10.0)
-            n += ' .oO'[int((f+1.0)*0.5*3+0.5)]
-        yield n
+        for c in '|/-\\':
+            yield c
 
+last_print_r_width = 0
 def print_r(text):
+    global last_print_r_width
     text = text.rstrip('\n \t')
-    spaces = 80 - len(text)
-    sys.stdout.write('\r' + text + ' '*spaces)
+    sys.stdout.write('\r' + text + ' '*last_print_r_width)
     sys.stdout.flush()
+    last_print_r_width = len(text)
 
 # lifehack
 if hasattr(ssl, '_create_unverified_context'):
     ssl._create_default_https_context = ssl._create_unverified_context
 
-def download_tempfile(url, filename, remove_stale = True, filepath = None):
+def download_tempfile(url, filename, remove_stale = True, filepath = None, silent=False):
     if filepath:
         tempfilepath = filepath
     else:
         tempdir = tempfile.mkdtemp("eo")
         tempfilepath = os.path.join(tempdir, filename)
-    print("downloading {0} to {1}...".format(url,tempfilepath))
+    if not silent:
+        print("downloading {0} to {1}...".format(url,tempfilepath))
     if os.path.isfile(tempfilepath):
         if remove_stale:
-            print("removing stale {0}".format(tempfilepath))
+            if not silent:
+                print("removing stale {0}".format(tempfilepath))
             os.remove(tempfilepath)
         else:
             return tempfilepath
     rotator = gen_rotator()
     def reporthook(count,blocksize,totalsize):
-        perc = min(count * blocksize, totalsize) * 100.0 / totalsize
-        print_r("%5.1f%% downloaded... %s" % (perc,next(rotator)))
-        sys.stdout.flush()
-    urllib.request.urlretrieve(url, tempfilepath, reporthook)
-    print_r("done.")
-    print()
+        if not silent:
+            perc = min(count * blocksize, totalsize) * 100.0 / totalsize
+            numchars = int(perc / 100.0 * 30.0)
+            msg = '{0} [{1}{2}] {3:.2f}%'.format(next(rotator), '='*numchars, ' '*(30-numchars), perc)
+            print_r(msg)
+            sys.stdout.flush()
+    try:
+        urllib.request.urlretrieve(url, tempfilepath, reporthook)
+    except:
+        if os.path.isfile(tempfilepath):
+            os.remove(tempfilepath)
+        raise
+    if not silent:
+        print_r("done.")
+        print()
     return tempfilepath
 
 # extract filename from URL
@@ -890,11 +895,11 @@ def builtin_download (ee, url):
     raw_filename = url_filename(url)
     hashed_name = hashlib.sha224(url.encode('utf-8')).hexdigest()
     filename = hashed_name + "_" + raw_filename
-    dlcachedir = ee.recipe.dlcachepath
+    dlcachedir = ee.package.dlcachepath
     os.makedirs(dlcachedir, exist_ok=True)
     filepath = os.path.join(dlcachedir, filename)
     return download_tempfile(url, "",
-        remove_stale = ee.recipe.always_sync(),
+        remove_stale = ee.package.always_sync(),
         filepath = filepath)
 
 def builtin_extract (ee, archivepath):
@@ -915,10 +920,10 @@ def builtin_mkdir(ee, path):
 def builtin_download_svn(ee, url, revision):
     hashed_name = hashlib.sha224((url + "/" + revision).encode('utf-8')).hexdigest()
     filename = hashed_name + ".tar.gz"
-    dlcachedir = ee.recipe.dlcachepath
+    dlcachedir = ee.package.dlcachepath
     os.makedirs(dlcachedir, exist_ok=True)
     filepath = os.path.join(dlcachedir, filename)
-    if ee.recipe.always_sync() or not os.path.isfile(filepath):
+    if ee.package.always_sync() or not os.path.isfile(filepath):
         tempdir = tempfile.mkdtemp("_eo_svn") + "/export"
         shell('svn export -q -r {} {} {}'.format(revision, url, tempdir))
         shell("tar -czf {} -C {} .".format(filepath, tempdir))
@@ -971,11 +976,11 @@ class Builtins:
     Shell = Builtin("shell", builtin_shell)
 
 class ExecutionEnv:
-    def __init__(self, recipe):
+    def __init__(self, package):
         self.cache = {}
         self.tempdirs = []
         self.tempfiles = []
-        self.recipe = recipe
+        self.package = package
 
     def cleanup(self):
         for tempdir in self.tempdirs:
@@ -1008,7 +1013,7 @@ def get_system_platform():
 
 NO_VERSION = "unknown"
 
-class Recipe:
+class Package:
     def __init__(self, name, project):
         self.name = name
         self.project = project
@@ -1020,7 +1025,7 @@ class Recipe:
         self.deps = set()
 
     def __repr__(self):
-        return "recipe({})".format(self.name)
+        return "package({})".format(self.name)
 
     def finalize(self):
         self.fullname = "{}-{}-{}".format(self.name.string,
@@ -1051,7 +1056,7 @@ class Recipe:
             else:
                 return self.version
         elif full:
-            return "unknown"
+            return "autosync"
         else:
             return ""
 
@@ -1059,7 +1064,7 @@ class Recipe:
         return self.version and (self.version != NO_VERSION)
 
     def always_sync(self):
-        return self.is_version_set()
+        return not self.is_version_set()
 
     def needs_sync(self):
         if not self.is_installed():
@@ -1075,8 +1080,11 @@ class Recipe:
     def get_status_string(self):
         if self.is_installed():
             if self.needs_sync():
-                status = "needs sync ({} != {})".format(
-                    self.get_installed_version(), self.version)
+                if self.always_sync():
+                    status = "needs sync"
+                else:
+                    status = "needs sync ({} != {})".format(
+                        self.get_installed_version(), self.version)
             else:
                 status = "installed ({})".format(self.get_installed_version())
         elif self.is_built():
@@ -1110,8 +1118,9 @@ class Recipe:
                 print("{} is already built, skipping".format(self.name))
             return
         ee = ExecutionEnv(self)
-        tempdir = tempfile.mkdtemp("_eo_recipe_" + self.name.string)
+        tempdir = tempfile.mkdtemp("_eo_pkg_" + self.name.string)
         for k,v in self.aliases.items():
+            k = eval_expr(ee, k)
             srcpath = eval_expr(ee, v)
             dstpath = os.path.normpath(tempdir + "/" + k)
             if os.path.isfile(srcpath):
@@ -1121,6 +1130,7 @@ class Recipe:
             else:
                 copytree(srcpath, dstpath)
         for k,vs in self.directories.items():
+            k = eval_expr(ee, k)
             dstpath = os.path.normpath(tempdir + "/" + k)
             for v in vs:
                 srcpath = eval_expr(ee, v)
@@ -1327,11 +1337,20 @@ def expand_args(env, args):
             result.append(arg)
     return orig_env,tuple(result)
 
-def parse_recipe(project, text, path, recipes):
+def parse_recipe(project, text, path, packages, update_urls):
+    recipe_path = path
+    def apply_update_url(orig_env, args):
+        env = orig_env
+        env,url = expand_expr(env, args[1])
+        if path in update_urls:
+            error("duplicate update-url in recipe {}", path)
+        update_urls[path] = url
+        return env,()
+
     def apply_package(orig_env, args):
         env = orig_env
         name = args[1]
-        recipe = Recipe(name, project)
+        package = Package(name, project)
         seen = set()
         for expr in args[2:]:
             if type(expr) == tuple:
@@ -1341,22 +1360,22 @@ def parse_recipe(project, text, path, recipes):
                         error("duplicate {}", dest)
                     if dest == ASTSymbol.In:
                         env,args = expand_args(env,expr[1:])
-                        if args[0] in recipe.directories:
+                        if args[0] in package.directories:
                             error("directory {} already filled in package {}", args[0], name)
-                        recipe.directories[args[0]] = args[1:]
+                        package.directories[args[0]] = args[1:]
                         continue
                     elif dest == ASTSymbol.Alias:
                         env,args = expand_args(env,expr[1:])
-                        if args[0] in recipe.aliases:
+                        if args[0] in package.aliases:
                             error("alias {} already defined in package {}", args[0], name)
-                        recipe.aliases[args[0]] = args[1]
+                        package.aliases[args[0]] = args[1]
                         continue
                     elif dest == ASTSymbol.Summary:
                         seen.add(dest)
                         env,args = expand_args(env,expr[1:])
                         if type(args[0]) != str:
                             error("summary string expected")
-                        recipe.summary = args[0]
+                        package.summary = args[0]
                         continue
                     elif dest == ASTSymbol.Platform:
                         seen.add(dest)
@@ -1364,14 +1383,14 @@ def parse_recipe(project, text, path, recipes):
                         for arg in args:
                             if not isinstance(arg, Platform):
                                 error("platform expected")
-                            recipe.platforms.add(arg)
+                            package.platforms.add(arg)
                         continue
                     elif dest == ASTSymbol.Version:
                         seen.add(dest)
                         env,args = expand_args(env,expr[1:])
                         if type(args[0]) != str:
                             error("version string expected")
-                        recipe.version = args[0]
+                        package.version = args[0]
                         continue
                     elif dest == ASTSymbol.Depends:
                         seen.add(dest)
@@ -1380,17 +1399,17 @@ def parse_recipe(project, text, path, recipes):
                             if not isinstance(arg, Symbol):
                                 error("depends: expected symbol, not " + repr(type(arg)))
                             depends.add(arg.string)
-                        recipe.deps = depends
+                        package.deps = depends
                         continue
             env,expr = expand_expr(env, expr)
             if expr == ():
                 continue
             error("summary|version|platform|depends|in|alias expression expected")
-        recipe.finalize()
-        if recipe.supports(project.platform):
-            if name.string in recipes:
-                error("duplicate recipe {}", name)
-            recipes[name.string] = recipe
+        package.finalize()
+        if package.supports(project.platform):
+            if name.string in packages:
+                error("duplicate package {}", name)
+            packages[name.string] = package
         return orig_env,()
     ast = Parser(text).parse()
     env = ()
@@ -1407,8 +1426,13 @@ def parse_recipe(project, text, path, recipes):
             continue
         env = env_bind(env, symbol(platform.name), platform)
     env = env_bind(env, symbol("package"), Macro("package", apply_package))
+    env = env_bind(env, symbol("update-url"), Macro("update-url", apply_update_url))
     # query number of CPU cores
     env = env_bind(env, symbol("cpu-core-count"), len(os.sched_getaffinity(0)))
+    rel_recipe_dir = os.path.relpath(project.recipe_dir, project.path)
+    env = env_bind(env, symbol("recipe-dir"),rel_recipe_dir)
+    recipe_file = os.path.relpath(recipe_path, project.path)
+    env = env_bind(env, symbol("recipe-file"),recipe_file)
     for expr in ast:
         env, expr = expand_expr(env, expr)
 
@@ -1428,7 +1452,7 @@ def eval_new_expr(ee, expr):
     else:
         return expr
 
-# recursively evaluate a previously expanded recipe expression
+# recursively evaluate a previously expanded expression
 def eval_expr(ee, expr):
     if expr not in ee.cache:
         ee.cache[expr] = eval_new_expr(ee, expr)
@@ -1475,6 +1499,7 @@ class MissingProject:
     show_status = stub
     search = stub
     import_recipe = stub
+    update = stub
 
 # break list of words into multiple lines
 def wrap_words(words, width = 80, indent = "  "):
@@ -1499,7 +1524,8 @@ class Project:
         self.platform = get_system_platform()
         self.archive_dir = os.path.join(self.config_dir, "archive")
         self.dlcache_dir = os.path.join(self.config_dir, "dlcache")
-        self.recipes = collections.OrderedDict()
+        self.update_urls = {}
+        self.packages = collections.OrderedDict()
         rcpath = os.path.join(self.config_dir, "eorc")
         rc = configparser.ConfigParser()
         if os.path.isfile(rcpath):
@@ -1509,146 +1535,172 @@ class Project:
         self.recipe_dir = self.path + project_recipe_dir
         self.install_state_dir = self.path + PROJECT_INSTALL_STATE_DIR
 
+    def clear_packages(self):
+        self.update_urls = {}
+        self.packages = collections.OrderedDict()
+
     def init (self):
         error("error: project already exists.")
 
+    def update(self):
+        self.read_packages()
+        update_urls = self.update_urls
+        self.clear_packages()
+        for path,url in update_urls.items():
+            targetname = os.path.relpath(path, self.path)
+            print_r("updating {} from '{}'...".format(targetname,url))
+            self.import_recipe(url, for_update = True, filepath = path)
+            print_r("updated {} from {}".format(targetname,url))
+            print()
+
     def show_status (self):
-        self.read_recipes()
+        self.read_packages()
         print("platform:",self.platform)
         print("project directory:", self.path)
         print("recipe directory:", self.recipe_dir)
         print()
+        if not self.update_urls:
+            print("no known update sources.")
+        else:
+            print("update sources:")
+            print()
+            for path,url in self.update_urls.items():
+                targetname = os.path.relpath(path, self.path)
+                print("{} <= {}".format(targetname,url))
+            print()
         installed = []
-        for name,recipe in self.recipes.items():
-            if recipe.is_installed():
-                installed.append((name,recipe))
+        for name,package in self.packages.items():
+            if package.is_installed():
+                installed.append((name,package))
         if not installed:
             print("no packages installed.")
         else:
             print("installed packages:")
             print()
-            for name,recipe in installed:
-                status = recipe.get_status_string()
-                var = recipe.get_version_string(full = True)
-                if recipe.needs_sync():
-                    print(name + " " + var + ": " + status)
+            for name,package in installed:
+                status = package.get_status_string()
+                var = package.get_version_string(full = True)
+                if package.needs_sync():
+                    print(name + " (" + var + ") - " + status)
                 else:
-                    print(name + " " + var)
+                    print(name + " (" + var + ")")
         print()
 
-    def read_recipes (self):
-        if self.recipes: # already read
+    def read_packages (self):
+        if self.packages: # already read
             return
         if os.path.isdir(self.recipe_dir):
-            print("reading recipes...")
+            print("reading packages...")
             for path in os.listdir(self.recipe_dir):
                 filepath = os.path.join(self.recipe_dir, path)
                 if filepath.endswith('.eo') and os.path.isfile(filepath):
                     with open(filepath, 'r') as f:
-                        parse_recipe(self, f.read(), filepath, self.recipes)
-            if not self.recipes:
-                print("no recipes available.")
+                        parse_recipe(self, f.read(), filepath, self.packages, self.update_urls)
+            if not self.packages:
+                print("no packages available.")
         else:
             print("recipe directory {} not found.".format(self.recipe_dir))
 
-    def import_recipe(self, url, install = False):
-        if url not in PRESET_IMPORT_URLS:
-            print(RECIPE_WARNING)
-            confirm = input("continue? [y/N] ").lower()
-            if confirm != "y":
-                return
-        url = PRESET_IMPORT_URLS.get(url, url)
+    def import_recipe(self, url, install = False, for_update = False, filepath = None):
+        if not for_update:
+            if url not in PRESET_IMPORT_URLS:
+                print(RECIPE_WARNING)
+                confirm = input("continue? [y/N] ").lower()
+                if confirm != "y":
+                    return
+            url = PRESET_IMPORT_URLS.get(url, url)
         filename = url_filename(url)
         if not filename.endswith(".eo"):
             error("don't know how to import {}", filename)
-        filepath = os.path.join(self.recipe_dir, filename)
-        if os.path.isfile(filepath):
-            error("file {} already exists.", filepath)
-        os.makedirs(self.recipe_dir, exist_ok=True)
+        if filepath is None:
+            filepath = os.path.join(self.recipe_dir, filename)
+            if not for_update:
+                if os.path.isfile(filepath):
+                    error("file {} already exists.", filepath)
+            os.makedirs(self.recipe_dir, exist_ok=True)
         try:
-            tmpfilepath = download_tempfile(url, filename)
+            tmpfilepath = download_tempfile(url, filename, silent = for_update)
         except:
             error("failed to download {}", url)
-        recipes = {}
         with open(tmpfilepath, 'r') as f:
-            parse_recipe(self, f.read(), tmpfilepath, self.recipes)
+            parse_recipe(self, f.read(), tmpfilepath, self.packages, self.update_urls)
         shutil.copy2(tmpfilepath, filepath)
-        names = []
-        for name,recipe in self.recipes.items():
-            print("successfully imported recipe for package {}".format(name))
-            names.append(name)
-        if install:
-            self.install(names[0:1])
-        return names
+        if not for_update:
+            names = []
+            for name,package in self.packages.items():
+                print("successfully imported recipe for package {}".format(name))
+                names.append(name)
+            if install:
+                self.install(names[0:1])
 
     def search (self, pattern):
-        self.read_recipes()
-        if self.recipes:
+        self.read_packages()
+        if self.packages:
             matches = 0
-            print("list of matching recipes:")
+            print("list of matching packages:")
             print()
-            for name,recipe in self.recipes.items():
+            for name,package in self.packages.items():
                 if re.match(pattern, name):
                     matches += 1
-                    print(name,recipe.get_version_string())
-                    print("  " + recipe.summary)
+                    print(name,package.get_version_string())
+                    print("  " + package.summary)
                     print()
-            print("{} matching recipes found.".format(matches))
+            print("{} matching packages found.".format(matches))
 
     def simple_package_function (funcname):
-        def func (self, recipenames, **kwargs):
-            self.read_recipes()
-            for name,recipe in self.recipes.items():
-                if name in recipenames:
-                    return getattr(recipe, funcname)(**kwargs)
+        def func (self, packagenames, **kwargs):
+            self.read_packages()
+            for name,package in self.packages.items():
+                if name in packagenames:
+                    return getattr(package, funcname)(**kwargs)
         return func
 
     show = simple_package_function("show")
     build = simple_package_function("build")
 
-    def compute_deps(self, recipenames, predicate = None):
+    def compute_deps(self, packagenames, predicate = None):
         deps = []
         seeing = set()
         seen = set()
-        def walk(recipe, level):
-            if recipe in seen:
+        def walk(package, level):
+            if package in seen:
                 return
-            if recipe in seeing:
-                error("circular dependency to package {} detected".format(recipe.name.string))
-            if predicate and not predicate(recipe, level):
+            if package in seeing:
+                error("circular dependency to package {} detected".format(package.name.string))
+            if predicate and not predicate(package, level):
                 return
-            seeing.add(recipe)
+            seeing.add(package)
             sublevel = level + 1
-            for dep in recipe.deps:
-                if not dep in self.recipes:
-                    error("recipe {} depends on unknown package {}", recipe.name, dep)
-                walk(self.recipes[dep], sublevel)
-            seen.add(recipe)
-            deps.append(recipe)
-        for name in recipenames:
-            if not name in self.recipes:
+            for dep in package.deps:
+                if not dep in self.packages:
+                    error("package {} depends on unknown package {}", package.name, dep)
+                walk(self.packages[dep], sublevel)
+            seen.add(package)
+            deps.append(package)
+        for name in packagenames:
+            if not name in self.packages:
                 error("unknown package '{}'", name)
-            walk(self.recipes[name], 0)
+            walk(self.packages[name], 0)
         return deps
 
     def compute_rdeps(self):
         rdeps = {}
-        for recipe in self.recipes.values():
-            rdeps[recipe.name.string] = set()
-        for recipe in self.recipes.values():
-            for dep in recipe.deps:
-                if not dep in self.recipes:
-                    error("recipe {} depends on unknown package {}", recipe.name, dep)
-                rdeps[dep].add(recipe.name.string)
+        for package in self.packages.values():
+            rdeps[package.name.string] = set()
+        for package in self.packages.values():
+            for dep in package.deps:
+                if not dep in self.packages:
+                    error("package {} depends on unknown package {}", package.name, dep)
+                rdeps[dep].add(package.name.string)
         return rdeps
 
-    def install (self, recipenames, autoconfirm = False, **kwargs):
-        self.read_recipes()
-        def pred(recipe, level):
-            return not recipe.is_installed()
-        deps = self.compute_deps(recipenames, predicate = pred)
+    def install (self, packagenames, autoconfirm = False, **kwargs):
+        self.read_packages()
+        def pred(package, level):
+            return not package.is_installed()
+        deps = self.compute_deps(packagenames, predicate = pred)
         if not deps:
-            print("nothing to install.")
+            print("no packages to install.")
             return
         print("the following packages will be installed:")
         for line in wrap_words([dep.name.string for dep in deps]):
@@ -1662,20 +1714,20 @@ class Project:
             dep.install(**kwargs)
         print("done.")
 
-    def sync (self, recipenames, force=False, **kwargs):
-        self.read_recipes()
-        if not recipenames:
-            recipenames = [recipe.name.string for recipe in self.recipes.values()
-                if recipe.is_installed()]
+    def sync (self, packagenames, force=False, **kwargs):
+        self.read_packages()
+        if not packagenames:
+            packagenames = [package.name.string for package in self.packages.values()
+                if package.is_installed()]
         if force:
-            def pred(recipe, level):
+            def pred(package, level):
                 return True
         else:
-            def pred(recipe, level):
-                return (not recipe.is_installed()) or recipe.needs_sync()
-        deps = self.compute_deps(recipenames, predicate = pred)
+            def pred(package, level):
+                return (not package.is_installed()) or package.needs_sync()
+        deps = self.compute_deps(packagenames, predicate = pred)
         if not deps:
-            print("nothing to synchronize.")
+            print("no packages to synchronize.")
             return
         print("the following packages will be synchronized:")
         for line in wrap_words([dep.name.string for dep in deps]):
@@ -1688,29 +1740,29 @@ class Project:
             dep.sync(force=force, **kwargs)
         print("done.")
 
-    def remove (self, recipenames, keep_deps = False, **kwargs):
-        self.read_recipes()
+    def remove (self, packagenames, keep_deps = False, **kwargs):
+        self.read_packages()
         rdeps = self.compute_rdeps()
-        to_remove = set(recipenames)
-        def pred(recipe, level):
-            if not recipe.is_installed():
+        to_remove = set(packagenames)
+        def pred(package, level):
+            if not package.is_installed():
                 if level == 0:
-                    error("package {} is not installed.", recipe.name)
+                    error("package {} is not installed.", package.name)
                 else:
                     return False
-            for rdep in rdeps[recipe.name.string]:
-                if rdep not in to_remove and self.recipes[rdep].is_installed():
+            for rdep in rdeps[package.name.string]:
+                if rdep not in to_remove and self.packages[rdep].is_installed():
                     if level == 0:
-                        error("package {} is still required by package {}", recipe.name, rdep)
+                        error("package {} is still required by package {}", package.name, rdep)
                     else:
                         return False
             if keep_deps and (level > 0):
                 return False
-            to_remove.add(recipe.name.string)
+            to_remove.add(package.name.string)
             return True
-        deps = self.compute_deps(recipenames, predicate = pred)
+        deps = self.compute_deps(packagenames, predicate = pred)
         if not deps:
-            print("nothing to remove.")
+            print("no packages to remove.")
             return
         print("the following packages will be removed:")
         for line in wrap_words([dep.name.string for dep in deps]):
@@ -1744,6 +1796,10 @@ def cmd_init(args):
 def cmd_import(args):
     project = Project.find(".")
     project.import_recipe(args.url, install=args.install)
+
+def cmd_update(args):
+    project = Project.find(".")
+    project.update()
 
 def cmd_status(args):
     project = Project.find(".")
@@ -1812,6 +1868,9 @@ cmd.add_argument("name",nargs="*",
     help="name of package to build")
 cmd.add_argument("--force",action="store_true",
     help="force building even if package is already built")
+
+cmd = subcommands.add_parser("update", help="update recipes from remote")
+cmd.set_defaults(func=cmd_update)
 
 cmd = subcommands.add_parser("install", help="install package from recipe")
 cmd.set_defaults(func=cmd_install)
