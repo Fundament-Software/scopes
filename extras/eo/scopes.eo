@@ -6,8 +6,8 @@ package scopes-unstable
     platform linux unknown
     # force fresh rebuild
     #version version
-    version := "tip"
-    archive-url := "https://hg.sr.ht/~duangle/scopes/archive/{version}.tar.gz"
+    VERSION := "tip"
+    archive-url := "https://hg.sr.ht/~duangle/scopes/archive/{VERSION}.tar.gz"
     rootdir := (commonpath (extract (download archive-url)))
     rootdir :=
         then
@@ -29,8 +29,8 @@ package scopes-unstable
         "{rootdir}/LICENSE.md"
 package scopes-source-unstable
     summary "The Scopes Programming Language & Infrastructure (Source)"
-    version := "tip"
-    version version
-    archive-url := "https://hg.sr.ht/~duangle/scopes/archive/{version}.tar.gz"
+    VERSION := "tip"
+    version VERSION
+    archive-url := "https://hg.sr.ht/~duangle/scopes/archive/{VERSION}.tar.gz"
     rootdir := (commonpath (extract (download archive-url)))
     alias "/" rootdir
