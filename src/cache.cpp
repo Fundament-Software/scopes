@@ -146,16 +146,21 @@ static void init_cache() {
 #define SCOPES_MKDIR(PATH, MODE) mkdir((PATH))
 #else
 #define SCOPES_MKDIR(PATH, MODE) mkdir((PATH),(MODE))
-    wordexp_t p;
-    char** w;
-    wordexp( "~/.cache", &p, 0 );
-    w = p.we_wordv;
-    int offset = 0;
-    for (size_t i=0; i<p.we_wordc;i++ ) {
-        strncpy(cache_dir + offset, w[i], PATH_MAX - offset);
-        offset += strlen(w[i]);
+    char *ptr = getenv("SCOPES_CACHE");
+    if (ptr == nullptr) {
+        wordexp_t p;
+        char** w;
+        wordexp( "~/.cache", &p, 0 );
+        w = p.we_wordv;
+        int offset = 0;
+        for (size_t i=0; i<p.we_wordc;i++ ) {
+            strncpy(cache_dir + offset, w[i], PATH_MAX - offset);
+            offset += strlen(w[i]);
+        }
+        wordfree( &p );
+    } else {
+        strcpy(cache_dir, ptr);
     }
-    wordfree( &p );
 #endif
 
     if (SCOPES_MKDIR(cache_dir, S_IRWXU)) {

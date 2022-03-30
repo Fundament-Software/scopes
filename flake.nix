@@ -67,9 +67,9 @@
             '';
 
             checkPhase = ''
-              bin/scopes testing/test_all.sc
+              SCOPES_CACHE=./scopes_cache bin/scopes testing/test_all.sc
             '';
-            doCheck = false;
+            doCheck = true;
           };
 
         });
