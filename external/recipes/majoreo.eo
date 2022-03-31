@@ -1,0 +1,13 @@
+version := "0.7"
+url := "https://hg.sr.ht/~duangle/majoreo/raw/eo?rev={version}"
+script := (download url)
+update-url "https://hg.sr.ht/~duangle/majoreo/raw/extras/recipes/majoreo.eo?rev=tip"
+package majoreo
+    summary "Major EO - Project Oriented Package Management"
+    version version
+
+    alias "/bin/eo"
+        then
+            cmd := (shell "." (dict))
+            cmd "chmod a+x {script}"
+            script
