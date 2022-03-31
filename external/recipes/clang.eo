@@ -1,10 +1,25 @@
 version := "12.0.1"
 url := "https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.1/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz"
 rootdir := (commonpath (extract (download url)))
+SUMMARY := "LLVM and clang distribution"
 package clang
-    summary "LLVM and clang distribution"
+    summary SUMMARY
     version version
     platform linux unknown
 
     alias "/clang" rootdir
     alias "/lib/clang/include" "{rootdir}/lib/clang/{version}/include"
+
+VERSION := "13.0.1"
+package clang
+    # this is a hacky package for MSYS2
+    # the msys packages are installed during the build process
+    summary SUMMARY
+    version VERSION
+    platform windows-mingw
+
+    alias "/lib/clang/include"
+        then
+            cmd := (shell mingw-dir (dict))
+            cmd "pacman -S --noconfirm mingw64/mingw-w64-x86_64-llvm mingw64/mingw-w64-x86_64-clang mingw64/mingw-w64-x86_64-polly"
+            "{mingw-dir}/lib/clang/{VERSION}/include"

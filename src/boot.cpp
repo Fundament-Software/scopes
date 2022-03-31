@@ -206,11 +206,18 @@ void init(void *c_main, int argc, char *argv[]) {
     scopes_working_dir = nullptr;
     scopes_argc = argc;
     scopes_argv = argv;
+#ifdef SCOPES_WIN32    
+    {
+        char path[PATH_MAX];
+        scopes_working_dir = String::from_cstr(getcwd(path, PATH_MAX))->data;
+    }
+#else
     {
         char *path = get_current_dir_name();
         scopes_working_dir = String::from_cstr(path)->data;
         free(path);
     }
+#endif
 
     on_startup();
 
@@ -230,9 +237,9 @@ void init(void *c_main, int argc, char *argv[]) {
         }
 
         char compiler_dir[PATH_MAX];
-        strncpy(compiler_dir, scopes_compiler_path, PATH_MAX);
+        strncpy(compiler_dir, scopes_compiler_path, PATH_MAX-1);
         dirname(compiler_dir);
-        strncat(compiler_dir, "/..", PATH_MAX);
+        strncat(compiler_dir, "/..", PATH_MAX-1);
         char real_compiler_dir[PATH_MAX];
         char *result = realpath(compiler_dir, real_compiler_dir);
         scopes_compiler_dir = String::from_cstr(result?result:compiler_dir)->data;

@@ -39,8 +39,10 @@ import ssl
 import shutil
 import hashlib
 import configparser
+import sysconfig
+import subprocess
 
-VERSION = "0.5"
+VERSION = "0.6"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -66,6 +68,13 @@ def print_program_header():
 
 ################################################################################
 
+IS_WIN32 = (sys.platform == "win32")
+IS_MINGW = False
+if IS_WIN32 and sysconfig.get_platform().startswith("mingw"):
+    IS_MINGW = True
+
+################################################################################
+
 def memoize(f):
     memo = {}
     def helper(*args):
@@ -73,6 +82,11 @@ def memoize(f):
             memo[args] = f(*args)
         return memo[args]
     return helper
+
+# query number of CPU cores
+def get_num_cpu_cores():
+    return os.cpu_count()
+    #return len(os.sched_getaffinity(0))
 
 def verify_dir(cwd):
     cwd = os.path.realpath(cwd)
@@ -204,6 +218,13 @@ def copytree(srcpath, dstpath, ignore_files=[], ignore_func=None):
 
     print("copying",srcpath,"=>",dstpath)
     copyovertree(srcpath, dstpath, symlinks=True, ignore=ignore_func_ex)
+
+# MSYS compatibility
+################################################################################
+
+MINGW_PATH = ""
+if IS_MINGW:
+    MINGW_PATH = os.path.realpath(os.path.join(os.path.dirname(sys.executable), ".."))
 
 ################################################################################
 
@@ -997,6 +1018,7 @@ class Platform:
 
 class Platforms:
     Windows = Platform("windows")
+    WindowsMinGW = Platform("windows-mingw")
     Linux = Platform("linux")
     MacOS = Platform("macos")
     Unknown = Platform("unknown")
@@ -1005,7 +1027,10 @@ def get_system_platform():
     if sys.platform.startswith('linux'):
         return Platforms.Linux
     elif sys.platform.startswith('win32'):
-        return Platforms.Windows
+        if IS_MINGW:
+            return Platforms.WindowsMinGW
+        else:
+            return Platforms.Windows
     elif sys.platform.startswith('darwin'):
         return Platforms.MacOS
     else:
@@ -1023,6 +1048,10 @@ class Package:
         self.directories = {}
         self.platforms = set()
         self.deps = set()
+        self.pre_install = None
+        self.post_install = None
+        self.pre_remove = None
+        self.post_remove = None
 
     def __repr__(self):
         return "package({})".format(self.name)
@@ -1050,7 +1079,7 @@ class Package:
 
     def get_version_string(self, full = False):
         if self.is_version_set():
-            MAX_L = 8
+            MAX_L = 16
             if not full and len(self.version) > (MAX_L + 3):
                 return self.version[:MAX_L] + "..."
             else:
@@ -1169,6 +1198,8 @@ class Package:
             return
         if not for_sync:
             print_r("removing package {}...".format(self.name))
+        if self.pre_remove:
+            eval_expr(ee, self.pre_remove)
         # read list of all recursively installed files from install state path
         install_state_path = self.statepath
         installed_files = []
@@ -1187,6 +1218,8 @@ class Package:
             if not os.listdir(filedir):
                 #print("removing empty directory",filedir)
                 os.rmdir(filedir)
+        if self.post_remove:
+            eval_expr(ee, self.post_remove)
         if not for_sync:
             print_r("{} removed.".format(self.name))
             print()
@@ -1212,8 +1245,13 @@ class Package:
         if not for_sync:
             self.build(for_sync = True)
             print_r("installing {}...".format(self.name))
+        ee = ExecutionEnv(self)
+        if self.pre_install:
+            eval_expr(ee, self.pre_install)
         shell("tar -xf {} -C {}".format(self.archivepath, self.project.path),
             silent=True)
+        if self.post_install:
+            eval_expr(ee, self.post_install)
         if not for_sync:
             print_r("{} installed.".format(self.name))
             print()
@@ -1227,6 +1265,10 @@ class ASTSymbol:
     Platform = symbol('platform')
     Version = symbol('version')
     Depends = symbol('depends')
+    PreInstall = symbol('preinstall')
+    PostInstall = symbol('postinstall')
+    PreRemove = symbol('preremove')
+    PostRemove = symbol('postremove')
 
 @memoize
 def env_bind (scope, name, value):
@@ -1392,6 +1434,15 @@ def parse_recipe(project, text, path, packages, update_urls):
                             error("version string expected")
                         package.version = args[0]
                         continue
+                    elif dest in (ASTSymbol.PreInstall, ASTSymbol.PostInstall, ASTSymbol.PreRemove, ASTSymbol.PostRemove):
+                        seen.add(dest)
+                        env,args = expand_args(env,expr[1:])
+                        attrname = {ASTSymbol.PreInstall:'pre_install', 
+                        ASTSymbol.PostInstall:'post_install', 
+                        ASTSymbol.PreRemove:'pre_remove', 
+                        ASTSymbol.PostRemove:'post_remove'}
+                        setattr(package,attrname[dest],args[0])
+                        continue
                     elif dest == ASTSymbol.Depends:
                         seen.add(dest)
                         depends = set()
@@ -1427,12 +1478,12 @@ def parse_recipe(project, text, path, packages, update_urls):
         env = env_bind(env, symbol(platform.name), platform)
     env = env_bind(env, symbol("package"), Macro("package", apply_package))
     env = env_bind(env, symbol("update-url"), Macro("update-url", apply_update_url))
-    # query number of CPU cores
-    env = env_bind(env, symbol("cpu-core-count"), len(os.sched_getaffinity(0)))
+    env = env_bind(env, symbol("cpu-core-count"), get_num_cpu_cores())
     rel_recipe_dir = os.path.relpath(project.recipe_dir, project.path)
     env = env_bind(env, symbol("recipe-dir"),rel_recipe_dir)
     recipe_file = os.path.relpath(recipe_path, project.path)
     env = env_bind(env, symbol("recipe-file"),recipe_file)
+    env = env_bind(env, symbol("mingw-dir"), MINGW_PATH)
     for expr in ast:
         env, expr = expand_expr(env, expr)
 
@@ -1558,6 +1609,8 @@ class Project:
         print("platform:",self.platform)
         print("project directory:", self.path)
         print("recipe directory:", self.recipe_dir)
+        if IS_MINGW:
+            print("mingw directory:", MINGW_PATH)
         print()
         if not self.update_urls:
             print("no known update sources.")
