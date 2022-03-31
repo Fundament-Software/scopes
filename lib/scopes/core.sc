@@ -3299,7 +3299,7 @@ let __env =
         include-search-path =
             Value
                 list
-                    .. compiler-dir "/lib/clang/include"
+                    .. compiler-dir "/lib/scopes/clang/include"
         library-search-path =
             Value
                 list;

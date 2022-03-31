@@ -42,7 +42,7 @@ import configparser
 import sysconfig
 import subprocess
 
-VERSION = "0.6"
+VERSION = "0.7"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -836,9 +836,10 @@ class Macro:
         return "<{}>".format(self.name)
 
 class Builtin:
-    def __init__(self, name, func = None):
+    def __init__(self, name, func = None, static = False):
         self.name = name
         self.func = func
+        self.static = static
 
     def __call__(self, *args):
         assert self.func, self.name + " not implemented"
@@ -879,6 +880,7 @@ def macro_dict(env, expr):
 class Tempdir(Builtin):
     def __init__(self):
         self.name = "tempdir"
+        self.static = False
 
     def __call__(self, ee, *args):
         dirpath = tempfile.mkdtemp("_eo_user")
@@ -888,6 +890,7 @@ class Tempdir(Builtin):
 class Tempfile(Builtin):
     def __init__(self):
         self.name = "tempfile"
+        self.static = False
 
     def __call__(self, ee, string):
         with tempfile.NamedTemporaryFile(suffix="_eo_user",delete=False) as f:
@@ -955,6 +958,7 @@ class Shell(Builtin):
     def __init__(self, cwd, env):
         self.name = "shell"
         self.cwd = cwd
+        self.static = False
         if env:
             assert(isinstance(env, WrappedDict))
             self.env = env.dict
@@ -987,7 +991,7 @@ class Macros:
     Plain = Macro("plain", macro_plain)
 
 class Builtins:
-    Join = Builtin('..', builtin_join)
+    Join = Builtin('..', builtin_join, static = True)
     Download = Builtin("download", builtin_download)
     DownloadSVN = Builtin("download-svn", builtin_download_svn)
     Then = Builtin("then", builtin_then)
@@ -997,17 +1001,22 @@ class Builtins:
     Shell = Builtin("shell", builtin_shell)
 
 class ExecutionEnv:
-    def __init__(self, package):
+    def __init__(self, package = None):
         self.cache = {}
         self.tempdirs = []
         self.tempfiles = []
         self.package = package
+
+    def is_static(self):
+        return self.package == None
 
     def cleanup(self):
         for tempdir in self.tempdirs:
             shutil.rmtree(tempdir)
         for tempfile in self.tempfiles:
             os.remove(tempfile)
+
+static_ee = ExecutionEnv()
 
 class Platform:
     def __init__(self, name):
@@ -1381,6 +1390,8 @@ def expand_args(env, args):
 
 def parse_recipe(project, text, path, packages, update_urls):
     recipe_path = path
+    static_env = ()
+
     def apply_update_url(orig_env, args):
         env = orig_env
         env,url = expand_expr(env, args[1])
@@ -1415,9 +1426,10 @@ def parse_recipe(project, text, path, packages, update_urls):
                     elif dest == ASTSymbol.Summary:
                         seen.add(dest)
                         env,args = expand_args(env,expr[1:])
-                        if type(args[0]) != str:
+                        arg = eval_expr(static_ee, args[0])
+                        if type(arg) != str:
                             error("summary string expected")
-                        package.summary = args[0]
+                        package.summary = arg
                         continue
                     elif dest == ASTSymbol.Platform:
                         seen.add(dest)
@@ -1430,16 +1442,17 @@ def parse_recipe(project, text, path, packages, update_urls):
                     elif dest == ASTSymbol.Version:
                         seen.add(dest)
                         env,args = expand_args(env,expr[1:])
-                        if type(args[0]) != str:
+                        arg = eval_expr(static_ee, args[0])
+                        if type(arg) != str:
                             error("version string expected")
-                        package.version = args[0]
+                        package.version = arg
                         continue
                     elif dest in (ASTSymbol.PreInstall, ASTSymbol.PostInstall, ASTSymbol.PreRemove, ASTSymbol.PostRemove):
                         seen.add(dest)
                         env,args = expand_args(env,expr[1:])
-                        attrname = {ASTSymbol.PreInstall:'pre_install', 
-                        ASTSymbol.PostInstall:'post_install', 
-                        ASTSymbol.PreRemove:'pre_remove', 
+                        attrname = {ASTSymbol.PreInstall:'pre_install',
+                        ASTSymbol.PostInstall:'post_install',
+                        ASTSymbol.PreRemove:'pre_remove',
                         ASTSymbol.PostRemove:'post_remove'}
                         setattr(package,attrname[dest],args[0])
                         continue
@@ -1495,6 +1508,8 @@ def eval_new_expr(ee, expr):
         if len(expr) >= 1:
             func = expr[0]
             if isinstance(func, Builtin):
+                if ee.is_static() and not func.static:
+                    error("builtin {} not available in static environment", func.name)
                 return func(ee, *expr[1:])
             else:
                 error("cannot apply value of type {} to function", type(func))

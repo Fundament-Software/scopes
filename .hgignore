@@ -36,7 +36,7 @@ syntax: regexp
 ^Makefile$
 ^scopes[.]make$
 ^build/
-^lib/clang/
+^lib/scopes/clang/
 ^[.]vscode/
 ^\.eo/dlcache
 ^\.eo/archive
