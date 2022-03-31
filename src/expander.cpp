@@ -179,7 +179,6 @@ struct Expander {
 
         assert(it != EOL);
 
-        bool continuing = false;
         Symbol bind_name = SYM_Unnamed;
         TemplateRef func;
         ValueRef result;
@@ -194,7 +193,6 @@ struct Expander {
                 && result.cast<Template>()->is_forward_decl()) {
                 func = result.cast<Template>();
                 func = ref(anchor, func);
-                continuing = true;
             } else {
                 func = ref(anchor, Template::from(sym));
                 result = func;

@@ -21,6 +21,9 @@
 // print a list of cumulative timers on program exit
 #define SCOPES_PRINT_TIMERS 0
 
+// if 0, will never cache modules
+#define SCOPES_ALLOW_CACHE 1
+
 // maximum size in bytes of object cache. by default, this is set to 100 MB
 #define SCOPES_MAX_CACHE_SIZE (100 << 20)
 // maximum number of inodes in cache directory

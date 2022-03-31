@@ -12,8 +12,8 @@
 using import enum
 
 # declare i8   @llvm.ctlz.i8  (i8   <src>, i1 <is_zero_undef>)
-let llvm.ctlz.char =
-    extern 'llvm.ctlz.char
+let llvm.ctlz.i8 =
+    extern 'llvm.ctlz.i8
         function char char bool
 # declare i32   @llvm.ctlz.i32  (i32   <src>, i1 <is_zero_undef>)
 let llvm.ctlz.u32 =
@@ -21,7 +21,7 @@ let llvm.ctlz.u32 =
         function u32 u32 bool
 
 inline ctlz (c)
-    llvm.ctlz.char c false
+    llvm.ctlz.i8 c false
 inline ctlz-u32 (c)
     llvm.ctlz.u32 c false
 

@@ -450,8 +450,11 @@ static LLVMMemoryBufferRef module_to_membuffer(LLVMModuleRef module) {
 SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
     uint64_t compiler_flags) {
     SCOPES_RESULT_TYPE(void);
-
+#if SCOPES_ALLOW_CACHE
     bool cache = ((compiler_flags & CF_Cache) == CF_Cache);
+#else
+    const bool cache = false;
+#endif
 
     LLVMMemoryBufferRef irbuf = nullptr;
     LLVMMemoryBufferRef membuf = nullptr;

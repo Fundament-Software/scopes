@@ -858,6 +858,7 @@ struct LLVMIRGenerator {
             build_store(val, fix_named_struct_store(val, ptrval));
             val = ptrval;
             memptrs.push_back(values.size());
+            assert(val);
             values.push_back(val);
             return {};
         }
@@ -876,11 +877,13 @@ struct LLVMIRGenerator {
                     };
                     auto val = LLVMBuildGEP(builder, ptr, indices, 2, "");
                     val = LLVMBuildLoad(builder, val, "");
+                    assert(val);
                     values.push_back(val);
                 }
                 return {};
             }
         }
+        assert(val);
         values.push_back(val);
         return {};
     }
@@ -892,7 +895,9 @@ struct LLVMIRGenerator {
         size_t sz = abi_classify(AT, classes);
         auto T = SCOPES_GET_RESULT(type_to_llvm_type(AT));
         if (!sz) {
-            params.push_back(LLVMPointerType(T, 0));
+            auto val = LLVMPointerType(T, 0);
+            assert(val);
+            params.push_back(val);
             return {};
         }
         auto tk = LLVMGetTypeKind(T);
@@ -900,11 +905,14 @@ struct LLVMIRGenerator {
             auto ST = abi_struct_type(classes, sz);
             if (ST) {
                 for (size_t i = 0; i < sz; ++i) {
-                    params.push_back(LLVMStructGetTypeAtIndex(ST, i));
+                    auto val = LLVMStructGetTypeAtIndex(ST, i);
+                    assert(val);
+                    params.push_back(val);
                 }
                 return {};
             }
         }
+        assert(T);
         params.push_back(T);
         return {};
     }
@@ -1337,7 +1345,9 @@ struct LLVMIRGenerator {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         LLVMValueRefs refs;
         for (auto val : values) {
-            refs.push_back(SCOPES_GET_RESULT(ref_to_value(val)));
+            auto newval = SCOPES_GET_RESULT(ref_to_value(val));
+            assert(newval);
+            refs.push_back(newval);
         }
         return write_return(refs, is_except);
     }
@@ -1486,6 +1496,7 @@ struct LLVMIRGenerator {
         if (is_external)
             return func;
 
+        assert(func);
         generated_symbols.push_back(func);
 
         if (use_debug_info) {
@@ -1645,6 +1656,7 @@ struct LLVMIRGenerator {
             } else {
                 val = LLVMBuildPhi(builder, argT, "");
             }
+            assert(val);
             refs.push_back(val);
         }
         return {};
@@ -1705,7 +1717,9 @@ struct LLVMIRGenerator {
             values.push_back(value);
         } else {
             for (int i = 0; i < count; ++i) {
-                values.push_back(LLVMBuildExtractValue(builder, value, i, ""));
+                auto val = LLVMBuildExtractValue(builder, value, i, "");
+                assert(val);
+                values.push_back(val);
             }
         }
     }
@@ -2535,6 +2549,7 @@ struct LLVMIRGenerator {
         if (it == global2global.end()) {
             auto pi = cast<PointerType>(node->get_type());
             LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(pi->element_type));
+
             LLVMValueRef result = nullptr;
             if (node->storage_class == SYM_SPIRV_StorageClassPrivate) {
 
@@ -2594,10 +2609,10 @@ struct LLVMIRGenerator {
                     LLVMSetInitializer(result, init);
 
                     if (node->constructor) {
-                        constructors.push_back(
-                            SCOPES_GET_RESULT(
-                                ref_to_value(
-                                    TypedValueRef(node->constructor))));
+                        auto val = SCOPES_GET_RESULT(
+                            ref_to_value(TypedValueRef(node->constructor)));
+                        assert(val);
+                        constructors.push_back(val);
                     }
                 }
                 return result;
@@ -2641,7 +2656,24 @@ struct LLVMIRGenerator {
                         if (!ptr) {
                             SCOPES_ERROR(CGenFailedToResolveExtern, node);
                         }
-                        result = LLVMAddGlobal(module, LLT, name);
+                        if (LLVMGetTypeKind(LLT) == LLVMFunctionTypeKind) {
+                            result = LLVMAddFunction(module, name, LLT);
+                            LLVMSetLinkage(result, LLVMExternalLinkage);
+
+                            auto ilfunctype = node->get_type();
+                            auto fi = extract_function_type(ilfunctype);
+                            auto rtype = abi_return_type(fi);
+                            bool use_sret = is_memory_class(rtype);
+
+                            if (use_sret) {
+                                LLVMAddAttributeAtIndex(result, 1,
+                                    get_type_attribute(attr_kind_sret,
+                                    SCOPES_GET_RESULT(_type_to_llvm_type(rtype))));
+                            }
+
+                        } else {
+                            result = LLVMAddGlobal(module, LLT, name);
+                        }
                     }
                 }
                 global2global.insert({ node.unref(), result });
@@ -2776,7 +2808,9 @@ struct LLVMIRGenerator {
 
         auto retT = SCOPES_GET_RESULT(type_to_llvm_type(rtype));
         if (use_sret) {
-            values.push_back(safe_alloca(retT));
+            auto val = safe_alloca(retT);
+            assert(val);
+            values.push_back(val);
         }
         std::vector<size_t> memptrs;
         for (size_t i = 0; i < argcount; ++i) {
@@ -2816,7 +2850,10 @@ struct LLVMIRGenerator {
 #endif
         }
         if (use_sret) {
-            LLVMAddCallSiteAttribute(ret, 1, attr_sret);
+            //LLVMAddCallSiteAttribute(ret, 1, attr_sret);
+            LLVMAddCallSiteAttribute(ret, 1,
+                get_type_attribute(attr_kind_sret, retT));
+
             ret = LLVMBuildLoad(builder, values[0], "");
         } else if (is_returning_value(rtype)) {
             // check if ABI needs something else and do a bitcast
@@ -3065,18 +3102,15 @@ struct LLVMIRGenerator {
 #if SCOPES_DEBUG_CODEGEN
         LLVMDumpModule(module);
 #endif
-        /*
+#if 1
         char *errmsg = NULL;
-        if (LLVMVerifyModule(module, LLVMReturnStatusAction, &errmsg)) {
-            StyledStream ss(SCOPES_CERR);
-            //if (entry) {
-            //    stream_value(ss, entry);
-            //}
+        if (LLVMVerifyModule(module,
+            LLVMReturnStatusAction, &errmsg)) {
             LLVMDumpModule(module);
             SCOPES_ERROR(CGenBackendFailed, errmsg);
         }
         LLVMDisposeMessage(errmsg);
-        */
+#endif
         return {};
     }
 
@@ -3134,6 +3168,7 @@ struct LLVMIRGenerator {
                     FunctionRef fn = SCOPES_GET_RESULT(extract_function_constant(val));
                     func_export_table.insert({fn.unref(), name});
                     LLVMValueRef func = SCOPES_GET_RESULT(ref_to_value(ValueIndex(fn)));
+                    assert(func);
                     exported_globals.push_back(func);
                 }
                 it = sc_scope_next(t, it._2);
