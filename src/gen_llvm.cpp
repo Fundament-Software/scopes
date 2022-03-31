@@ -3102,7 +3102,7 @@ struct LLVMIRGenerator {
 #if SCOPES_DEBUG_CODEGEN
         LLVMDumpModule(module);
 #endif
-#if 1
+#ifndef SCOPES_WIN32
         char *errmsg = NULL;
         if (LLVMVerifyModule(module,
             LLVMReturnStatusAction, &errmsg)) {
