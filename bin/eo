@@ -42,7 +42,7 @@ import configparser
 import sysconfig
 import subprocess
 
-VERSION = "0.7"
+VERSION = "0.8"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -63,7 +63,7 @@ privileges. Only continue if you trust the source of this recipe.
 def print_program_header():
     print("Major EO - Project Oriented Package Management")
     print("Version",VERSION)
-    print("https://hg.sr.ht/~duangle/majoreo")
+    print("http://majoreo.rocks")
     print()
 
 ################################################################################
@@ -74,6 +74,11 @@ if IS_WIN32 and sysconfig.get_platform().startswith("mingw"):
     IS_MINGW = True
 
 ################################################################################
+
+def user_confirmation(prompt = "continue?"):
+    confirm = input(prompt + " [y/N] ").lower()
+    if confirm != "y":
+        error("aborted")
 
 def memoize(f):
     memo = {}
@@ -1527,18 +1532,21 @@ def eval_expr(ee, expr):
 # project
 ################################################################################
 
-def find_project_config_dir(cwd):
+def find_project_config_dir(cwd, search_parents = True):
     while True:
         path = cwd + PROJECT_CONFIG_DIR
         if os.path.isdir(path):
             return path
+        if not search_parents:
+            return None
         next_cwd = os.path.realpath(cwd + "/..")
         if (cwd == next_cwd):
             return None
         cwd = next_cwd
 
-def find_project_dir(cwd):
-    path = find_project_config_dir(cwd)
+def find_project_dir(cwd, search_parents = True):
+    path = find_project_config_dir(cwd,
+        search_parents = search_parents)
     if path:
         return os.path.realpath(path + "/..")
     else:
@@ -1673,9 +1681,7 @@ class Project:
         if not for_update:
             if url not in PRESET_IMPORT_URLS:
                 print(RECIPE_WARNING)
-                confirm = input("continue? [y/N] ").lower()
-                if confirm != "y":
-                    return
+                user_confirmation()
             url = PRESET_IMPORT_URLS.get(url, url)
         filename = url_filename(url)
         if not filename.endswith(".eo"):
@@ -1775,9 +1781,7 @@ class Project:
             print(line)
         print()
         if not autoconfirm:
-            confirm = input("continue? [y/N] ").lower()
-            if confirm != "y":
-                return
+            user_confirmation()
         for dep in deps:
             dep.install(**kwargs)
         print("done.")
@@ -1801,9 +1805,7 @@ class Project:
         for line in wrap_words([dep.name.string for dep in deps]):
             print(line)
         print()
-        confirm = input("continue? [y/N] ").lower()
-        if confirm != "y":
-            return
+        user_confirmation()
         for dep in deps:
             dep.sync(force=force, **kwargs)
         print("done.")
@@ -1836,17 +1838,15 @@ class Project:
         for line in wrap_words([dep.name.string for dep in deps]):
             print(line)
         print()
-        confirm = input("continue? [y/N] ").lower()
-        if confirm != "y":
-            return
+        user_confirmation()
         for dep in deps:
             dep.remove(**kwargs)
         print("done.")
 
     @classmethod
-    def find(cls, cwd):
+    def find(cls, cwd, search_parents = True):
         cwd = os.path.realpath(cwd)
-        proj_dir = find_project_dir(cwd)
+        proj_dir = find_project_dir(cwd, search_parents = search_parents)
         if proj_dir:
             return Project(proj_dir)
         else:
@@ -1856,7 +1856,7 @@ class Project:
 ################################################################################
 
 def cmd_init(args):
-    project = Project.find(args.dest)
+    project = Project.find(args.dest, search_parents = False)
     project = project.init()
     if args.url:
         project.import_recipe(args.url, install=True)
