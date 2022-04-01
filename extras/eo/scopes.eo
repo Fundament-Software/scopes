@@ -9,9 +9,10 @@ package scopes
     archive-url := "https://hg.sr.ht/~duangle/scopes-binaries/raw/scopes-0.17-glibc_2.31-linux-x86_64.tar.xz"
     rootdir := (commonpath (extract (download archive-url)))
     alias "/" rootdir
+SUMMARY := "The Scopes Programming Language & Infrastructure"
 package scopes-unstable
-    summary "The Scopes Programming Language & Infrastructure"
-    platform linux windows-mingw
+    summary SUMMARY
+    platform linux
     # force fresh rebuild
     #version version
     VERSION := "tip"
@@ -35,6 +36,38 @@ package scopes-unstable
         "{rootdir}/.eo/installed/majoreo"
     in "/recipes"
         "{rootdir}/external/recipes/majoreo.eo"
+    in "/include"
+        "{rootdir}/include/scopes"
+    in "/"
+        "{rootdir}/lib"
+        "{rootdir}/testing"
+        "{rootdir}/CREDITS.md"
+        "{rootdir}/LICENSE.md"
+package scopes-unstable
+    summary SUMMARY
+    platform windows-mingw
+    # force fresh rebuild
+    #version version
+    VERSION := "tip"
+    archive-url := "https://hg.sr.ht/~duangle/scopes/archive/{VERSION}.tar.gz"
+    rootdir := (commonpath (extract (download archive-url)))
+    rootdir :=
+        then
+            cmd := (shell rootdir)
+            cmd "echo ./bin/eo update | bash"
+            cmd "echo ./bin/eo install -y majoreo | bash"
+            doc-cmd := (shell "{rootdir}/doc")
+            doc-cmd "make html"
+            cmd "echo ./build.sh | bash"
+            rootdir
+    alias "/doc/scopes/html" "{rootdir}/doc/site"
+    in "/bin"
+        "{rootdir}/bin/libgcc_s_seh-1.dll"
+        "{rootdir}/bin/libstdc++-6.dll"
+        "{rootdir}/bin/libwinpthread-1.dll"
+        "{rootdir}/bin/scopes.exe"
+        "{rootdir}/bin/scopesrt.dll"
+        "{rootdir}/bin/zlib1.dll"
     in "/include"
         "{rootdir}/include/scopes"
     in "/"
