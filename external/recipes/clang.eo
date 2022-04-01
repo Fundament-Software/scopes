@@ -23,5 +23,5 @@ package clang
     alias target-clang-include-dir
         then
             cmd := (shell mingw-dir (dict))
-            cmd "pacman -S --noconfirm mingw64/mingw-w64-x86_64-llvm mingw64/mingw-w64-x86_64-clang mingw64/mingw-w64-x86_64-polly"
+            cmd "pacman -S --needed --noconfirm mingw64/mingw-w64-x86_64-llvm mingw64/mingw-w64-x86_64-clang mingw64/mingw-w64-x86_64-polly"
             "{mingw-dir}/lib/clang/{VERSION}/include"
