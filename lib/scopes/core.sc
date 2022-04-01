@@ -719,16 +719,6 @@ sc_type_set_symbol Arguments '__typecall
                 add i 1
             box-pointer (sc_arguments_type pcount types)
 
-# calling arguments
-sc_type_set_symbol Arguments '__call
-    box-spice-macro
-        fn "Arguments" (args)
-            let argcount = (sc_argcount args)
-            verify-count argcount 1 -1
-            let head = (sc_getarg args 0)
-            let args = (sc_getarglist args 1)
-            sc_valueref_tag (sc_value_anchor args) `(head args)
-
 # shorter type constructor
 let _: = Arguments
 
