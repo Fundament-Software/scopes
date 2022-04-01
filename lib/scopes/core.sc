@@ -7438,13 +7438,15 @@ inline gen-allocator-sugar (copyf newf)
                     .. "syntax: " (tostring expr-head) " [<name>] [: <type>] [= <value>]"
         'tag result anchor
 
-""""valid syntax:
-    local name : type = value
-    local name = value
-    local = value
-    local : type = value
-    local : type args...
-    local type args...
+""""declares a mutable variable on the local function stack.
+
+    Syntax:
+        local name : type = value
+        local name = value
+        local = value
+        local : type = value
+        local : type args...
+        local type args...
 let local =
     gen-allocator-sugar
         spice "local-copy" (expr-head T value)
