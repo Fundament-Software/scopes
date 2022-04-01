@@ -141,12 +141,12 @@ do
     # collecting into a mutable string
     using import itertools
     local src = (String "test")
-    let new-str =
-        ->> src
-            filter
-                (x) -> (x > 101)
-            map
-                (el) -> el
-            local String "foo"
-    test (new-str == "footst")
+    ->> src
+        filter
+            (x) -> (x > 101)
+        map
+            (el) -> el
+        view
+            local dst : String "foo"
+    test (dst == "footst")
 ;
