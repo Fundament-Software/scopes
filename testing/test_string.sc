@@ -137,4 +137,16 @@ do
     verify-zero-terminated q
     ;
 
+do
+    # collecting into a mutable string
+    using import itertools
+    local src = (String "test")
+    let new-str =
+        ->> src
+            filter
+                (x) -> (x > 101)
+            map
+                (el) -> el
+            local dst : String
+    test (new-str == "tst")
 ;
