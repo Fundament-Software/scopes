@@ -3,7 +3,7 @@
 update-url "https://hg.sr.ht/~duangle/scopes/raw/extras/eo/scopes.eo?rev=tip"
 package scopes
     summary "The Scopes Programming Language & Infrastructure"
-    platform linux unknown
+    platform linux
     VERSION := "0.17"
     version VERSION
     archive-url := "https://hg.sr.ht/~duangle/scopes-binaries/raw/scopes-0.17-glibc_2.31-linux-x86_64.tar.xz"
@@ -11,7 +11,7 @@ package scopes
     alias "/" rootdir
 package scopes-unstable
     summary "The Scopes Programming Language & Infrastructure"
-    platform linux unknown
+    platform linux windows-mingw
     # force fresh rebuild
     #version version
     VERSION := "tip"
@@ -20,6 +20,8 @@ package scopes-unstable
     rootdir :=
         then
             cmd := (shell rootdir)
+            cmd "./bin/eo update"
+            cmd "./bin/eo install -y majoreo"
             doc-cmd := (shell "{rootdir}/doc")
             doc-cmd "make html"
             cmd "./build.sh"
@@ -28,6 +30,11 @@ package scopes-unstable
     in "/bin"
         "{rootdir}/bin/libscopesrt.so"
         "{rootdir}/bin/scopes"
+        "{rootdir}/bin/eo"
+    in "/.eo/installed"
+        "{rootdir}/.eo/installed/majoreo"
+    in "/recipes"
+        "{rootdir}/external/recipes/majoreo.eo"
     in "/include"
         "{rootdir}/include/scopes"
     in "/"
