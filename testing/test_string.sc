@@ -147,6 +147,6 @@ do
                 (x) -> (x > 101)
             map
                 (el) -> el
-            local dst : String
-    test (new-str == "tst")
+            local String "foo"
+    test (new-str == "footst")
 ;
