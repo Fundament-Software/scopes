@@ -2,14 +2,8 @@
 #
 
 # You can set these variables from the command line.
-MKDOCS        = mkdocs
 BUILDDIR      = site
 PYBUILDDIR    = site-packages
-
-# User-friendly check for MkDocs
-ifeq ($(shell which $(MKDOCS) >/dev/null 2>&1; echo $$?), 1)
-$(error The '$(MKDOCS)' command was not found. Make sure you have MkDocs installed, then set the MKDOCS environment variable to point to the full path of the '$(MKDOCS)' executable. Alternatively you can add the directory with the executable to your PATH. If you don't have MkDocs installed, grab it from https://www.mkdocs.org/)
-endif
 
 # Internal variables.
 .PHONY: help clean html
