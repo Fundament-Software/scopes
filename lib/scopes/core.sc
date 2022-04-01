@@ -7416,22 +7416,35 @@ inline gen-allocator-sugar (copyf newf)
             case (name '= value)
                 let callexpr =
                     'tag `[(qq ([copy-by-value expr-head value]))] anchor
-                qq [_let name] = [callexpr]
+                `[(qq [_let name] = [callexpr])]
+            case ('= value)
+                `[(qq ([copy-by-value expr-head value]))]
             case (name ': T '= value)
                 let callexpr =
                     'tag `[(qq ([copyf expr-head T value]))] anchor
-                qq [_let name] = [callexpr]
+                `[(qq [_let name] = [callexpr])]
+            case (': T '= value)
+                `[(qq ([copyf expr-head T value]))]
             case (name ': T args...)
                 let callexpr =
                     'tag `[(qq [newf expr-head T] (unquote-splice args...))] anchor
-                qq [_let name] = [callexpr]
+                `[(qq [_let name] = [callexpr])]
+            case (': T args...)
+                `[(qq [newf expr-head T] (unquote-splice args...))]
             case (T args...)
-                qq [newf expr-head T] (unquote-splice args...)
+                `[(qq [newf expr-head T] (unquote-splice args...))]
             default
                 error
-                    .. "syntax: " (tostring expr-head) " <name> [: <type>] [= <value>]"
-        'tag `result anchor
+                    .. "syntax: " (tostring expr-head) " [<name>] [: <type>] [= <value>]"
+        'tag result anchor
 
+""""valid syntax:
+    local name : type = value
+    local name = value
+    local = value
+    local : type = value
+    local : type args...
+    local type args...
 let local =
     gen-allocator-sugar
         spice "local-copy" (expr-head T value)
