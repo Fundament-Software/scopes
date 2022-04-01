@@ -3485,7 +3485,7 @@ let Closure->Collector =
                 error "Closure must be constant"
             let self = (as self Closure)
             let self = (bitcast self Collector)
-            `self
+            'tag `self ('anchor args)
 
 # (define name expr ...)
 fn expand-define (expr)
@@ -3740,7 +3740,7 @@ let va-option =
                     error "Generator must be constant"
                 let self = (self as Collector)
                 let self = (bitcast self Closure)
-                `(self)
+                'tag `(self) ('anchor args)
 
 #---------------------------------------------------------------------------
 # for iterator

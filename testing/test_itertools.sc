@@ -161,3 +161,22 @@ do
         'insert used k
         print i (unpack A)
 
+do
+    # collecting into a mutable array
+    using import Array
+
+    local src : (Array i32) 10 2 9 6 15 21 49 55
+    let new-arr =
+        ->> src
+            filter
+                (x) -> (x > 10)
+            map
+                (el) -> el
+            local dst : (Array i32)
+
+    # verify
+    for i in new-arr
+        print i
+
+
+;

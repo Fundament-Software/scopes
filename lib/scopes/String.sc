@@ -29,6 +29,15 @@ inline string-generator (self)
         inline (i) (self @ i)
         inline (i) (i + 1:usize)
 
+inline string-collector (self)
+    Collector
+        inline ()
+        inline () true
+        inline () self
+        inline (src)
+            'append self (src)
+            ;
+
 typedef StringBase < Struct
 typedef FixedString < StringBase
 typedef GrowingString < StringBase
@@ -155,6 +164,7 @@ typedef+ StringBase
         `Generator`, or directly passed to `for`.
     inline __as (cls T)
         static-if (T == Generator) string-generator
+        elseif (T == Collector) string-collector
         elseif ((cls.ElementType == char) and (T == string))
             inline (self)
                 string self._items self._count

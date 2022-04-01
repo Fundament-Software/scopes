@@ -32,6 +32,15 @@ inline... array-generator (self, offset : usize = 0:usize)
         inline (i) (self @ i)
         inline (i) (i + 1:usize)
 
+inline array-collector (self)
+    Collector
+        inline ()
+        inline () true
+        inline () self
+        inline (src)
+            'append self (src)
+            ;
+
 typedef Array < Struct
 typedef FixedArray < Array
 typedef GrowingArray < Array
@@ -44,6 +53,7 @@ typedef+ Array
         `Generator`, or directly passed to `for`.
     inline __as (cls T)
         static-if (T == Generator) array-generator
+        elseif (T == Collector) array-collector
 
     let forward = array-generator
 
