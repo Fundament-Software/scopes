@@ -645,8 +645,6 @@ typedef+ GrowingString
 
     unlet gen-growing-string-type parent-type nearest-capacity
 
-let String = (GrowingString char)
-
 spice format (cls str args...)
     import UTF-8
     let prefix:c = UTF-8.char32
@@ -733,5 +731,7 @@ type+ StringBase
 
 do
     #let StringBase FixedString GrowingString
-    let String
+    let String = (GrowingString char)
+    let FixedString
+
     locals;
