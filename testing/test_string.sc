@@ -1,17 +1,6 @@
 using import testing
 using import String
 
-# \ followed by \n is a line continuation
-test
-    ==
-        "the\
-        quick\
-        brown\
-        \
-        fox\
-"
-        "thequickbrownfox"
-
 # raw string blocks
 ###################
 
@@ -160,4 +149,40 @@ do
         view
             local dst : String "foo"
     test (dst == "footst")
+
+
+# string formatting
+
+test
+    ==
+        report
+            'format String
+                "test test2 {2} {1} more {u}x{v}x{wx} {Q} {P} {}"
+                \ 1 2 3
+                Q = "test"
+                P =
+                    local : String "hi"
+                u = 10
+                v = 20
+                wx = 30
+        "test test2 3 2 more 10x20x30 test hi 1"
+
+test-compiler-error
+    'format String "{test"
+test-compiler-error
+    'format String "test {2p}"
+test-compiler-error
+    'format String "test {x}"
+
+# \ followed by \n is a line continuation
+test
+    ==
+        "the\
+        quick\
+        brown\
+        \
+        fox\
+"
+        "thequickbrownfox"
+
 ;
