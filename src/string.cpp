@@ -50,6 +50,18 @@ int unescape_string(char *buf) {
                 *dst = '\t';
             } else if (*src == 'r') {
                 *dst = '\r';
+            } else if (*src == '\n') {
+                src++;
+                // skip until next non whitespace character
+                while(*src) {
+                    char c = *src;
+                    if ((c == ' ') || (c == '\t')) {
+                        src++;
+                    } else {
+                        break;
+                    }
+                }
+                continue;
             } else if (*src == 'x') {
                 char c0 = parse_hexchar(*(src + 1));
                 char c1 = parse_hexchar(*(src + 2));

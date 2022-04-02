@@ -1,6 +1,17 @@
 using import testing
 using import String
 
+# \ followed by \n is a line continuation
+test
+    ==
+        "the\
+        quick\
+        brown\
+        \
+        fox\
+"
+        "thequickbrownfox"
+
 # raw string blocks
 ###################
 

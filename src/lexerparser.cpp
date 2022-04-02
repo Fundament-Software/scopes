@@ -456,7 +456,7 @@ SCOPES_RESULT(void) LexerParser::read_string(char terminator) {
             SCOPES_ERROR(ParserUnterminatedSequence);
         }
         char c = SCOPES_GET_RESULT(next());
-        if (c == '\n') {
+        if ((c == '\n') && !escape) {
             // 0.10
             //newline();
             // 0.11
