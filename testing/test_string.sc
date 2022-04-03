@@ -10,7 +10,7 @@ test
 
 # doesn't escape anything
 test
-    "hello \"world\"\\n\n" == """"hello "world"\n
+    "hello \{ \"world\"\\n\n" == """"hello \{ "world"\n
 
 # sub 4-space indentation is illegal
 #test
@@ -153,17 +153,5 @@ do
         view
             local dst : String "foo"
     test (dst == "footst")
-
-
-# \ followed by \n is a line continuation
-test
-    ==
-        "the\
-        quick\
-        brown\
-        \
-        fox\
-"
-        "thequickbrownfox"
 
 ;

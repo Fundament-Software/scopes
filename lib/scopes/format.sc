@@ -33,18 +33,23 @@ using import String
                 age = 42
 
 spice format (str args...)
-    import UTF-8
-    let prefix:c = UTF-8.char32
+    using import UTF-8
 
     anchor := ('anchor str)
     str as:= string
     local block : (Array Value)
-    inline scan-until (i L ch)
+    inline scan-until (i L search-character)
         loop (i)
-            if ((i < L) & (str @ i != ch))
-                repeat (i + 1)
-            else
+            if (i >= L)
+                break (min L i)
+            c := str @ i
+            switch c
+            case search-character
                 break i
+            case c"\\"
+                repeat (i + 2)
+            default
+                repeat (i + 1)
     fn parse-integer (str)
         L := (countof str)
         loop (i val = 0:usize 0:usize)
@@ -64,7 +69,7 @@ spice format (str args...)
             "while parsing format string"
             msg
     loop (i nextarg = 0:usize 0)
-        if (i >= L)
+        if (i == L)
             break;
         c := str @ i
         if (c == c"{")
@@ -98,11 +103,25 @@ spice format (str args...)
                 else `(tostring body)
             _ (i + 1) nextarg
         else
-            # read string chunk up to the next variable and append to result
+            # read string chunk up to the next variable and append to result,
+            # after unescaping braces.
             start := i
             let i = (scan-until i L c"{")
-            substr := (slice str start i)
-            'append block substr
+            local substr : String
+            loop (k = start)
+                if (k == i)
+                    break;
+                c := str @ k
+                if (c == c"\\")
+                    k1 := k + 1
+                    if (k1 < i)
+                        d := str @ k1
+                        if ((d == c"{") | (d == c"}"))
+                            'append substr d
+                            repeat (k1 + 1)
+                'append substr c
+                repeat (k + 1)
+            'append block (substr as string)
             _ i nextarg
     sc_argument_list_new ((countof block) as i32) (& (block @ 0))
 

@@ -389,6 +389,7 @@ SCOPES_LIBEXPORT sc_rawstring_size_t_tuple_t sc_string_buffer(const sc_string_t 
 SCOPES_LIBEXPORT const sc_string_t *sc_string_lslice(const sc_string_t *str, size_t offset);
 SCOPES_LIBEXPORT const sc_string_t *sc_string_rslice(const sc_string_t *str, size_t offset);
 SCOPES_LIBEXPORT int sc_string_compare(const sc_string_t *a, const sc_string_t *b);
+SCOPES_LIBEXPORT const sc_string_t *sc_string_unescape(const sc_string_t *str);
 
 // lists
 

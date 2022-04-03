@@ -29,6 +29,12 @@ test
                     wx = 30
         "test test2 3 2 more 10x20x30 test hi 1"
 
+test
+    ==
+        report
+            .. (format "\{\} \{\} \{\}" "test" "test2" "test3")
+        "{} {} {}"
+
 test-compiler-error
     format "{test"
 test-compiler-error

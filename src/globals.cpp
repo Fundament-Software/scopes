@@ -982,6 +982,15 @@ const sc_string_t *sc_string_lslice(const sc_string_t *str, size_t offset) {
     return String::from(str->data, offset);
 }
 
+const sc_string_t *sc_string_unescape(const sc_string_t *str) {
+    using namespace scopes;
+    char *s = strdup(str->data);
+    unescape_string(s);
+    auto result = String::from(s, strlen(s));
+    free(s);
+    return result;
+}
+
 // List
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2558,6 +2567,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_string_buffer, arguments_type({rawstring, TYPE_USize}), TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_string_lslice, TYPE_String, TYPE_String, TYPE_USize);
     DEFINE_EXTERN_C_FUNCTION(sc_string_rslice, TYPE_String, TYPE_String, TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_string_unescape, TYPE_String, TYPE_String);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_at, TYPE_ValueRef, TYPE_Type, TYPE_Symbol);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_local_at, TYPE_ValueRef, TYPE_Type, TYPE_Symbol);

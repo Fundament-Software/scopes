@@ -158,6 +158,11 @@ spice char32 (value)
         drain
     result
 
+run-stage;
+
+inline prefix:c (value)
+    char32 ('unescape value)
+
 do
-    let encoder decoder char32
+    let encoder decoder char32 prefix:c
     locals;

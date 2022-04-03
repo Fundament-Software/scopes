@@ -30,5 +30,15 @@ do
 
     test (r"\\test\n\"test\"" == "\\\\test\\n\"test\"")
 
+# \ followed by \n is a line continuation
+test
+    ==
+        "the\
+        quick\
+        brown\
+        \
+        fox\
+"
+        "thequickbrownfox"
 
 ;

@@ -44,12 +44,6 @@ int unescape_string(char *buf) {
             src++;
             if (*src == 0) {
                 break;
-            } else if (*src == 'n') {
-                *dst = '\n';
-            } else if (*src == 't') {
-                *dst = '\t';
-            } else if (*src == 'r') {
-                *dst = '\r';
             } else if (*src == '\n') {
                 src++;
                 // skip until next non whitespace character
@@ -62,18 +56,38 @@ int unescape_string(char *buf) {
                     }
                 }
                 continue;
-            } else if (*src == 'x') {
-                char c0 = parse_hexchar(*(src + 1));
-                char c1 = parse_hexchar(*(src + 2));
-                if ((c0 >= 0) && (c1 >= 0)) {
-                    *dst = (c0 << 4) | c1;
-                    src += 2;
-                } else {
-                    src--;
-                    *dst = *src;
-                }
             } else {
-                *dst = *src;
+                switch(*src) {
+                case 'n': {
+                    *dst = '\n';
+                } break;
+                case 't': {
+                    *dst = '\t';
+                } break;
+                case 'r': {
+                    *dst = '\r';
+                } break;
+                case 'x': {
+                    char c0 = parse_hexchar(*(src + 1));
+                    char c1 = parse_hexchar(*(src + 2));
+                    if ((c0 >= 0) && (c1 >= 0)) {
+                        *dst = (c0 << 4) | c1;
+                        src += 2;
+                    } else {
+                        src--;
+                        *dst = *src;
+                    }
+                } break;
+                case '"':
+                case '\\': {
+                    *dst = *src;
+                } break;
+                default: {
+                    // translate as-is
+                    *dst++ = *(src - 1);
+                    *dst = *src;
+                } break;
+                }
             }
         } else {
             *dst = *src;

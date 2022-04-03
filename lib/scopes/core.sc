@@ -2049,6 +2049,19 @@ fn string@ (self i)
                         `count
                     else
                         `(sc_string_count self)
+    unescape =
+        box-pointer
+            spice-macro
+                fn (args)
+                    let argc = (sc_argcount args)
+                    verify-count argc 1 1
+                    let self = (sc_getarg args 0)
+                    if ('constant? self)
+                        let count =
+                            sc_string_unescape (unbox self string)
+                        `count
+                    else
+                        `(sc_string_unescape self)
 
 'define-symbols list
     __typecall = list-constructor
