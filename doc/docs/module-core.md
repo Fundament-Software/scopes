@@ -687,10 +687,6 @@ parses the command-line and optionally enters the REPL.
 
 :   An opaque type labeled `Arguments`.
 
-    *spice*{.property} `__call`{.descname} (*&ensp;...&ensp;*)[](#scopes._:.spice.__call "Permalink to this definition"){.headerlink} {#scopes._:.spice.__call}
-
-    :   
-
     *spice*{.property} `__typecall`{.descname} (*&ensp;...&ensp;*)[](#scopes._:.spice.__typecall "Permalink to this definition"){.headerlink} {#scopes._:.spice.__typecall}
 
     :   
@@ -714,10 +710,6 @@ parses the command-line and optionally enters the REPL.
 *type*{.property} `Arguments`{.descname} [](#scopes.type.Arguments "Permalink to this definition"){.headerlink} {#scopes.type.Arguments}
 
 :   An opaque type.
-
-    *spice*{.property} `__call`{.descname} (*&ensp;...&ensp;*)[](#scopes.Arguments.spice.__call "Permalink to this definition"){.headerlink} {#scopes.Arguments.spice.__call}
-
-    :   
 
     *spice*{.property} `__typecall`{.descname} (*&ensp;...&ensp;*)[](#scopes.Arguments.spice.__typecall "Permalink to this definition"){.headerlink} {#scopes.Arguments.spice.__typecall}
 
@@ -3589,7 +3581,15 @@ parses the command-line and optionally enters the REPL.
 
 *sugar*{.property} (`local`{.descname} *&ensp;...&ensp;*) [](#scopes.sugar.local "Permalink to this definition"){.headerlink} {#scopes.sugar.local}
 
-:   
+:   declares a mutable variable on the local function stack.
+    
+    Syntax:
+        local name : type = value
+        local name = value
+        local = value
+        local : type = value
+        local : type args...
+        local type args...
 
 *sugar*{.property} (`locals`{.descname} *&ensp;...&ensp;*) [](#scopes.sugar.locals "Permalink to this definition"){.headerlink} {#scopes.sugar.locals}
 

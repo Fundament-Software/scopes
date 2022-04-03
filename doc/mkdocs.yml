@@ -15,6 +15,7 @@ nav:
         - "chaining": module-chaining.md
         - "console": module-console.md
         - "enum": module-enum.md
+        - "format": module-format.md
         - "FunctionChain": module-FunctionChain.md
         - "glm": module-glm.md
         - "glsl": module-glsl.md

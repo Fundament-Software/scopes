@@ -40,4 +40,6 @@ echo "generating core..." \
     && ./build_reference.sc testing 25 > ./docs/module-testing.md \
     && echo "generating UTF-8..." \
     && ./build_reference.sc UTF-8 26 > ./docs/module-UTF-8.md \
+    && echo "generating format..." \
+    && ./build_reference.sc format 27 > ./docs/module-format.md \
     && make clean && make html

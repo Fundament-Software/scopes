@@ -37,6 +37,7 @@ test-modules
     .test_feature_matrix
     .test_fnchain
     .test_folding
+    .test_format
     .test_forward
     .test_frame
     .test_from
