@@ -19,7 +19,7 @@
         let
           pkgs = nixpkgsFor.${system};
           selfpkgs = self.packages.${system};
-          llvmpkgs = pkgs.llvmPackages_12;
+          llvmpkgs = pkgs.llvmPackages_13;
         in {
 
           genie = pkgs.stdenv.mkDerivation {
@@ -32,7 +32,7 @@
 
           scopes = pkgs.stdenv.mkDerivation {
             pname = "scopes";
-            version = "0.16";
+            version = "0.18";
             src = ./.;
             enableParallelBuilding = true;
 
