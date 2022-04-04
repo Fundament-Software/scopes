@@ -999,6 +999,8 @@ SCOPES_RESULT(const Scope *) import_c_module (
 
     // grab compiler args from the nix wrapper variable
     std::string nixenv = getenv("NIX_CFLAGS_COMPILE");
+    //DEBUG
+    std::cout << "nix_cflags_compile value: " << nixenv << std::endl;
     std::vector<std::string> nixargs;
     size_t last = 0;
     size_t pos = 0;
@@ -1007,11 +1009,13 @@ SCOPES_RESULT(const Scope *) import_c_module (
         if(last != pos)
         {
             nixargs.push_back(nixenv.substr(last, pos - last));
-            aargs.push_back(nixargs.back().c_str());
         }
         last = pos + 1;
     }
     nixargs.push_back(nixenv.substr(last));
+    for (auto &it : nixargs) {
+        aargs.push_back(it.c_str());
+    }
 
     auto argcount = args.size();
     std::string object_file;
@@ -1024,6 +1028,10 @@ SCOPES_RESULT(const Scope *) import_c_module (
         aargs.push_back(args[i].c_str());
     }
 
+    //DEBUG
+    for (auto it : aargs) {
+        std::cout << "c module arg: " << it << std::endl;
+    }
 
     CompilerInstance compiler;
     compiler.setInvocation(createInvocationFromCommandLine(aargs));
