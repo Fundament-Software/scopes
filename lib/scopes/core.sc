@@ -1184,6 +1184,15 @@ let mutable@ =
             let T = (sc_pointer_type T pointer-flag-non-writable unnamed)
             return `[('mutable T)]
 
+let mutable& =
+    spice-macro
+        fn (args)
+            let argc = (sc_argcount args)
+            verify-count argc 1 1
+            let self = (sc_getarg args 0)
+            let T = (unbox-pointer self type)
+            return `[('mutable& T)]
+
 let signed =
     spice-macro
         fn (args)
