@@ -2481,6 +2481,9 @@ let repr =
                 let f = (sc_type_at T '__repr)
                 `(f value)
             else
+                let value =
+                    if ('refer? ('qualifiersof value)) `(deref value)
+                    else value
                 let s = `(sc_value_content_repr value)
                 if (type-is-default-suffix? T) s
                 else
