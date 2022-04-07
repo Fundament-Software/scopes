@@ -16,7 +16,7 @@ fn... _extract-payload (enum-value, extractT, unpack? = true)
     if (extractT == Nothing)
         return (spice-quote none)
 
-    let qcls = ('qualified-typeof enum-value)
+    let qcls = ('qualifiersof enum-value)
     let cls = ('strip-qualifiers qcls)
     let payload-cls = ('element@ cls 1)
     let raw-payload = `(extractvalue enum-value 1)
@@ -39,9 +39,20 @@ fn... _extract-payload (enum-value, extractT, unpack? = true)
                 let ptr = (bitcast ptr ptrET)
                 load ptr
     let ET = ('strip-qualifiers extractT)
+    let qview? = ('view? qcls)
+    let extracted =
+        if qview? extracted
+        else
+            spice-quote
+                let newextracted = (dupe extracted)
+                lose enum-value
+                newextracted
     let extracted =
         if ((ET < tuple) & unpack?)
-            `(unpack extracted)
+            if qview?
+                `(unpack extracted)
+            else
+                `('explode extracted)
         else extracted
 
 @@ memo
@@ -98,12 +109,13 @@ inline gen-apply-from-tag (f)
 
 # tagged union / sum type
 typedef Enum
-    inline literal (self)
-        extractvalue self 0
+    let literal =
+        inline "#hidden" (self)
+            extractvalue self 0
     spice __unsafe-dispatch2 (self other enum-value handlers...)
         call
             gen-dispatch-from-tag
-                inline (T self other)
+                inline "#hidden" (T self other)
                     _
                         _extract-payload self T false
                         _extract-payload other T false
@@ -112,14 +124,14 @@ typedef Enum
         let tag = `(extractvalue self 0)
         call
             gen-dispatch-from-tag
-                inline (T self)
+                inline "#hidden" (T self)
                     _extract-payload self T
             \ tag handlers... self
     spice apply (self handler)
         let tag = `(extractvalue self 0)
         call
             gen-apply-from-tag
-                inline (T self)
+                inline "#hidden" (T self)
                     _extract-payload self T
             \ tag handler self
 
@@ -376,26 +388,31 @@ fn finalize-enum-runtime (T storage)
         # build repr function
         spice-quote
             fn repr (self)
+                viewing self
                 let val = (extractvalue self 0)
                 spice-unquote
                     build-repr-switch-case index-type val false true field-types
             fn tostring (self)
+                viewing self
                 let val = (extractvalue self 0)
                 spice-unquote
                     build-repr-switch-case index-type val false false field-types
             inline __repr (self)
+                let self = (view self)
                 let val = (extractvalue self 0)
                 static-if (constant? val)
                     static-repr-switch-case index-type val false true field-types
                 else
                     repr self
             inline __tostring (self)
+                let self = (view self)
                 let val = (extractvalue self 0)
                 static-if (constant? val)
                     static-repr-switch-case index-type val false false field-types
                 else
                     tostring self
             fn __copy (self)
+                viewing self
                 '__dispatch self
                     spice-unquote
                         sc_argument_list_map_new (numfields + 1)
@@ -412,6 +429,7 @@ fn finalize-enum-runtime (T storage)
                                                 field
                                                     va-map copy args...
             fn __drop (self)
+                viewing self
                 #print "dropping option" self
                 '__dispatch self
                     spice-unquote
@@ -425,6 +443,7 @@ fn finalize-enum-runtime (T storage)
                                     let name = (('@ field 'Name) as Symbol)
                                     sc_keyed_new name drop-any
             fn __hash (self)
+                viewing self
                 let tag = (extractvalue self 0)
                 inline hash-with-tag (self)
                     hash tag self
@@ -442,6 +461,8 @@ fn finalize-enum-runtime (T storage)
             inline __== (A B)
                 static-if (A == B)
                     fn Enum== (a b)
+                        viewing a
+                        viewing b
                         let tag-a = (extractvalue a 0)
                         let tag-b = (extractvalue b 0)
                         if (icmp== tag-a tag-b)
