@@ -999,8 +999,6 @@ SCOPES_RESULT(const Scope *) import_c_module (
 
     // grab compiler args from the nix wrapper variable
     std::string nixenv = getenv("NIX_CFLAGS_COMPILE");
-    //DEBUG
-    std::cout << "nix_cflags_compile value: " << nixenv << std::endl;
     std::vector<std::string> nixargs;
     size_t last = 0;
     size_t pos = 0;
@@ -1026,11 +1024,6 @@ SCOPES_RESULT(const Scope *) import_c_module (
             continue;
         }
         aargs.push_back(args[i].c_str());
-    }
-
-    //DEBUG
-    for (auto it : aargs) {
-        std::cout << "c module arg: " << it << std::endl;
     }
 
     CompilerInstance compiler;
