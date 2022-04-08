@@ -3,7 +3,7 @@ SUMMARY := "GENie - Project generator tool"
 package genie
     summary SUMMARY
     version VERSION
-    platform linux unknown
+    platform linux
 
     url := "https://github.com/bkaradzic/bx/raw/master/tools/bin/linux/genie"
     binary := (download url)

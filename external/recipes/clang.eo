@@ -9,7 +9,7 @@ target-clang-include-dir := "/lib/scopes/clang/include"
 package clang
     summary SUMMARY
     version PACKAGE_VERSION
-    platform linux unknown
+    platform linux
 
     alias "/clang" rootdir
     alias target-clang-include-dir "{rootdir}/lib/clang/{VERSION}/include"
