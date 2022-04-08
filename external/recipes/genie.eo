@@ -10,7 +10,7 @@ package genie
     binary :=
         then
             cmd := (shell "." (dict))
-            cmd "chmod a+x {binary}"
+            cmd "chmod a+x \"{binary}\""
             binary
     alias "/bin/genie" binary
 package genie

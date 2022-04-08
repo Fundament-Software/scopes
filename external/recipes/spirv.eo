@@ -17,7 +17,7 @@ package spirv-tools
     rootdir :=
         then
             cmd := (shell rootdir (dict))
-            cmd "cp -r {headersdir}/* {targetheadersdir}"
+            cmd "cp -r \"{headersdir}/*\" \"{targetheadersdir}\""
             cmd := (shell builddir (dict))
             cmd "{cmakedir}/bin/cmake .. -DCMAKE_BUILD_TYPE=Release"
             cmd "make -j {cpu-core-count}"
@@ -40,7 +40,7 @@ package spirv-tools
     rootdir :=
         then
             cmd := (shell rootdir (dict))
-            cmd "cp -r {headersdir}/* {targetheadersdir}"
+            cmd "cp -r \"{headersdir}/*\" \"{targetheadersdir}\""
             cmd := (shell builddir (dict))
             cmd "{cmakedir}/bin/cmake .. -G \"MSYS Makefiles\" -DCMAKE_BUILD_TYPE=Release"
             cmd "make -j {cpu-core-count}"
