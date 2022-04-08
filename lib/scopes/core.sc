@@ -3,8 +3,8 @@
     This file is distributed under the MIT License.
     See LICENSE.md for details.
 
-""""globals
-    =======
+""""global-scope
+    ============
 
     These names are bound in every fresh module and main program by default.
     Essential symbols are created by the compiler, and subsequent utility
@@ -6938,6 +6938,8 @@ let
     realpath = sc_realpath
     globals = sc_get_globals
     set-globals! = sc_set_globals
+    global-scope = sc_get_globals
+    set-global-scope! = sc_set_globals
     exit = sc_exit
     launch-args = sc_launch_args
     set-signal-abort! = sc_set_signal_abort
@@ -7236,17 +7238,18 @@ define append-to-scope
                 spice-quote
                     'bind-with-docstring packedscope key values docstr
 
-""""Export locals as a chain of up to two new scopes: a scope that contains
-    all the constant values in the immediate scope, and a scope that contains
-    the runtime values. If all values in the scope are constant, then the
-    resulting scope will also be constant.
-sugar locals ()
+""""Export values bound in the local scope as a chain of up to two new scopes:
+    a scope that contains all the constant values in the immediate scope, and a
+    scope that contains the runtime values. If all values in the scope are
+    constant, then the resulting scope will also be constant.
+sugar local-scope ()
     spice make-scope (docstring)
         let docstring = (docstring as string)
         # create a scope constant at compile time
         `[(sc_scope_new_with_docstring docstring)]
     let docstring = ('module-docstring sugar-scope)
     list fold-locals (list make-scope docstring) append-to-scope
+let locals = local-scope
 
 #-------------------------------------------------------------------------------
 # typedef
@@ -8548,7 +8551,7 @@ fn print-logo ()
 
 #-------------------------------------------------------------------------------
 
-set-globals! (__this-scope)
+set-global-scope! (__this-scope)
 
 #-------------------------------------------------------------------------------
 # main
@@ -8570,8 +8573,8 @@ fn print-help (exename)
     exit 0
 
 fn set-project-dir (env path set-paths?)
-    set-globals!
-        'bind-symbols (globals)
+    set-global-scope!
+        'bind-symbols (global-scope)
             project-dir = path
     if set-paths?
         # add default paths to package
@@ -8664,7 +8667,7 @@ fn run-main ()
         return sourcearg argc argv
     let scope =
         'bind-symbols
-            sc_scope_new_subscope_with_docstring (globals) ""
+            sc_scope_new_subscope_with_docstring (global-scope) ""
             script-launch-args = script-launch-args
     let base-dir env =
         if project?
@@ -8710,10 +8713,10 @@ fn run-main ()
                     else (result as Scope)
             _ project-dir env
         else (_ working-dir core-module-env)
-    # globals might have since been updated with project-dir
+    # global-scope might have since been updated with project-dir
     let scope =
         'bind-symbols
-            sc_scope_new_subscope_with_docstring (globals) ""
+            sc_scope_new_subscope_with_docstring (global-scope) ""
             script-launch-args = script-launch-args
     if command?
         hide-traceback;
