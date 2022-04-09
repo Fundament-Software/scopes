@@ -8540,14 +8540,25 @@ fn compiler-version-string ()
         \ compiler-timestamp ")"
 
 fn print-logo ()
-    io-write! "  "; io-write! (default-styler style-string "\\\\\\"); io-write! "\n"
-    io-write! "   "; io-write! (default-styler style-number "\\\\\\   ")
-    io-write! (compiler-version-string); io-write! "\n";
-    io-write! " "; io-write! (default-styler style-comment "///")
-    io-write! (default-styler style-sfxfunction "\\\\\\")
-    io-write! "  http://scopes.rocks"; io-write! "\n";
-    io-write! (default-styler style-comment "///"); io-write! "  "
-    io-write! (default-styler style-function "\\\\\\"); io-write! "\n"
+    static-if true
+        # due to current events
+        io-write! "  "; io-write! (default-styler style-type "\\\\\\"); io-write! "\n"
+        io-write! "   "; io-write! (default-styler style-type "\\\\\\   ")
+        io-write! (compiler-version-string); io-write! "\n";
+        io-write! " "; io-write! (default-styler style-comment "///")
+        io-write! (default-styler style-function "\\\\\\")
+        io-write! "  http://scopes.rocks"; io-write! "\n";
+        io-write! (default-styler style-comment "///"); io-write! "  "
+        io-write! (default-styler style-function "\\\\\\"); io-write! "\n"
+    else
+        io-write! "  "; io-write! (default-styler style-string "\\\\\\"); io-write! "\n"
+        io-write! "   "; io-write! (default-styler style-number "\\\\\\   ")
+        io-write! (compiler-version-string); io-write! "\n";
+        io-write! " "; io-write! (default-styler style-comment "///")
+        io-write! (default-styler style-sfxfunction "\\\\\\")
+        io-write! "  http://scopes.rocks"; io-write! "\n";
+        io-write! (default-styler style-comment "///"); io-write! "  "
+        io-write! (default-styler style-function "\\\\\\"); io-write! "\n"
 
 #-------------------------------------------------------------------------------
 
