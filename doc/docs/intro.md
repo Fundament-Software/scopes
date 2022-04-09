@@ -23,9 +23,10 @@ Scopes only supports the `MSYS2/mingw64` toolchain for the foreseeable future.
 
 * Install [MSYS2](http://msys2.github.io) and
   install the `make` package, as well as `mingw64/mingw-w64-x86_64-python`, and `mingw64/mingw-w64-x86_64-python-pip` to make the docs.
-* Nice to have: `mingw-w64-x86_64-gdb`
 * at least `usr/bin` from your MSYS2 installation must be added to the
   `PATH` variable so that the buildscript can find MSYS2.
+* To check out the repository, also install `mercurial`
+* Nice to have for debugging later: `mingw-w64-x86_64-gdb`
 * Launch `bash` in the workspace folder, then run `./build.sh`. This will pull
   and build all additional dependencies, and then build the project itself.
 * There should now be a `scopes.exe` executable in the `bin` folder.
