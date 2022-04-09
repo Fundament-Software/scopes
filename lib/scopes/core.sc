@@ -8542,14 +8542,14 @@ fn compiler-version-string ()
 fn print-logo ()
     static-if true
         # due to current events
-        io-write! "  "; io-write! (default-styler style-type "\\\\\\"); io-write! "\n"
-        io-write! "   "; io-write! (default-styler style-type "\\\\\\   ")
+        io-write! "  "; io-write! (default-styler style-function "\\\\\\"); io-write! "\n"
+        io-write! "   "; io-write! (default-styler style-function "\\\\\\   ")
         io-write! (compiler-version-string); io-write! "\n";
         io-write! " "; io-write! (default-styler style-comment "///")
-        io-write! (default-styler style-function "\\\\\\")
+        io-write! (default-styler style-type "\\\\\\")
         io-write! "  http://scopes.rocks"; io-write! "\n";
         io-write! (default-styler style-comment "///"); io-write! "  "
-        io-write! (default-styler style-function "\\\\\\"); io-write! "\n"
+        io-write! (default-styler style-type "\\\\\\"); io-write! "\n"
     else
         io-write! "  "; io-write! (default-styler style-string "\\\\\\"); io-write! "\n"
         io-write! "   "; io-write! (default-styler style-number "\\\\\\   ")
