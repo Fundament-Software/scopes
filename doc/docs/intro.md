@@ -22,7 +22,7 @@ you have checked out the Scopes source tree.
 Scopes only supports the `MSYS2/mingw64` toolchain for the foreseeable future.
 
 * Install [MSYS2](http://msys2.github.io) and
-  install the `mingw/make` package, as well as `mingw/python` 3.8 or later, and `mingw64/mingw-w64-x86_64-python-pip` to make the docs.
+  install the `make` package, as well as `mingw64/mingw-w64-x86_64-python`, and `mingw64/mingw-w64-x86_64-python-pip` to make the docs.
 * Nice to have: `mingw-w64-x86_64-gdb`
 * at least `usr/bin` from your MSYS2 installation must be added to the
   `PATH` variable so that the buildscript can find MSYS2.
