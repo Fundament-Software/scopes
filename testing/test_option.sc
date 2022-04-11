@@ -2,10 +2,12 @@
 using import testing
 using import Option
 
+let optT = (Option One)
+
 # Option unwrap method
 do
-    let optT = (Option One)
     let opt = (optT (One 1234))
+    test ((typeof opt) < Option)
     let opt2 = (optT)
     let result =
         try ('unwrap opt)
@@ -19,10 +21,17 @@ do
     test (result == (One 12345))
     ;
 
+do
+    # wrapping
+    let opt = (Option.wrap (One 1234))
+    test ((typeof opt) == optT)
+    ;
+
 # Option dispatch method
 do
-    let optT = (Option One)
-    let opt = (optT (One 1234))
+    # implicit cast to generic class
+    let opt = (imply (One 1234) Option)
+    test ((typeof opt) == optT)
     let result =
         dispatch opt
         case Some (val) val
