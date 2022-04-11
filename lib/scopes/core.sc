@@ -3,8 +3,8 @@
     This file is distributed under the MIT License.
     See LICENSE.md for details.
 
-""""globals
-    =======
+""""global-scope
+    ============
 
     These names are bound in every fresh module and main program by default.
     Essential symbols are created by the compiler, and subsequent utility
@@ -1183,6 +1183,15 @@ let mutable@ =
             let T = (unbox-pointer self type)
             let T = (sc_pointer_type T pointer-flag-non-writable unnamed)
             return `[('mutable T)]
+
+let mutable& =
+    spice-macro
+        fn (args)
+            let argc = (sc_argcount args)
+            verify-count argc 1 1
+            let self = (sc_getarg args 0)
+            let T = (unbox-pointer self type)
+            return `[('mutable& T)]
 
 let signed =
     spice-macro
@@ -2472,6 +2481,9 @@ let repr =
                 let f = (sc_type_at T '__repr)
                 `(f value)
             else
+                let value =
+                    if ('refer? ('qualifiersof value)) `(deref value)
+                    else value
                 let s = `(sc_value_content_repr value)
                 if (type-is-default-suffix? T) s
                 else
@@ -6926,6 +6938,8 @@ let
     realpath = sc_realpath
     globals = sc_get_globals
     set-globals! = sc_set_globals
+    global-scope = sc_get_globals
+    set-global-scope! = sc_set_globals
     exit = sc_exit
     launch-args = sc_launch_args
     set-signal-abort! = sc_set_signal_abort
@@ -7224,17 +7238,18 @@ define append-to-scope
                 spice-quote
                     'bind-with-docstring packedscope key values docstr
 
-""""Export locals as a chain of up to two new scopes: a scope that contains
-    all the constant values in the immediate scope, and a scope that contains
-    the runtime values. If all values in the scope are constant, then the
-    resulting scope will also be constant.
-sugar locals ()
+""""Export values bound in the local scope as a chain of up to two new scopes:
+    a scope that contains all the constant values in the immediate scope, and a
+    scope that contains the runtime values. If all values in the scope are
+    constant, then the resulting scope will also be constant.
+sugar local-scope ()
     spice make-scope (docstring)
         let docstring = (docstring as string)
         # create a scope constant at compile time
         `[(sc_scope_new_with_docstring docstring)]
     let docstring = ('module-docstring sugar-scope)
     list fold-locals (list make-scope docstring) append-to-scope
+let locals = local-scope
 
 #-------------------------------------------------------------------------------
 # typedef
@@ -8239,6 +8254,18 @@ spice defer (f args...)
         ;
 
 #-------------------------------------------------------------------------------
+# checking if all names are bound
+#-------------------------------------------------------------------------------
+
+sugar defined? (name...)
+    for name in name...
+        name as:= Symbol
+        try ('@ sugar-scope name)
+        else
+            return false
+    return true
+
+#-------------------------------------------------------------------------------
 # type initializers
 #-------------------------------------------------------------------------------
 
@@ -8525,18 +8552,29 @@ fn compiler-version-string ()
         \ compiler-timestamp ")"
 
 fn print-logo ()
-    io-write! "  "; io-write! (default-styler style-string "\\\\\\"); io-write! "\n"
-    io-write! "   "; io-write! (default-styler style-number "\\\\\\   ")
-    io-write! (compiler-version-string); io-write! "\n";
-    io-write! " "; io-write! (default-styler style-comment "///")
-    io-write! (default-styler style-sfxfunction "\\\\\\")
-    io-write! "  http://scopes.rocks"; io-write! "\n";
-    io-write! (default-styler style-comment "///"); io-write! "  "
-    io-write! (default-styler style-function "\\\\\\"); io-write! "\n"
+    static-if true
+        # due to current events
+        io-write! "  "; io-write! (default-styler style-function "\\\\\\"); io-write! "\n"
+        io-write! "   "; io-write! (default-styler style-function "\\\\\\   ")
+        io-write! (compiler-version-string); io-write! "\n";
+        io-write! " "; io-write! (default-styler style-comment "///")
+        io-write! (default-styler style-type "\\\\\\")
+        io-write! "  http://scopes.rocks"; io-write! "\n";
+        io-write! (default-styler style-comment "///"); io-write! "  "
+        io-write! (default-styler style-type "\\\\\\"); io-write! "\n"
+    else
+        io-write! "  "; io-write! (default-styler style-string "\\\\\\"); io-write! "\n"
+        io-write! "   "; io-write! (default-styler style-number "\\\\\\   ")
+        io-write! (compiler-version-string); io-write! "\n";
+        io-write! " "; io-write! (default-styler style-comment "///")
+        io-write! (default-styler style-sfxfunction "\\\\\\")
+        io-write! "  http://scopes.rocks"; io-write! "\n";
+        io-write! (default-styler style-comment "///"); io-write! "  "
+        io-write! (default-styler style-function "\\\\\\"); io-write! "\n"
 
 #-------------------------------------------------------------------------------
 
-set-globals! (__this-scope)
+set-global-scope! (__this-scope)
 
 #-------------------------------------------------------------------------------
 # main
@@ -8558,8 +8596,8 @@ fn print-help (exename)
     exit 0
 
 fn set-project-dir (env path set-paths?)
-    set-globals!
-        'bind-symbols (globals)
+    set-global-scope!
+        'bind-symbols (global-scope)
             project-dir = path
     if set-paths?
         # add default paths to package
@@ -8652,7 +8690,7 @@ fn run-main ()
         return sourcearg argc argv
     let scope =
         'bind-symbols
-            sc_scope_new_subscope_with_docstring (globals) ""
+            sc_scope_new_subscope_with_docstring (global-scope) ""
             script-launch-args = script-launch-args
     let base-dir env =
         if project?
@@ -8698,10 +8736,10 @@ fn run-main ()
                     else (result as Scope)
             _ project-dir env
         else (_ working-dir core-module-env)
-    # globals might have since been updated with project-dir
+    # global-scope might have since been updated with project-dir
     let scope =
         'bind-symbols
-            sc_scope_new_subscope_with_docstring (globals) ""
+            sc_scope_new_subscope_with_docstring (global-scope) ""
             script-launch-args = script-launch-args
     if command?
         hide-traceback;

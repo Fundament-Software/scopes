@@ -9,5 +9,5 @@ package majoreo
     alias "/bin/eo"
         then
             cmd := (shell "." (dict))
-            cmd "chmod a+x {script}"
+            cmd "chmod a+x \"{script}\""
             script

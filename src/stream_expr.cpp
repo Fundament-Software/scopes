@@ -620,26 +620,26 @@ static bool is_list (const ValueRef &_value) {
     return try_get_const_type(_value) == TYPE_List;
 }
 
-void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool naked, bool types) {
-    if (naked) {
-        stream_indent(depth);
+void walk(const Anchor *anchor, const List *l, const StreamExprFormat &fmt) {
+    if (fmt.naked) {
+        stream_indent(fmt.depth);
     }
     if (anchor) {
         if (atom_anchors) {
             stream_anchor(anchor);
         }
 
-        if (naked && line_anchors && !atom_anchors) {
+        if (fmt.naked && line_anchors && !atom_anchors) {
             stream_anchor(anchor);
         }
     }
 
-    maxdepth = maxdepth - 1;
+    int maxdepth = fmt.maxdepth - 1;
 
     auto it = l;
     if (it == EOL) {
         ss << Style_Operator << "()" << Style_None;
-        if (naked) { ss << std::endl; }
+        if (fmt.naked) { ss << std::endl; }
         return;
     }
     if (maxdepth == 0) {
@@ -647,10 +647,10 @@ void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool nak
             << Style_Comment << "..."
             << Style_Operator << ")"
             << Style_None;
-        if (naked) { ss << std::endl; }
+        if (fmt.naked) { ss << std::endl; }
         return;
     }
-    if (naked && it->at.isa<ConstInt>()) {
+    if (fmt.naked && it->at.isa<ConstInt>()) {
         auto ci = it->at.cast<ConstInt>();
         if ((ci->get_type() == TYPE_Symbol)
             && (Symbol::wrap(ci->value()) == FN_Annotate)) {
@@ -661,7 +661,11 @@ void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool nak
                 if (try_get_const_type(it->at) == TYPE_String) {
                     ss << ((const String *)it->at.cast<ConstPointer>()->value)->data;
                 } else {
-                    walk(it->at, depth, maxdepth, false, true);
+                    StreamExprFormat subfmt(fmt);
+                    subfmt.maxdepth = maxdepth;
+                    subfmt.naked = false;
+                    subfmt.types = true;
+                    walk(it->at, subfmt);
                 }
                 it = it->next;
             }
@@ -671,13 +675,19 @@ void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool nak
     }
     int offset = 0;
     // int numsublists = 0;
-    if (naked) {
+    if (fmt.naked) {
         if (is_list(convert(it->at))) {
             ss << ";" << std::endl;
             goto print_sparse;
         }
     print_terse:
-        walk(convert(it->at), depth, maxdepth, false, true);
+        {
+            StreamExprFormat subfmt(fmt);
+            subfmt.maxdepth = maxdepth;
+            subfmt.naked = false;
+            subfmt.types = true;
+            walk(convert(it->at), subfmt);
+        }
         it = it->next;
         offset = offset + 1;
         while (it != EOL) {
@@ -686,13 +696,19 @@ void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool nak
                 break;
             }
             ss << " ";
-            walk(at, depth, maxdepth, false, true);
+            {
+                StreamExprFormat subfmt(fmt);
+                subfmt.maxdepth = maxdepth;
+                subfmt.naked = false;
+                subfmt.types = true;
+                walk(at, subfmt);
+            }
             offset = offset + 1;
             it = it->next;
         }
         ss << std::endl;
     print_sparse:
-        int subdepth = depth + 1;
+        int subdepth = fmt.depth + 1;
         while (it != EOL) {
             auto value = convert(it->at);
             if (!is_list(value) // not a list
@@ -706,13 +722,20 @@ void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool nak
                 ss << Style_Comment << "..." << Style_None << std::endl;
                 return;
             }
-            walk(value, subdepth, maxdepth, true, true);
+            {
+                StreamExprFormat subfmt(fmt);
+                subfmt.depth = subdepth;
+                subfmt.maxdepth = maxdepth;
+                subfmt.naked = true;
+                subfmt.types = true;
+                walk(value, subfmt);
+            }
             offset = offset + 1;
             it = it->next;
         }
         return;
     } else {
-        depth = depth + 1;
+        int depth = fmt.depth + 1;
         ss << Style_Operator << "(" << Style_None;
         while (it != EOL) {
             if (offset > 0) {
@@ -722,34 +745,42 @@ void walk(const Anchor *anchor, const List *l, int depth, int maxdepth, bool nak
                 ss << Style_Comment << "..." << Style_None;
                 break;
             }
-            walk(convert(it->at), depth, maxdepth, false, true);
+            {
+                StreamExprFormat subfmt(fmt);
+                subfmt.depth = depth;
+                subfmt.maxdepth = maxdepth;
+                subfmt.naked = false;
+                subfmt.types = true;
+                walk(convert(it->at), subfmt);
+            }
             offset = offset + 1;
             it = it->next;
         }
         ss << Style_Operator << ")" << Style_None;
     }
-    if (naked) { ss << std::endl; }
+    if (fmt.naked) { ss << std::endl; }
 }
 
 void stream_illegal_value_type(const std::string &name) {
     ss << Style_Error << "<illegal type for " << name << ">" << Style_None;
 }
 
-void walk(const ValueRef &e, int depth, int maxdepth, bool naked, bool types) {
+void walk(const ValueRef &_e, const StreamExprFormat &fmt) {
     const Type *T = nullptr;
+    ValueRef e = _e;
     if (e) {
         visited.insert(e.unref());
         T = try_get_const_type(e);
         if (T == TYPE_List) {
             walk(e.anchor(),
                 extract_list_constant(e.cast<TypedValue>()).assert_ok(),
-                depth, maxdepth, naked, types);
+                fmt);
             return;
         }
     }
 
-    if (naked) {
-        stream_indent(depth);
+    if (fmt.naked) {
+        stream_indent(fmt.depth);
     }
     if (e) {
         const Anchor *anchor = e.anchor();
@@ -834,7 +865,7 @@ void walk(const ValueRef &e, int depth, int maxdepth, bool naked, bool types) {
             stream_address(ss, e.unref());
         } break;
         }
-        if (types && e.isa<TypedValue>()) {
+        if (fmt.types && e.isa<TypedValue>()) {
             auto tv = e.cast<TypedValue>();
             if (!tv.isa<Const>() || !is_default_suffix(tv->get_type())) {
                 ss << Style_Operator << ":" << Style_None;
@@ -842,16 +873,16 @@ void walk(const ValueRef &e, int depth, int maxdepth, bool naked, bool types) {
             }
         }
     }
-    if (naked) { ss << std::endl; }
+    if (fmt.naked) { ss << std::endl; }
 }
 
 void stream(const List *l) {
-    walk(nullptr, l, fmt.depth, fmt.maxdepth, fmt.naked, fmt.types);
+    walk(nullptr, l, fmt);
 }
 
 void stream(const ValueRef &node) {
     ValueRef e = convert(node);
-    walk(e, fmt.depth, fmt.maxdepth, fmt.naked, fmt.types);
+    walk(e, fmt);
 }
 
 }; // struct StreamExpr

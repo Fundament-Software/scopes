@@ -44,7 +44,7 @@ inline Option (T)
             imply value this-type
 
         inline __tobool (self)
-            dispatch self
+            dispatch (view self)
             case None () false
             default true
 

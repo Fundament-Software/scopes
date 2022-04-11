@@ -15,7 +15,7 @@ do
     let fallback = (One 12345)
     let result =
         try (deref ('unwrap opt2))
-        else (view fallback)
+        else fallback
     test (result == (One 12345))
     ;
 

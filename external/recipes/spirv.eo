@@ -3,7 +3,7 @@ SUMMARY := "SPIR-V Tools is a collection of tools for working with the SPIR-V bi
 package spirv-tools
     summary SUMMARY
     version version
-    platform linux unknown
+    platform linux
 
     cmake-url := "https://github.com/Kitware/CMake/releases/download/v3.23.0-rc5/cmake-3.23.0-rc5-linux-x86_64.tar.gz"
     cmakedir := (commonpath (extract (download cmake-url)))
@@ -17,7 +17,7 @@ package spirv-tools
     rootdir :=
         then
             cmd := (shell rootdir (dict))
-            cmd "cp -r {headersdir}/* {targetheadersdir}"
+            cmd "cp -r \"{headersdir}/\"* \"{targetheadersdir}\""
             cmd := (shell builddir (dict))
             cmd "{cmakedir}/bin/cmake .. -DCMAKE_BUILD_TYPE=Release"
             cmd "make -j {cpu-core-count}"
@@ -40,7 +40,7 @@ package spirv-tools
     rootdir :=
         then
             cmd := (shell rootdir (dict))
-            cmd "cp -r {headersdir}/* {targetheadersdir}"
+            cmd "cp -r \"{headersdir}/\"* \"{targetheadersdir}\""
             cmd := (shell builddir (dict))
             cmd "{cmakedir}/bin/cmake .. -G \"MSYS Makefiles\" -DCMAKE_BUILD_TYPE=Release"
             cmd "make -j {cpu-core-count}"
