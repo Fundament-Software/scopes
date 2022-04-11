@@ -7,6 +7,8 @@ let optT = (Option One)
 # Option unwrap method
 do
     let opt = (optT (One 1234))
+    print opt
+    print (optT) (none as optT)
     test ((typeof opt) < Option)
     let opt2 = (optT)
     let result =
@@ -30,7 +32,7 @@ do
 # Option dispatch method
 do
     # implicit cast to generic class
-    let opt = (imply (One 1234) Option)
+    let opt = ((One 1234) as Option)
     test ((typeof opt) == optT)
     let result =
         dispatch opt

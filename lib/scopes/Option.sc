@@ -34,7 +34,7 @@ type Option < Enum
 inline gen-type (T)
     T := (unqualified T)
 
-    enum (.. "<Option " (tostring T) ">") < Option
+    enum (.. "(Option " (tostring T) ")") < Option
         None
         Some : T
 
@@ -44,6 +44,14 @@ inline gen-type (T)
         case (cls : type, value)
             # follow same rules as assignment
             imply value this-type
+
+        fn __repr (self)
+            viewing self
+            dispatch self
+            case Some (val)
+                .. "(" (repr val) " as Option)"
+            default
+                .. "(" (tostring (typeof self)) ")"
 
         inline __tobool (self)
             dispatch (view self)
