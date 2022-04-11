@@ -71,6 +71,7 @@ test-modules
     .test_overload
     .test_parser
     .test_pointer
+    .test_print
     .test_property
     .test_quote
     .test_rc

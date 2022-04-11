@@ -3,14 +3,14 @@ SUMMARY := "GENie - Project generator tool"
 package genie
     summary SUMMARY
     version VERSION
-    platform linux unknown
+    platform linux
 
     url := "https://github.com/bkaradzic/bx/raw/master/tools/bin/linux/genie"
     binary := (download url)
     binary :=
         then
             cmd := (shell "." (dict))
-            cmd "chmod a+x {binary}"
+            cmd "chmod a+x \"{binary}\""
             binary
     alias "/bin/genie" binary
 package genie
