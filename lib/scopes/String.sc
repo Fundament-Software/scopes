@@ -198,6 +198,22 @@ typedef+ StringBase
     inline __ras (T cls)
         static-if ((cls.ElementType == char) and (T == string)) cls
 
+    inline... __lslice (self, offset : usize)
+        let T = (typeof self)
+        if (offset == 0) (T)
+        elseif (offset >= (countof self))
+            copy self
+        else
+            T (& (self @ 0)) offset
+
+    inline... __rslice (self, offset : usize)
+        let T = (typeof self)
+        if (offset == 0)
+            copy self
+        elseif (offset >= (countof self)) (T)
+        else
+            T (& (self @ offset)) ((countof self) - offset)
+
     inline reverse (self)
         Generator
             inline () (deref self._count)

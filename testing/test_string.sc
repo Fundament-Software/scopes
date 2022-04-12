@@ -154,4 +154,9 @@ do
             local dst : String "foo"
     test (dst == "footst")
 
+do
+    # test slicing
+    local s = (String "0123456789")
+    test ((slice s 2 7) == "23456")
+
 ;
