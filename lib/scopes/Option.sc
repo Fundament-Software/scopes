@@ -28,11 +28,13 @@ typedef UnwrapError : (tuple)
     inline __typecall (cls)
         bitcast none this-type
 
+type Option < Enum
+
 @@ memo
-inline Option (T)
+inline gen-type (T)
     T := (unqualified T)
 
-    enum (.. "<Option " (tostring T) ">")
+    enum (.. "(Option " (tostring T) ")") < Option
         None
         Some : T
 
@@ -42,6 +44,14 @@ inline Option (T)
         case (cls : type, value)
             # follow same rules as assignment
             imply value this-type
+
+        fn __repr (self)
+            viewing self
+            dispatch self
+            case Some (val)
+                .. "(" (repr val) " as Option)"
+            default
+                .. "(" (tostring (typeof self)) ")"
 
         inline __tobool (self)
             dispatch (view self)
@@ -68,6 +78,16 @@ inline Option (T)
             if (not self)
                 raise (UnwrapError)
             extract-payload self T
+
+type+ Option
+    inline... __typecall (cls, T : type)
+        gen-type T
+
+    inline wrap (value)
+        (Option (typeof value)) value
+
+    inline __rimply (other-cls cls)
+        static-if (not (other-cls < Option)) wrap
 
 do
     let Option UnwrapError
