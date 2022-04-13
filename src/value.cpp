@@ -272,6 +272,15 @@ bool ArgumentList::is_constant() const {
     return true;
 }
 
+bool ArgumentList::is_pure() const {
+    for (auto val : values) {
+        assert(val);
+        if (!val.isa<Pure>())
+            return false;
+    }
+    return true;
+}
+
 TypedValueRef ArgumentList::from(const TypedValues &values) {
     if (values.size() == 0) {
         if (!_empty_argument_list)
