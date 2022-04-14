@@ -42,4 +42,6 @@ echo "generating core..." \
     && ./build_reference.sc UTF-8 26 > ./docs/module-UTF-8.md \
     && echo "generating format..." \
     && ./build_reference.sc format 27 > ./docs/module-format.md \
+    && echo "generating docstring..." \
+    && ./build_reference.sc docstring 28 > ./docs/module-docstring.md \
     && make clean && make html
