@@ -4027,10 +4027,15 @@ SCOPES_RESULT(TypedValueRef) prove(const ValueRef &node) {
         ASTContext fnctx = ASTContext::from_function(fn);
         ASTContext bodyctx = fnctx.with_block(fn->body);
         auto result = SCOPES_GET_RESULT(prove(bodyctx, node));
-        if (!result.isa<Pure>()) {
-            SCOPES_ERROR(ResultMustBePure);
+        if (result.isa<ArgumentList>()) {
+            if (result.cast<ArgumentList>()->is_pure()) {
+                return result;
+            }
         }
-        return result;
+        if (result.isa<Pure>()) {
+            return result;
+        }
+        SCOPES_ERROR(ResultMustBePure);
     } else {
         return prove(*ast_context, node);
     }

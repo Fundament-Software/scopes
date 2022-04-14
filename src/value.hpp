@@ -228,6 +228,7 @@ struct ArgumentList : TypedValue {
     ArgumentList(const TypedValues &values);
 
     bool is_constant() const;
+    bool is_pure() const;
 
     static TypedValueRef from(const TypedValues &values);
 
