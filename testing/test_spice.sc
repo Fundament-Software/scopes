@@ -54,4 +54,11 @@ run-stage;
 
 test-main;
 
+run-stage;
+
+# verify sc_prove works on empty and multiple arguments
+inline somefunc ()
+sc_prove `(somefunc)
+sc_prove `(_ 1 2 3)
+
 return;
