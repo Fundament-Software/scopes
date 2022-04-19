@@ -52,9 +52,10 @@ test
 # global strings
 ###################
 
-let str = (sc_global_string_new "te\x00st\n" 6)
+let str = (sc_const_string_new "te\x00st\n")
 run-stage;
 print (sizeof str)
+test ((countof str) == 6)
 #let C = (include "stdio.h")
 let C =
     include

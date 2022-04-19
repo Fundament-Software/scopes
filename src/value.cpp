@@ -703,31 +703,6 @@ struct ConstSet {
 
 //------------------------------------------------------------------------------
 
-static ConstSet<GlobalString> globalstrings;
-
-GlobalString::GlobalString(const char *_data, size_t _count)
-    : Pure(VK_GlobalString,
-        refer_type(
-            array_type(TYPE_Char, _count).assert_ok(),
-            PTF_NonWritable,
-            SYM_SPIRV_StorageClassPrivate)),
-        value(_data, _count) {
-}
-
-bool GlobalString::key_equal(const GlobalString *other) const {
-    return value == other->value;
-}
-
-std::size_t GlobalString::hash() const {
-    return hash_bytes(value.data(), value.size());
-}
-
-GlobalStringRef GlobalString::from(const char *_data, size_t _count) {
-    return globalstrings.from(_data, _count);
-}
-
-//------------------------------------------------------------------------------
-
 PureCast::PureCast(const Type *type, const PureRef &_value)
     : Pure(VK_PureCast, type), value(_value) {}
 
@@ -1789,6 +1764,31 @@ std::size_t ConstReal::hash() const {
 
 ConstRealRef ConstReal::from(const Type *type, double value) {
     return constreals.from(type, value);
+}
+
+//------------------------------------------------------------------------------
+
+static ConstSet<ConstString> conststrings;
+
+ConstString::ConstString(const String *_value)
+    : Const(VK_ConstString,
+        refer_type(
+            array_type(TYPE_Char, _value->count).assert_ok(),
+            PTF_NonWritable,
+            SYM_SPIRV_StorageClassPrivate)),
+        value(_value) {
+}
+
+bool ConstString::key_equal(const ConstString *other) const {
+    return value == other->value;
+}
+
+std::size_t ConstString::hash() const {
+    return std::hash<const void *>{}(value);
+}
+
+ConstStringRef ConstString::from(const String *_value) {
+    return conststrings.from(_value);
 }
 
 //------------------------------------------------------------------------------

@@ -1482,16 +1482,6 @@ sc_uint_raises_t sc_global_flags(sc_valueref_t value) {
     SCOPES_C_RETURN((uint32_t)glob->flags);
 }
 
-sc_valueref_t sc_global_string_new(const char *ptr, size_t count) {
-    using namespace scopes;
-    return GlobalString::from(ptr, count);
-}
-
-sc_valueref_t sc_global_string_new_from_cstr(const char *ptr) {
-    using namespace scopes;
-    return GlobalString::from(ptr, strlen(ptr));
-}
-
 sc_valueref_t sc_cond_new(sc_valueref_t cond, sc_valueref_t then_value, sc_valueref_t else_value) {
     using namespace scopes;
     return CondTemplate::from(cond, then_value, else_value);
@@ -1661,6 +1651,16 @@ sc_valueref_t sc_const_extract_at(const sc_valueref_t value, int index) {
 const void *sc_const_pointer_extract(const sc_valueref_t value) {
     using namespace scopes;
     return value.cast<ConstPointer>()->value;
+}
+
+sc_valueref_t sc_const_string_new(const sc_string_t *str) {
+    using namespace scopes;
+    return ConstString::from(str);
+}
+
+const sc_string_t *sc_const_string_extract(sc_valueref_t value) {
+    using namespace scopes;
+    return value.cast<ConstString>()->value;
 }
 
 sc_valueref_t sc_quote_new(sc_valueref_t value) {
@@ -2459,8 +2459,6 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_storage_class, TYPE_Symbol, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_name, TYPE_Symbol, TYPE_ValueRef);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_global_flags, TYPE_U32, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_string_new, TYPE_ValueRef, rawstring, TYPE_USize);
-    DEFINE_EXTERN_C_FUNCTION(sc_global_string_new_from_cstr, TYPE_ValueRef, rawstring);
     DEFINE_EXTERN_C_FUNCTION(sc_cond_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_case_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_pass_case_new, TYPE_ValueRef, TYPE_ValueRef, TYPE_ValueRef);
@@ -2494,6 +2492,8 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_extract, TYPE_F64, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_const_extract_at, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_extract, voidstar, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_string_new, TYPE_ValueRef, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_const_string_extract, TYPE_String, TYPE_ValueRef);
 
     DEFINE_EXTERN_C_FUNCTION(sc_quote_new, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_unquote_new, TYPE_ValueRef, TYPE_ValueRef);

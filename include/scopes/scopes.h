@@ -238,9 +238,6 @@ SCOPES_LIBEXPORT sc_symbol_raises_t sc_global_storage_class(sc_valueref_t value)
 SCOPES_LIBEXPORT sc_symbol_raises_t sc_global_name(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_uint_raises_t sc_global_flags(sc_valueref_t value);
 
-SCOPES_LIBEXPORT sc_valueref_t sc_global_string_new(const char *ptr, size_t count);
-SCOPES_LIBEXPORT sc_valueref_t sc_global_string_new_from_cstr(const char *ptr);
-
 SCOPES_LIBEXPORT sc_valueref_t sc_cond_new(sc_valueref_t cond, sc_valueref_t then_value, sc_valueref_t else_value);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_case_new(sc_valueref_t literal, sc_valueref_t body);
@@ -280,6 +277,8 @@ SCOPES_LIBEXPORT int sc_const_int_word_count(const sc_valueref_t value);
 SCOPES_LIBEXPORT double sc_const_real_extract(const sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_const_extract_at(const sc_valueref_t value, int index);
 SCOPES_LIBEXPORT const void *sc_const_pointer_extract(const sc_valueref_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_const_string_new(const sc_string_t *str);
+SCOPES_LIBEXPORT const sc_string_t *sc_const_string_extract(sc_valueref_t value);
 
 SCOPES_LIBEXPORT sc_valueref_t sc_quote_new(sc_valueref_t value);
 SCOPES_LIBEXPORT sc_valueref_t sc_unquote_new(sc_valueref_t value);
