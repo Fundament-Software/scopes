@@ -1046,10 +1046,6 @@ SCOPES_RESULT(const Scope *) import_c_module (
         aargs.push_back(args[i].c_str());
     }
 
-    for (auto it : aargs) {
-        std::cout << "import argument: " << it << std::endl;
-    }
-
     CompilerInstance compiler;
     compiler.setInvocation(createInvocationFromCommandLine(aargs));
 
