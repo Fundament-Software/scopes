@@ -2,6 +2,7 @@
   description = "Scopes retargetable programming language & infrastructure";
 
   inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-21.11";
     genie-src.url = "github:bkaradzic/genie";
     genie-src.flake = false;
     spirv-cross-src.url = "github:KhronosGroup/SPIRV-Cross";
