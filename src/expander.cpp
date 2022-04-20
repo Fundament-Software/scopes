@@ -199,7 +199,7 @@ struct Expander {
                 bind_name = sym;
             }
             it = it->next;
-        } else if (T == TYPE_String) {
+        } else if (it->at.isa<ConstString>()) {
             auto str = try_extract_string(it->at);
             assert(str);
             // named lambda
