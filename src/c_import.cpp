@@ -1015,7 +1015,6 @@ SCOPES_RESULT(const Scope *) import_c_module (
         aargs.push_back(it.c_str());
     }
 #ifdef SCOPES_ADD_IMPORT_CFLAGS
-    std::cout << "adding custom built in cflags" << std::endl;
     std::string addflags = SCOPES_ADD_IMPORT_CFLAGS;
     std::vector<std::string> addargs;
     last = 0;
