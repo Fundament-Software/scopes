@@ -2,6 +2,7 @@
   description = "Scopes retargetable programming language & infrastructure";
 
   inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-21.11";
     genie-src.url = "github:bkaradzic/genie";
     genie-src.flake = false;
     spirv-cross-src.url = "github:KhronosGroup/SPIRV-Cross";
@@ -60,15 +61,28 @@
 
             makeFlags = [ "-C build" "config=release" ];
 
+            buildPhase = ''
+              NIX_CFLAGS_COMPILE+=\ -DSCOPES_ADD_IMPORT_CFLAGS=\"-isystem!${llvmpkgs.clang}/resource-root/include/!-isystem!${
+                nixpkgs.lib.getDev pkgs.stdenv.cc.libc
+              }/include/\"
+
+              echo $NIX_CFLAGS_COMPILE
+
+              # echo make $makeFlags scopes
+              make -j$cores $makeFlags
+              # false
+            '';
+
             installPhase = ''
               install -D --target-directory="$out/bin" bin/scopes
-              wrapProgram $out/bin/scopes --suffix NIX_CFLAGS_COMPILE "" " -isystem ${llvmpkgs.clang}/resource-root/include/ -isystem ${
+              # wrapProgram $out/bin/scopes --suffix NIX_CFLAGS_COMPILE "" " -isystem ${llvmpkgs.clang}/resource-root/include/ -isystem ${
                 nixpkgs.lib.getDev pkgs.stdenv.cc.libc
               }/include/"
               install -D --target-directory="$out/lib" bin/libscopesrt.so
               cp -r ./lib/scopes $out/lib/scopes
-              echo ${llvmpkgs.clang} >> $out/clangpath
-              cp -r ./ $out/builddump
+              # echo ${llvmpkgs.clang} >> $out/clangpath
+              # mkdir -p $out
+              # cp -r ./ $out/builddump
             '';
 
             checkInputs = [ pkgs.glibc.dev ];

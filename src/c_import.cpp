@@ -1014,6 +1014,25 @@ SCOPES_RESULT(const Scope *) import_c_module (
     for (auto &it : nixargs) {
         aargs.push_back(it.c_str());
     }
+#ifdef SCOPES_ADD_IMPORT_CFLAGS
+    std::string addflags = SCOPES_ADD_IMPORT_CFLAGS;
+    std::vector<std::string> addargs;
+    last = 0;
+    pos = 0;
+    //split by ! because defining a symbol to a string containing spaces through escaping and an environment variable was too painful
+    while((pos = addflags.find("!", last)) != std::string::npos)
+    {
+        if(last != pos)
+        {
+            addargs.push_back(addflags.substr(last, pos - last));
+        }
+        last = pos + 1;
+    }
+    addargs.push_back(addflags.substr(last));
+    for (auto &it : addargs) {
+        aargs.push_back(it.c_str());
+    }
+#endif
 
     auto argcount = args.size();
     std::string object_file;
