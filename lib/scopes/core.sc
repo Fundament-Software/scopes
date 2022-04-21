@@ -5109,7 +5109,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                 let T = ('typeof lhs)
                                 let ET = ('element@ T 0)
                                 let sz1 = ('element-count T)
-                                let sz2 = ('element-count T)
+                                let sz2 = ('element-count ('typeof rhs))
                                 let sz = (sz1 + sz2)
                                 let AT = (sc_pointer_type
                                     (sc_array_type ET sz)
@@ -5133,7 +5133,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                         spice-quote
                                             store
                                                 extractvalue rhs i
-                                                getelementptr result (i + sz2)
+                                                getelementptr result (sz1 + i)
                                     repeat (i + 1)
                                 sc_expression_append block
                                     'tag `(ptrtoref (bitcast result AT)) ('anchor args)

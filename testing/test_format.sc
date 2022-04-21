@@ -27,7 +27,7 @@ test
                     u = 10
                     v = 20
                     wx = 30
-        "test test2 3 2 more 10x20x30 test hi 1"
+        "xtest test2 3 2 more 10x20x30 test hi 1"
 
 test
     ==
