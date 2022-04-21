@@ -2013,7 +2013,7 @@ struct SPIRVGenerator {
         return builder.createUndefined(ty);
     }
 
-    SCOPES_RESULT(spv::Id) GlobalString_to_value(const GlobalStringRef &node) {
+    SCOPES_RESULT(spv::Id) ConstString_to_value(const ConstStringRef &node) {
         SCOPES_RESULT_TYPE(spv::Id);
         SCOPES_ERROR(CGenFailedToTranslateValue, node->kind());
     }

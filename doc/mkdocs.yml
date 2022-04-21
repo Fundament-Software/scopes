@@ -14,6 +14,7 @@ nav:
         - "Capture": module-Capture.md
         - "chaining": module-chaining.md
         - "console": module-console.md
+        - "docstring": module-docstring.md
         - "enum": module-enum.md
         - "format": module-format.md
         - "FunctionChain": module-FunctionChain.md
