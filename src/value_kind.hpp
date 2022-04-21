@@ -32,6 +32,7 @@ namespace scopes {
 #define SCOPES_CONST_VALUE_KIND() \
     T(VK_ConstInt, "value-kind-const-int", ConstInt) \
     T(VK_ConstReal, "value-kind-const-real", ConstReal) \
+    T(VK_ConstString, "value-kind-const-string", ConstString) \
     T(VK_ConstAggregate, "value-kind-const-aggregate", ConstAggregate) \
     T(VK_ConstPointer, "value-kind-const-pointer", ConstPointer) \
 
@@ -39,7 +40,6 @@ namespace scopes {
 #define SCOPES_PURE_VALUE_KIND() \
     T(VK_Function, "value-kind-function", Function) \
     T(VK_Global, "value-kind-global", Global) \
-    T(VK_GlobalString, "value-kind-global-string", GlobalString) \
     T(VK_PureCast, "value-kind-pure-cast", PureCast) \
     T(VK_Undef, "value-kind-undef", Undef) \
     /* constants (Const::classof) */ \

@@ -112,10 +112,10 @@ local CLANG_DEPS = {
     "-lclangLex",
     "-lclangBasic",
 }
-local POLLY_DEPS = {
-    -- "-lPolly",
-    -- "-lPollyISL",
-} -- Polly is no longer a distinct library as of llvm 12
+--local POLLY_DEPS = {
+--    "-lPolly",
+--    "-lPollyISL",
+--}
 
 if not os.is("windows") then
     premake.gcc.cxx = CLANG_CXX
@@ -309,7 +309,7 @@ project "scopesrt"
         }
         linkoptions(LLVM_LDFLAGS)
         linkoptions(CLANG_DEPS)
-        linkoptions(POLLY_DEPS)
+        --linkoptions(POLLY_DEPS)
         --linkoptions { "-Wl,--whole-archive" }
         linkoptions(LLVM_LIBS)
         --linkoptions { "-Wl,--no-whole-archive" }
@@ -445,7 +445,7 @@ project "scopesrt"
 
         linkoptions(LLVM_LDFLAGS)
         linkoptions(CLANG_DEPS)
-        linkoptions(POLLY_DEPS)
+        --linkoptions(POLLY_DEPS)
         linkoptions(LLVM_LIBS)
 
         postbuildcommands {

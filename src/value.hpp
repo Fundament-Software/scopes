@@ -1240,6 +1240,21 @@ struct ConstReal : Const {
 
 //------------------------------------------------------------------------------
 
+struct ConstString : Const {
+    static bool classof(const Value *T);
+
+    ConstString(const String *value);
+
+    bool key_equal(const ConstString *other) const;
+    std::size_t hash() const;
+
+    static ConstStringRef from(const String *value);
+
+    const String *value;
+};
+
+//------------------------------------------------------------------------------
+
 struct ConstAggregate : Const {
     static bool classof(const Value *T);
 
@@ -1326,21 +1341,6 @@ struct Global : Pure {
     int location = -1;
     int binding = -1;
     int descriptor_set = -1;
-};
-
-//------------------------------------------------------------------------------
-
-struct GlobalString : Pure {
-    static bool classof(const Value *T);
-
-    GlobalString(const char *_data, size_t _count);
-
-    bool key_equal(const GlobalString *other) const;
-    std::size_t hash() const;
-
-    static GlobalStringRef from(const char *_data, size_t _count);
-
-    std::string value;
 };
 
 //------------------------------------------------------------------------------

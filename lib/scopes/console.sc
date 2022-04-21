@@ -8,6 +8,8 @@
 
     Implements the read-eval-print loop for Scopes' console.
 
+using import docstring
+
 #-------------------------------------------------------------------------------
 # Utility functions
 #-------------------------------------------------------------------------------
@@ -67,41 +69,6 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
     if (not (empty? history-path))
         sc_prompt_load_history history-path
 
-    sugar help ((value as Symbol))
-        let val =
-            try
-                '@ sugar-scope value
-            except (err)
-                print "no such symbol in scope"
-                return `()
-        if (('constant? val) and ('typeof val) == Closure)
-            let val = (val as Closure)
-            let docstr = ('docstring val)
-            let tmpl = (sc_closure_get_template val)
-            if (sc_template_is_inline tmpl)
-                sc_write (repr 'inline)
-            else
-                sc_write (repr 'fn)
-            sc_write " "
-            sc_write (value as string)
-            sc_write " ("
-            let count = (sc_template_parameter_count tmpl)
-            for i in (range count)
-                if (i != 0)
-                    sc_write " "
-                let param = (sc_template_parameter tmpl i)
-                sc_write ((sc_parameter_name param) as string)
-            sc_write ")\n\n"
-            if (not (empty? docstr))
-                sc_write docstr
-            return `()
-        let docstr = ('docstring sugar-scope value)
-        if (empty? docstr)
-            print "no help available"
-        else
-            sc_write docstr
-        `()
-
     sugar sh (values...)
         let system = (extern 'system (function i32 rawstring))
         let block = (sc_expression_new)
@@ -130,6 +97,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
             main-module? = true
             sh = sh
             help = help
+            docstring = docstring
             exit =
                 typedef (do "Enter 'exit;' or Ctrl+D to exit")
                     inline __typecall () (if true (exit 0))
