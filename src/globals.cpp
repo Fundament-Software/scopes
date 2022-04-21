@@ -985,8 +985,8 @@ const sc_string_t *sc_string_lslice(const sc_string_t *str, size_t offset) {
 const sc_string_t *sc_string_unescape(const sc_string_t *str) {
     using namespace scopes;
     char *s = strdup(str->data);
-    unescape_string(s);
-    auto result = String::from(s, strlen(s));
+    int sz = unescape_string(s);
+    auto result = String::from(s, sz);
     free(s);
     return result;
 }

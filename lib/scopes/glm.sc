@@ -12,15 +12,15 @@
 
 spice element-prefix (element-type)
     match (element-type as type)
-    case bool "b"
-    case i8 "i8"
-    case i16 "i16"
-    case i32 "i"
-    case u8 "u8"
-    case u16 "u16"
-    case u32 "u"
-    case f32 ""
-    case f64 "d"
+    case bool str"b"
+    case i8 str"i8"
+    case i16 str"i16"
+    case i32 str"i"
+    case u8 str"u8"
+    case u16 str"u16"
+    case u32 str"u"
+    case f32 str""
+    case f64 str"d"
     default
         error "illegal element type"
 
@@ -376,10 +376,10 @@ typedef+ vec-type
         vec-type-binary-op-dispatch '__<= '__r<= '__vector<=
 
     fn build-access-mask (name width)
-        let element-set-xyzw = "^[xyzw01]{1,4}$"
-        let element-set-rgba = "^[rgba01]{1,4}$"
-        let element-set-stpq = "^[stpq01]{1,4}$"
-        let element-set-any = "^([xyzw01]|[stpq01]|[rgba01]){1,4}$"
+        let element-set-xyzw = str"^[xyzw01]{1,4}$"
+        let element-set-rgba = str"^[rgba01]{1,4}$"
+        let element-set-stpq = str"^[stpq01]{1,4}$"
+        let element-set-any = str"^([xyzw01]|[stpq01]|[rgba01]){1,4}$"
 
         let s = (name as string)
         let sz = ((countof s) as i32)

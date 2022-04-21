@@ -993,6 +993,18 @@ let decons =
                     break block
                 _ i next
 
+#-------------------------------------------------------------------------------
+
+# unescape at compile time
+let prefix:str =
+    spice-macro
+        fn (args)
+            raising Error
+            let str = (sc_getarg args 0)
+            let str = (sc_string_unescape (sc_const_string_extract str))
+            spice-quote
+                sc_const_string_extract `str
+
 run-stage; # 3
 
 'define-symbol type 'set-symbols
@@ -1045,6 +1057,9 @@ run-stage; # 3
         fn "dekey" (self)
             let k = (sc_type_key ('qualified-typeof self))
             _ k (sc_keyed_new unnamed self)
+    string-constant? =
+        inline (self)
+            icmp== (sc_value_kind self) value-kind-const-string
 
 'define-symbols Scope
     @ = sc_scope_at
@@ -1718,16 +1733,18 @@ fn unary-operator (symbol T)
         if (operator-valid? op) (return op)
     return (sc_empty_argument_list)
 
-fn binary-operator (symbol lhsT rhsT)
+fn binary-operator (symbol qlhsT qrhsT)
     """"For an operation performed on two argument types, of which only
         the left type can provide a suitable candidate, find a matching
         operator function. This function only works inside a spice macro.
-    let lhsT = ('strip-qualifiers lhsT)
-    let rhsT = ('strip-qualifiers rhsT)
+    let lhsT = ('strip-qualifiers qlhsT)
+    let rhsT = ('strip-qualifiers qrhsT)
     label next
         let f =
             try ('@ lhsT symbol)
             except (err) (merge next)
+        let op = (sc_prove `(f qlhsT qrhsT))
+        if (operator-valid? op) (return op)
         let op = (sc_prove `(f lhsT rhsT))
         if (operator-valid? op) (return op)
     return (sc_empty_argument_list)
@@ -1791,7 +1808,6 @@ fn balanced-lvalue-binary-operator (symbol lhsT rhsT rhs-static?)
     if (operator-valid? op) (return op)
     if (ptrcmp!= slhsT srhsT)
         # asymmetrical types
-
         # can we cast rhsT to lhsT?
         let conv = (imply-converter rhsT slhsT rhs-static?)
         if (operator-valid? conv)
@@ -1820,6 +1836,7 @@ fn binary-op-error (friendly-op-name lhsT rhsT)
 
 fn balanced-binary-operation (args symbol rsymbol friendly-op-name)
     let argc = ('argcount args)
+    let anchor = ('anchor args)
     verify-count argc 2 2
     let lhs rhs =
         'getarg args 0
@@ -1829,7 +1846,7 @@ fn balanced-binary-operation (args symbol rsymbol friendly-op-name)
     let op = (balanced-binary-operator symbol rsymbol lhsT rhsT
         ('constant? lhs) ('constant? rhs))
     if (operator-valid? op)
-        return ('tag `(op lhs rhs) ('anchor args))
+        return ('tag `(op lhs rhs) anchor)
     hide-traceback;
     binary-op-error friendly-op-name lhsT rhsT
 
@@ -4376,7 +4393,7 @@ let import =
                     repeat (add i 1:usize) start
             let sxname rest = (decons args)
             let name namestr bind? =
-                if (('typeof sxname) == string)
+                if (('kind sxname) == value-kind-const-string)
                     let name = (sxname as string)
                     _ (Symbol name) name false
                 else
@@ -5056,6 +5073,11 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                 fn (args)
                     let self = ('getarg args 0)
                     let other = ('getarg args 1)
+                    if
+                        &
+                            ('kind self) == value-kind-const-string
+                            ('kind self) == value-kind-const-string
+                        return ('tag `[(self == other)] ('anchor args))
                     loop (i result = ('element-count ('typeof self)) `true)
                         if (i == 0)
                             break result
@@ -5114,7 +5136,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                                 getelementptr result (i + sz2)
                                     repeat (i + 1)
                                 sc_expression_append block
-                                    `(ptrtoref (bitcast result AT))
+                                    'tag `(ptrtoref (bitcast result AT)) ('anchor args)
                                 block
                     if
                         &
@@ -6407,6 +6429,25 @@ let nodefault = (opaque "nodefault")
 fn nodefault? (x)
     (('typeof x) == type) and (x as type == nodefault)
 
+fn spice-typematch? (qparamT qargT arg-constant?)
+    let argT = ('strip-qualifiers qargT)
+    let paramT = ('strip-qualifiers qparamT)
+    assert (paramT != Variadic)
+    if (paramT == Unknown)
+        return true
+    elseif (argT <= paramT)
+        return (not (('refer? qparamT) & (not ('refer? qargT))))
+    try
+        let matchfunc = ('@ paramT '__typematch)
+        let result = (sc_prove `(matchfunc paramT argT))
+        if (result as bool)
+            return (not (('refer? qparamT) & (not ('refer? qargT))))
+        else
+            return false
+    else;
+    let conv = (imply-converter qargT paramT arg-constant?)
+    operator-valid? conv
+
 spice overloaded-fn-append (T args...)
     let outtype = (T as type)
     let acount = ('argcount args...)
@@ -6526,28 +6567,9 @@ spice overloaded-fn-append (T args...)
                         else
                             no-match;
                     let qargT = ('qualified-typeof arg)
-                    let argT = ('strip-qualifiers qargT)
                     let qparamT = (sc_arguments_type_getarg FT i)
-                    let paramT = ('strip-qualifiers qparamT)
-                    if (paramT == Unknown)
-                        continue;
-                    elseif (argT <= paramT)
-                        if (('refer? qparamT) & (not ('refer? qargT)))
-                            no-match;
-                        continue;
-                    try
-                        let matchfunc = ('@ paramT '__typematch)
-                        let result = (sc_prove `(matchfunc paramT argT))
-                        if (result as bool)
-                            if (('refer? qparamT) & (not ('refer? qargT)))
-                                no-match;
-                            continue;
-                        else
-                            no-match;
-                    else;
-                    assert (paramT != Variadic)
-                    let conv = (imply-converter argT paramT ('constant? arg))
-                    if (not (operator-valid? conv))
+                    let argT = ('strip-qualifiers qargT)
+                    if (not (spice-typematch? qparamT qargT ('constant? arg)))
                         no-match;
                 if failed
                     continue;
@@ -7908,7 +7930,7 @@ sugar include (args...)
                         do
                             let expr = (sc_expand at '() sugar-scope)
                             sc_prove expr
-                    if (('typeof val) != string)
+                    if (not ('string-constant? val))
                         error "option arguments must evaluate to constant strings"
                     val as:= string
                     outopts := (cons val outopts)
@@ -8564,6 +8586,9 @@ sugar typematch (...)
                         let head = (decons ...)
                         head
                     else `...
+
+spice typematch? (paramT argT arg-constant?)
+    spice-typematch? (paramT as type) (argT as type) (arg-constant? as bool)
 
 #-------------------------------------------------------------------------------
 # extensions to intrinsics
