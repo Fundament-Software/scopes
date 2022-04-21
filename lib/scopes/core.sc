@@ -4634,6 +4634,11 @@ let verify-stepsize =
                         "step size must be > 0"
             `()
 
+let llvm.memcpy.p0i8.p0i8.i64 =
+    sc_global_new 'llvm.memcpy.p0i8.p0i8.i64
+        function void (mutable rawstring) rawstring i64 bool
+        \ 0:u32 unnamed
+
 run-stage; # 7
 
 # (define-scope-macro name expr ...)
@@ -5106,10 +5111,13 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                             sc_string_join
                                                 sc_const_string_extract lhs
                                                 sc_const_string_extract rhs
-                                let T = ('typeof lhs)
+                                let QTL = ('qualified-typeof lhs)
+                                let QTR = ('qualified-typeof rhs)
+                                let T = ('strip-qualifiers QTL)
+                                let TR = ('strip-qualifiers QTR)
                                 let ET = ('element@ T 0)
                                 let sz1 = ('element-count T)
-                                let sz2 = ('element-count ('typeof rhs))
+                                let sz2 = ('element-count TR)
                                 let sz = (sz1 + sz2)
                                 let AT = (sc_pointer_type
                                     (sc_array_type ET sz)
@@ -5117,24 +5125,42 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                 let block = (sc_expression_new)
                                 let result = `(alloca-array ET sz)
                                 sc_expression_append block result
-                                loop (i = 0)
-                                    if (i == sz1)
-                                        break;
+                                if ('refer? QTL)
                                     sc_expression_append block
                                         spice-quote
-                                            store
-                                                extractvalue lhs i
-                                                getelementptr result i
-                                    repeat (i + 1)
-                                loop (i = 0)
-                                    if (i == sz2)
-                                        break;
+                                            llvm.memcpy.p0i8.p0i8.i64
+                                                bitcast result (mutable rawstring)
+                                                bitcast (& (lhs @ 0)) rawstring
+                                                sz1 as i64
+                                                false
+                                else
+                                    loop (i = 0)
+                                        if (i == sz1)
+                                            break;
+                                        sc_expression_append block
+                                            spice-quote
+                                                store
+                                                    extractvalue lhs i
+                                                    getelementptr result i
+                                        repeat (i + 1)
+                                if ('refer? QTR)
                                     sc_expression_append block
                                         spice-quote
-                                            store
-                                                extractvalue rhs i
-                                                getelementptr result (sz1 + i)
-                                    repeat (i + 1)
+                                            llvm.memcpy.p0i8.p0i8.i64
+                                                bitcast (getelementptr result sz1) (mutable rawstring)
+                                                bitcast (& (rhs @ 0)) rawstring
+                                                sz2 as i64
+                                                false
+                                else
+                                    loop (i = 0)
+                                        if (i == sz2)
+                                            break;
+                                        sc_expression_append block
+                                            spice-quote
+                                                store
+                                                    extractvalue rhs i
+                                                    getelementptr result (sz1 + i)
+                                        repeat (i + 1)
                                 sc_expression_append block
                                     'tag `(ptrtoref (bitcast result AT)) ('anchor args)
                                 block
@@ -6591,7 +6617,6 @@ spice overloaded-fn-append (T args...)
                 # complete default values
                 for i in (range count explicit-argcount)
                     let arg = ('getarg defs i)
-                    let argT = ('typeof arg)
                     sc_call_append_argument outargs arg
                 if true
                     return outargs
@@ -6620,7 +6645,6 @@ spice overloaded-fn-append (T args...)
                             break str
 
 sugar fn... (name...)
-    fn wrapdef (def) ('tag `(inline () def) ('anchor def))
     spice make-defaults (atypes defaults...)
         let atypes = (atypes as type)
         let outargs =
@@ -6628,7 +6652,8 @@ sugar fn... (name...)
                 inline (i)
                     let def = ('getarg defaults... i)
                     let paramT = (sc_arguments_type_getarg atypes i)
-                    if (not ('constant? def))
+                    let defconst? = ('constant? def)
+                    if (not defconst?)
                         hide-traceback;
                         error@ ('anchor def) "while checking default argument"
                             "default argument must be constant"
@@ -6639,13 +6664,12 @@ sugar fn... (name...)
                     elseif (paramT == Variadic) def
                     elseif (argT <= paramT) def
                     else
-                        let conv = (as-converter argqT paramT true)
+                        let conv = (as-converter argqT paramT defconst?)
                         if (not (operator-valid? conv))
                             hide-traceback;
                             error@ ('anchor def) "while checking default argument"
                                 "default argument does not match argument type"
-                        wrapdef
-                            'tag `(conv def) ('anchor def)
+                        'tag `(conv def) ('anchor def)
         `(inline () outargs)
 
     spice init-overloaded-function (T)
@@ -8728,7 +8752,7 @@ sugar static-shared-library (name...)
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
     \ tuple-comparison gen-arrayof MethodsAccessor-typeattr floorf modules
-    \ string-array-ref-type?
+    \ string-array-ref-type? llvm.memcpy.p0i8.p0i8.i64
 
 run-stage; # 12
 
