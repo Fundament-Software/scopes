@@ -664,7 +664,7 @@ def trace(anchor):
 
 def error(msg, *args):
     print(msg.format(*args))
-    exit(255)
+    sys.exit(255)
 
 def tag(anchor, obj):
     return obj

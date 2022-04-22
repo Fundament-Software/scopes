@@ -141,6 +141,8 @@ do
     let module =
         include
             """"
+                #include <assert.h>
+
                 struct nkc {
                     int nkcInited;
                     struct nkc *ctx;
@@ -158,28 +160,42 @@ do
                     struct nkc_key_event key;
                 };
 
-                union nkc_event __attribute__((noinline)) nkc_poll_events(struct nkc* handle)
+                union nkc_event
+                nkc_poll_events(struct nkc* handle)
                 {
-                union nkc_event ne;
-                ne.key.type = handle->window->nkcInited;
-                return ne;
+                    assert (handle->nkcInited == 0x23456789);
+                    assert (handle->ctx == 0x12345678);
+                    assert (handle->keepRunning == 0x3456789A);
+                    assert (handle->window == 0x23456789);
+                    union nkc_event ne;
+                    ne.key.type = 0x12345678;
+                    ne.key.code = 0x23456789;
+                    ne.key.mod = 0x3456789A;
+                    return ne;
                 }
 
-            options "-ggdb"
+            #options "-ggdb"
 
     let nkc = module.struct.nkc
 
     fn main ()
         local nkcx = (nkc)
-        nkcx.ctx = &nkcx;
-        nkcx.window = &nkcx;
-        nkcx.nkcInited = 4;
-        print "begin test"
-        (module.extern.nkc_poll_events &nkcx)
-        print "should reach here"
-        (module.extern.nkc_poll_events &nkcx)
-        print "SHOULD NOT REACH HERE"
-        (module.extern.nkc_poll_events &nkcx) # this is never reached, but if it isn't here, the segfault in the previous statement doesn't happen?????
-        print "ok"
+        nkcx.nkcInited = 0x23456789
+        nkcx.ctx = (inttoptr 0x12345678 (mutable @nkc));
+        nkcx.keepRunning = 0x3456789A
+        nkcx.window = (inttoptr 0x23456789 (mutable @nkc));
+        inline docall ()
+            print "calling..."
+            let val = (module.extern.nkc_poll_events &nkcx)
+            test (val.key.type == 0x12345678)
+            test (val.key.code == 0x23456789)
+            test (val.key.mod == 0x3456789A)
+        docall;
+        docall;
+        docall;
 
     (main)
+
+print "ok"
+
+;
