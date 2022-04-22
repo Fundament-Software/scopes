@@ -133,3 +133,53 @@ do
     print (storageof i.struct.inotify_event)
     print (sizeof i.struct.inotify_event) (i.extern.query_inotify_event_size)
     test ((sizeof i.struct.inotify_event) == (i.extern.query_inotify_event_size))
+
+do
+    # submitted by `Erik McClure#9999` on #scopes-dev
+    # https://discord.com/channels/793835483708915752/796056890660225064/967005880937742366
+
+    let module =
+        include
+            """"
+                struct nkc {
+                    int nkcInited;
+                    struct nkc *ctx;
+                    int keepRunning; // If this is commented out, it crashes on the first call instead of the second
+
+                    struct nkc *window;
+                };
+                struct nkc_key_event {
+                    int type;
+                    int code;
+                    int mod; // If this is commented out, it stops crashing.
+                };
+                union nkc_event {
+                    int type;
+                    struct nkc_key_event key;
+                };
+
+                union nkc_event __attribute__((noinline)) nkc_poll_events(struct nkc* handle)
+                {
+                union nkc_event ne;
+                ne.key.type = handle->window->nkcInited;
+                return ne;
+                }
+
+            options "-ggdb"
+
+    let nkc = module.struct.nkc
+
+    fn main ()
+        local nkcx = (nkc)
+        nkcx.ctx = &nkcx;
+        nkcx.window = &nkcx;
+        nkcx.nkcInited = 4;
+        print "begin test"
+        (module.extern.nkc_poll_events &nkcx)
+        print "should reach here"
+        (module.extern.nkc_poll_events &nkcx)
+        print "SHOULD NOT REACH HERE"
+        (module.extern.nkc_poll_events &nkcx) # this is never reached, but if it isn't here, the segfault in the previous statement doesn't happen?????
+        print "ok"
+
+    (main)
