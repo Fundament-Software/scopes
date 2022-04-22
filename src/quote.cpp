@@ -570,6 +570,7 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
 
 static ValueRef wrap_value_inner(const Type *T, const ValueRef &value) {
     auto _anchor = value.anchor();
+    bool isref = is_reference(T);
     T = strip_qualifiers(T);
     auto ST = storage_type(T).assert_ok();
     auto kind = ST->kind();
@@ -649,25 +650,50 @@ static ValueRef wrap_value_inner(const Type *T, const ValueRef &value) {
         auto ET = at->element_type;
         auto numvals = (int)at->count();
         auto numelems = REF(ConstInt::from(TYPE_I32, numvals));
-        auto buf = REF(CallTemplate::from(g_alloca_array, {
-                REF(ConstPointer::type_from(TYPE_ValueRef)),
-                numelems
-            }));
-        result->append(buf);
-        for (int i = 0; i < numvals; ++i) {
-            auto idx = REF(ConstInt::from(TYPE_I32, i));
-            auto arg =
-                REF(CallTemplate::from(g_extractvalue, { value, idx }));
-            auto wrapped_arg = wrap_value(ET, arg);
-            assert(wrapped_arg);
-            result->append(
-                REF(CallTemplate::from(g_store, {
-                    wrapped_arg,
-                    REF(CallTemplate::from(g_getelementptr, { buf, idx }))
-                })));
+        bool is_stringarray = (ET == TYPE_Char);
+        ValueRef buf;
+        if (is_stringarray && isref) {
+            const Type *rawstring = native_ro_pointer_type(TYPE_Char);
+            buf = REF(CallTemplate::from(g_bitcast, {
+                    REF(CallTemplate::from(g_reftoptr, { value })),
+                    REF(ConstPointer::type_from(rawstring))
+                }));
+            result->append(buf);
+        } else {
+            if (is_stringarray) {
+                buf = REF(CallTemplate::from(g_alloca_array, {
+                    REF(ConstPointer::type_from(TYPE_Char)),
+                    numelems
+                }));
+            } else {
+                buf = REF(CallTemplate::from(g_alloca_array, {
+                    REF(ConstPointer::type_from(TYPE_ValueRef)),
+                    numelems
+                }));
+            }
+            result->append(buf);
+            for (int i = 0; i < numvals; ++i) {
+                auto idx = REF(ConstInt::from(TYPE_I32, i));
+                ValueRef arg =
+                    REF(CallTemplate::from(g_extractvalue, { value, idx }));
+                if (!is_stringarray) {
+                    arg = wrap_value(ET, arg);
+                    assert(arg);
+                }
+                result->append(
+                    REF(CallTemplate::from(g_store, {
+                        arg,
+                        REF(CallTemplate::from(g_getelementptr, { buf, idx }))
+                    })));
+            }
         }
-        result->append(REF(CallTemplate::from(g_sc_const_aggregate_new,
-            { REF(ConstPointer::type_from(T)), numelems, buf })));
+        if (is_stringarray) {
+            result->append(REF(CallTemplate::from(g_sc_const_string_new,
+                { REF(CallTemplate::from(g_sc_string_new, { buf, numelems })) })));
+        } else {
+            result->append(REF(CallTemplate::from(g_sc_const_aggregate_new,
+                { REF(ConstPointer::type_from(T)), numelems, buf })));
+        }
         return result;
     } break;
     case TK_Tuple: {

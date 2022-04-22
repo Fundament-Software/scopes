@@ -11,6 +11,8 @@
 
 using import struct
 
+let &chararray = (& (array char))
+
 # declare void @llvm.memcpy.p0i8.p0i8.i64(i8* <dest>, i8* <src>,
                                         i64 <len>, i1 <isvolatile>)
 let llvm.memcpy.p0i8.p0i8.i64 =
@@ -152,6 +154,12 @@ let
     compare-strings> = (gen-compare-strings false false true)
     compare-strings< = (gen-compare-strings true false false)
 
+inline &chararray? (T)
+    and
+        &? T
+        (unqualified T) < array
+        (elementof T) == char
+
 inline string-binary-op (f superf)
     @@ memo
     inline (cls T)
@@ -159,7 +167,7 @@ inline string-binary-op (f superf)
         static-if ((T == (pointer ET)) or (T == (mutable pointer ET)))
             inline (self other)
                 f self other (zero-terminated-length other)
-        elseif ((ET == char) and (T == string))
+        elseif ((ET == char) and ((T == string) or (&chararray? T)))
             inline (self other)
                 f self (other as rawstring) (countof other)
         elseif (not none? superf)
@@ -235,7 +243,9 @@ typedef+ StringBase
 
     inline __static-rimply (T cls)
         let ET = cls.ElementType
-        static-if ((ET == char) and (T == string)) cls
+        static-if (ET == char)
+            static-if (&chararray? T) cls
+            elseif (T == string) cls
 
     inline __typecall (cls element-type capacity)
         """"Construct a mutable string type of `element-type` with a variable or
@@ -312,6 +322,17 @@ typedef+ StringBase
         llvm.memcpy.p0i8.p0i8.i64
             bitcast (& ptr) (mutable rawstring)
             & (value @ 0)
+            (count * (sizeof cls.ElementType)) as i64
+            false
+        ;
+    case (self, value : &chararray)
+        let cls = (typeof self)
+        static-assert (cls.ElementType == char)
+        let count = (countof value)
+        let ptr = (append-slots self (countof value))
+        llvm.memcpy.p0i8.p0i8.i64
+            bitcast (& ptr) (mutable rawstring)
+            value as rawstring
             (count * (sizeof cls.ElementType)) as i64
             false
         ;
@@ -586,20 +607,6 @@ typedef+ GrowingString
                 _capacity = capacity
 
         inline... string-constructor
-        case (s : string, ...)
-            local self = (from-rawstring (s as rawstring) (countof s))
-            va-map
-                inline (arg)
-                    'append self arg
-                ...
-            deref self
-        case (s : cls, ...)
-            local self = (copy s)
-            va-map
-                inline (arg)
-                    'append self arg
-                ...
-            deref self
         case (data : PointerType, count : usize)
             from-rawstring data count
         #case (data : PointerType,)
@@ -618,6 +625,27 @@ typedef+ GrowingString
                 _items = items
                 _count = 0:usize
                 _capacity = capacity
+        case (s : &chararray, ...)
+            local self = (from-rawstring (s as rawstring) (countof s))
+            va-map
+                inline (arg)
+                    'append self arg
+                ...
+            deref self
+        case (s : string, ...)
+            local self = (from-rawstring (s as rawstring) (countof s))
+            va-map
+                inline (arg)
+                    'append self arg
+                ...
+            deref self
+        case (s : cls, ...)
+            local self = (copy s)
+            va-map
+                inline (arg)
+                    'append self arg
+                ...
+            deref self
 
     inline __typecall (cls opts...)
         static-if (cls == this-type)
@@ -679,7 +707,14 @@ typedef+ GrowingString
 
     unlet gen-growing-string-type parent-type nearest-capacity
 
+let String = (GrowingString char)
+
+spice prefix:S (str)
+    let str = (sc_string_unescape (sc_const_string_extract str))
+    spice-quote
+        String str
+
 do
     #let StringBase FixedString GrowingString
-    let String = (GrowingString char)
+    let String prefix:S
     locals;
