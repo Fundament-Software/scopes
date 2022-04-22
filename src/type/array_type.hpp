@@ -21,12 +21,13 @@ struct ArrayType : ArrayLikeType {
 
     void stream_name(StyledStream &ss) const;
 
-    ArrayType(const Type *_element_type, size_t _count);
+    ArrayType(const Type *_element_type, size_t _count, bool zterm);
 };
 
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(const Type *) array_type(const Type *element_type, size_t count);
+SCOPES_RESULT(const Type *) array_type(const Type *element_type, size_t count,
+    bool zterm = false);
 
 } // namespace scopes
 

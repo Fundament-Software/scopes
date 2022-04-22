@@ -28,18 +28,22 @@ enum {
 struct ArrayLikeType : CompositeType {
     static bool classof(const Type *T);
 
-    ArrayLikeType(TypeKind kind, const Type *_element_type, size_t _count);
+    ArrayLikeType(TypeKind kind, const Type *_element_type, size_t _count, bool _zterm = false);
 
     SCOPES_RESULT(void *) getelementptr(void *src, size_t i) const;
 
     SCOPES_RESULT(const Type *) type_at_index(size_t i) const;
 
     bool is_unsized() const;
+    bool is_zterm() const;
     size_t count() const;
+    size_t full_count() const; // including zero terminating element
 
     const Type *element_type;
     size_t stride;
     size_t _count;
+    bool _zterm;
+
 };
 
 //------------------------------------------------------------------------------

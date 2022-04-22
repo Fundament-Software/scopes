@@ -1776,7 +1776,7 @@ static ConstSet<ConstString> conststrings;
 ConstString::ConstString(const String *_value)
     : Const(VK_ConstString,
         refer_type(
-            array_type(TYPE_Char, _value->count).assert_ok(),
+            array_type(TYPE_Char, _value->count, true).assert_ok(),
             PTF_NonWritable,
             SYM_SPIRV_StorageClassPrivate)),
         value(_value) {

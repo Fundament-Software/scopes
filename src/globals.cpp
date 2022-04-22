@@ -2121,6 +2121,32 @@ sc_type_raises_t sc_array_type(const sc_type_t *element_type, size_t count) {
     return convert_result(array_type(element_type, count));
 }
 
+const sc_type_t *sc_array_type_set_zterm(const sc_type_t *T, bool zterm) {
+    using namespace scopes;
+    if (is_kind<TK_Array>(T)) {
+        auto at = cast<ArrayType>(T);
+        return array_type(at->element_type, at->_count, zterm).assert_ok();
+    }
+    return T;
+}
+
+const sc_type_t *sc_array_type_set_count(const sc_type_t *T, size_t count) {
+    using namespace scopes;
+    if (is_kind<TK_Array>(T)) {
+        auto at = cast<ArrayType>(T);
+        return array_type(at->element_type, count, at->is_zterm()).assert_ok();
+    }
+    return T;
+}
+
+bool sc_array_type_is_zterm(const sc_type_t *T) {
+    using namespace scopes;
+    if (is_kind<TK_Array>(T)) {
+        return cast<ArrayType>(T)->is_zterm();
+    }
+    return T;
+}
+
 // Vector Type
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -2617,6 +2643,9 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_typename_type_set_opaque, _void, TYPE_Type);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_array_type, TYPE_Type, TYPE_Type, TYPE_USize);
+    DEFINE_EXTERN_C_FUNCTION(sc_array_type_set_zterm, TYPE_Type, TYPE_Type, TYPE_Bool);
+    DEFINE_EXTERN_C_FUNCTION(sc_array_type_is_zterm, TYPE_Bool, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_array_type_set_count, TYPE_Type, TYPE_Type, TYPE_USize);
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_vector_type, TYPE_Type, TYPE_Type, TYPE_USize);
 
