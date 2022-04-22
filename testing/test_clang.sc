@@ -146,34 +146,32 @@ do
                 struct nkc {
                     int nkcInited;
                     struct nkc *ctx;
-                    int keepRunning; // If this is commented out, it crashes on the first call instead of the second
-
+                    int keepRunning;
                     struct nkc *window;
                 };
                 struct nkc_key_event {
                     int type;
                     int code;
-                    int mod; // If this is commented out, it stops crashing.
+                    int mod;
                 };
-                union nkc_event {
+                typedef union nkc_event {
                     int type;
                     struct nkc_key_event key;
-                };
+                } nkc_event_t;
 
-                union nkc_event
+                nkc_event_t
                 nkc_poll_events(struct nkc* handle)
                 {
                     assert (handle->nkcInited == 0x23456789);
-                    assert (handle->ctx == 0x12345678);
+                    assert (handle->ctx == (struct nkc*)0x12345678);
                     assert (handle->keepRunning == 0x3456789A);
-                    assert (handle->window == 0x23456789);
-                    union nkc_event ne;
+                    assert (handle->window == (struct nkc*)0x23456789);
+                    nkc_event_t ne;
                     ne.key.type = 0x12345678;
                     ne.key.code = 0x23456789;
                     ne.key.mod = 0x3456789A;
                     return ne;
                 }
-
             #options "-ggdb"
 
     let nkc = module.struct.nkc
@@ -185,7 +183,6 @@ do
         nkcx.keepRunning = 0x3456789A
         nkcx.window = (inttoptr 0x23456789 (mutable @nkc));
         inline docall ()
-            print "calling..."
             let val = (module.extern.nkc_poll_events &nkcx)
             test (val.key.type == 0x12345678)
             test (val.key.code == 0x23456789)
@@ -195,6 +192,11 @@ do
         docall;
 
     (main)
+
+    #static-compile
+        static-typify main
+        'dump-module
+
 
 print "ok"
 

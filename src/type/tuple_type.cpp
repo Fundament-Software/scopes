@@ -189,36 +189,64 @@ SCOPES_RESULT(const Type *) tuple_type(const Types &values,
 
 static const Type *build_union_alignment_field(size_t sz, size_t al, ABIClass *classes, size_t classes_sz) {
     // currently fixing only a few float-related cases
+    // and one integer related one
     if (al == 4) {
         if (classes_sz == 1) {
-            if (classes[0] == ABI_CLASS_SSESF)
-                return TYPE_F32;
-            else if (classes[0] == ABI_CLASS_SSE)
-                return array_type(TYPE_F32, 2).assert_ok();
+            switch(classes[0]) {
+            case ABI_CLASS_INTEGER: return array_type(TYPE_I32, 2).assert_ok();
+            case ABI_CLASS_INTEGERSI: return TYPE_I32;
+            case ABI_CLASS_SSESF: return TYPE_F32;
+            case ABI_CLASS_SSE: return array_type(TYPE_F32, 2).assert_ok();
+            default: break;
+            }
         } else if (classes_sz == 2) {
-            if ((classes[0] == ABI_CLASS_INTEGER) && (classes[1] == ABI_CLASS_SSESF))
-                return tuple_type({
-                    array_type(TYPE_I32, 2).assert_ok(),
-                    TYPE_F32}).assert_ok();
-            else if ((classes[0] == ABI_CLASS_INTEGER) && (classes[1] == ABI_CLASS_SSE))
-                return tuple_type({
-                    array_type(TYPE_I32, 2).assert_ok(),
-                    array_type(TYPE_F32, 2).assert_ok()}).assert_ok();
-            else if ((classes[0] == ABI_CLASS_SSE) && (classes[1] == ABI_CLASS_INTEGERSI)) {
-                assert(sz > 8);
-                return tuple_type({
-                    array_type(TYPE_F32, 2).assert_ok(),
-                    array_type(TYPE_I8, sz - 8).assert_ok()}).assert_ok();
-            } else if ((classes[0] == ABI_CLASS_SSE) && (classes[1] == ABI_CLASS_INTEGER))
-                return tuple_type({
-                    array_type(TYPE_F32, 2).assert_ok(),
-                    array_type(TYPE_I32, 2).assert_ok()}).assert_ok();
-            else if ((classes[0] == ABI_CLASS_SSE) && (classes[1] == ABI_CLASS_SSESF))
-                return array_type(TYPE_F32, 3).assert_ok();
-            else if ((classes[0] == ABI_CLASS_SSE) && (classes[1] == ABI_CLASS_SSE))
-                return array_type(TYPE_F32, 4).assert_ok();
+            switch(classes[0]) {
+            case ABI_CLASS_INTEGER: {
+                switch(classes[1]) {
+                case ABI_CLASS_INTEGERSI:
+                    return tuple_type({
+                        array_type(TYPE_I32, 2).assert_ok(),
+                        TYPE_I32 }).assert_ok();
+                case ABI_CLASS_SSESF:
+                    return tuple_type({
+                        array_type(TYPE_I32, 2).assert_ok(),
+                        TYPE_F32}).assert_ok();
+                case ABI_CLASS_SSE:
+                    return tuple_type({
+                        array_type(TYPE_I32, 2).assert_ok(),
+                        array_type(TYPE_F32, 2).assert_ok()}).assert_ok();
+                default: break;
+                }
+            } break;
+            case ABI_CLASS_SSE: {
+                switch(classes[1]) {
+                case ABI_CLASS_INTEGERSI:
+                    assert(sz > 8);
+                    return tuple_type({
+                        array_type(TYPE_F32, 2).assert_ok(),
+                        array_type(TYPE_I8, sz - 8).assert_ok()}).assert_ok();
+                case ABI_CLASS_INTEGER:
+                    return tuple_type({
+                        array_type(TYPE_F32, 2).assert_ok(),
+                        array_type(TYPE_I32, 2).assert_ok()}).assert_ok();
+                case ABI_CLASS_SSESF:
+                    return array_type(TYPE_F32, 3).assert_ok();
+                case ABI_CLASS_SSE:
+                    return array_type(TYPE_F32, 4).assert_ok();
+                default: break;
+                }
+            } break;
+            default: break;
+            }
         }
     }
+#if SCOPES_WARN_MISSING_CTYPE_SUPPORT
+    printf("warning: missing construction rules for union of size %zu, alignment %zu and classes ", sz, al);
+    for (size_t i = 0; i < classes_sz; ++i) {
+        printf("%s ", abi_class_to_string(classes[i]));
+    }
+    printf("\n");
+#endif
     return vector_type(TYPE_I8, al).assert_ok();
 }
 
