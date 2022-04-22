@@ -1153,6 +1153,19 @@ run-stage; # 3
                 if ('function? ('element@ cls 0))
                     return true
             return false
+    zterm? = sc_array_type_is_zterm
+    zterm =
+        inline (cls zterm?)
+            sc_array_type_set_zterm cls
+                static-branch (none? zterm?)
+                    inline () true
+                    inline () zterm?
+    set-element-count =
+        inline (cls count)
+            sc_array_type_set_count cls
+                static-branch (none? count)
+                    inline () -1:usize
+                    inline () count
     change-element-type =
         fn (cls ET)
             sc_pointer_type_set_element_type cls ET
@@ -3516,6 +3529,7 @@ let
     sizeof = (make-const-type-property-function sc_type_sizeof)
     bitcountof = (make-const-type-property-function sc_type_bitcountof)
     alignof = (make-const-type-property-function sc_type_alignof)
+    zterm? = (make-const-type-property-function sc_array_type_is_zterm)
     unqualified = (make-const-type-property-function sc_strip_qualifiers)
     qualifiersof = (make-const-value-property-function sc_value_qualified_type)
     keyof = (make-const-type-property-function sc_type_key)
@@ -4638,6 +4652,10 @@ let llvm.memcpy.p0i8.p0i8.i64 =
     sc_global_new 'llvm.memcpy.p0i8.p0i8.i64
         function void (mutable rawstring) rawstring i64 bool
         \ 0:u32 unnamed
+let llvm.memset.p0i8.i64 =
+    sc_global_new 'llvm.memset.p0i8.i64
+        function void (mutable rawstring) char i64 bool
+        \ 0:u32 unnamed
 
 run-stage; # 7
 
@@ -5116,14 +5134,20 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                 let T = ('strip-qualifiers QTL)
                                 let TR = ('strip-qualifiers QTR)
                                 let ET = ('element@ T 0)
+                                let ETsz = ('sizeof ET)
                                 let sz1 = ('element-count T)
                                 let sz2 = ('element-count TR)
                                 let sz = (sz1 + sz2)
-                                let AT = (sc_pointer_type
-                                    (sc_array_type ET sz)
+                                let zterm? = (('zterm? T) | ('zterm? TR))
+                                let AT = (sc_array_type ET sz)
+                                let AT =
+                                    if zterm? ('zterm AT)
+                                    else AT
+                                let AT = (sc_pointer_type AT
                                     pointer-flag-non-writable 'Function)
                                 let block = (sc_expression_new)
-                                let result = `(alloca-array ET sz)
+                                let szz = (? zterm? (sz + 1) sz)
+                                let result = `(alloca-array ET szz)
                                 sc_expression_append block result
                                 if ('refer? QTL)
                                     sc_expression_append block
@@ -5131,7 +5155,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                             llvm.memcpy.p0i8.p0i8.i64
                                                 bitcast result (mutable rawstring)
                                                 bitcast (& (lhs @ 0)) rawstring
-                                                sz1 as i64
+                                                [(sz1 * ETsz)] as i64
                                                 false
                                 else
                                     loop (i = 0)
@@ -5149,7 +5173,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                             llvm.memcpy.p0i8.p0i8.i64
                                                 bitcast (getelementptr result sz1) (mutable rawstring)
                                                 bitcast (& (rhs @ 0)) rawstring
-                                                sz2 as i64
+                                                [(sz2 * ETsz)] as i64
                                                 false
                                 else
                                     loop (i = 0)
@@ -5161,6 +5185,14 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                                     extractvalue rhs i
                                                     getelementptr result (sz1 + i)
                                         repeat (i + 1)
+                                if zterm?
+                                    sc_expression_append block
+                                        spice-quote
+                                            llvm.memset.p0i8.i64
+                                                getelementptr result sz
+                                                0:char
+                                                ETsz as i64
+                                                false
                                 sc_expression_append block
                                     'tag `(ptrtoref (bitcast result AT)) ('anchor args)
                                 block
@@ -5188,18 +5220,26 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                 verify-count argc 1 -1
                 raising Error
                 let cls = (('getarg args 0) as type)
-                if (cls == array)
+                if ((cls == array) | (cls == zarray))
                     verify-count argc 2 -1
                     let element-type = (('getarg args 1) as type)
-                    if (argc == 2)
-                        `[(sc_array_type element-type -1:usize)]
-                    else
-                        let T = (ptrtoref (alloca type))
-                        T = element-type
-                        for i in (rrange 2 argc)
-                            let size = (extract-integer ('getarg args i))
-                            T = (sc_array_type T (size as usize))
-                        `T
+                    let T =
+                        if (argc == 2)
+                            let T = (sc_array_type element-type -1:usize)
+                            if (cls == zarray) ('zterm T)
+                            else T
+                        else
+                            let T = (ptrtoref (alloca type))
+                            T = element-type
+                            for i in (rrange 2 argc)
+                                let size = (extract-integer ('getarg args i))
+                                let AT = (sc_array_type T (size as usize))
+                                let AT =
+                                    if (cls == zarray) ('zterm AT)
+                                    else AT
+                                T = AT
+                            deref T
+                    `T
                 else
                     let count = ('element-count cls)
                     let argc = ('argcount args)
@@ -5278,18 +5318,16 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
             spice-cast-macro
                 fn "array.__rimply" (cls T)
                     if ('unsized? T)
-                        if (('kind cls) == type-kind-array)
-                            if (('element@ cls 0) == ('element@ T 0))
-                                return `passthru
+                        if (T == ('set-element-count cls))
+                            return `passthru
                     `()
 
     __typematch =
         spice-cast-macro
             fn "array.__typematch" (cls T)
                 if ('unsized? cls) # unsized array
-                    if (('kind T) == type-kind-array)
-                        if (('element@ T 0) == ('element@ cls 0))
-                            return `true
+                    if (cls == ('set-element-count T))
+                        return `true
                 `false
 
 inline gen-arrayof (gentypef insertop)

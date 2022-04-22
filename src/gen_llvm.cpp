@@ -949,7 +949,7 @@ struct LLVMIRGenerator {
         case TK_Array:
         case TK_Matrix: {
             auto ai = cast<ArrayLikeType>(type);
-            return LLVMArrayType(SCOPES_GET_RESULT(_type_to_llvm_type(ai->element_type)), ai->count());
+            return LLVMArrayType(SCOPES_GET_RESULT(_type_to_llvm_type(ai->element_type)), ai->full_count());
         } break;
         case TK_Vector: {
             auto vi = cast<ArrayLikeType>(type);
@@ -1120,7 +1120,7 @@ struct LLVMIRGenerator {
         case TK_Matrix: {
             auto ai = cast<ArrayLikeType>(type);
             auto ll_el_type = SCOPES_GET_RESULT(_type_to_llvm_debug_type(ai->element_type));
-            LLVMMetadataRef subranges[] = { LLVMDIBuilderGetOrCreateSubrange(di_builder, 0, ai->count()) }; // TODO: n-dimensional arrays?
+            LLVMMetadataRef subranges[] = { LLVMDIBuilderGetOrCreateSubrange(di_builder, 0, ai->full_count()) }; // TODO: n-dimensional arrays?
             auto size = SCOPES_GET_RESULT(size_of(ai)) * 8;
             auto align = SCOPES_GET_RESULT(align_of(ai)) * 8;
             return LLVMDIBuilderCreateArrayType(di_builder, size, align, ll_el_type, subranges, 1);
@@ -2535,7 +2535,7 @@ struct LLVMIRGenerator {
         SCOPES_RESULT_TYPE(LLVMValueRef);
         LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         //auto ET = LLVMGetElementType(LLT);
-        auto data = LLVMConstString(node->value->data, node->value->count, true);
+        auto data = LLVMConstString(node->value->data, node->value->count, false);
 
         LLVMValueRef result = LLVMAddGlobal(module, LLVMTypeOf(data), "");
         LLVMSetInitializer(result, data);
@@ -2762,22 +2762,27 @@ struct LLVMIRGenerator {
 
     SCOPES_RESULT(LLVMValueRef) ConstAggregate_to_value(const ConstAggregateRef &node) {
         SCOPES_RESULT_TYPE(LLVMValueRef);
-        LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
+        auto T = node->get_type();
+        LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(T));
         size_t count = node->values.size();
-        LLVMValueRef values[count];
+        LLVMValueRef values[count+1];
         for (size_t i = 0; i < count; ++i) {
             values[i] = SCOPES_GET_RESULT(ref_to_value(ValueIndex(get_field(node, i))));
         }
         switch(LLVMGetTypeKind(LLT)) {
         case LLVMStructTypeKind: {
-            if (node->get_type()->kind() == TK_Typename) {
+            if (T->kind() == TK_Typename) {
                 return LLVMConstNamedStruct(LLT, values, count);
             } else {
                 return LLVMConstStruct(values, count, false);
             }
         } break;
         case LLVMArrayTypeKind: {
-            auto ai = cast<ArrayLikeType>(SCOPES_GET_RESULT(storage_type(node->get_type())));
+            auto ai = cast<ArrayLikeType>(SCOPES_GET_RESULT(storage_type(T)));
+            if (ai->is_zterm()) {
+                values[count] = LLVMConstNull(LLVMGetElementType(LLT));
+                count++;
+            }
             return LLVMConstArray(SCOPES_GET_RESULT(type_to_llvm_type(ai->element_type)),
                 values, count);
         } break;
