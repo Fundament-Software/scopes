@@ -160,6 +160,7 @@ typedef std::vector<const Type *> Types;
     T(TYPE_Real, "real") \
     T(TYPE_Pointer, "pointer") \
     T(TYPE_Array, "array") \
+    T(TYPE_ZArray, "zarray") \
     T(TYPE_Vector, "vector") \
     T(TYPE_Matrix, "matrix") \
     T(TYPE_Tuple, "tuple") \

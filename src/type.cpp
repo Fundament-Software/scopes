@@ -349,7 +349,8 @@ const Type *superof(const Type *T) {
     case TK_Integer: return TYPE_Integer;
     case TK_Real: return TYPE_Real;
     case TK_Pointer: return TYPE_Pointer;
-    case TK_Array: return TYPE_Array;
+    case TK_Array:
+        return (cast<ArrayType>(T)->is_zterm())?TYPE_ZArray:TYPE_Array;
     case TK_Vector: return TYPE_Vector;
     case TK_Matrix: return TYPE_Matrix;
     case TK_Tuple: return TYPE_Tuple;
@@ -504,6 +505,7 @@ void init_types() {
     DEFINE_OPAQUE_TYPENAME("CEnum", TYPE_CEnum, TYPE_Immutable);
 
     DEFINE_OPAQUE_TYPENAME("array", TYPE_Array, TYPE_Aggregate);
+    DEFINE_OPAQUE_TYPENAME("zarray", TYPE_ZArray, TYPE_Array);
     DEFINE_OPAQUE_TYPENAME("tuple", TYPE_Tuple, TYPE_Aggregate);
     DEFINE_OPAQUE_TYPENAME("union", TYPE_Union, nullptr);
 

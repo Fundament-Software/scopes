@@ -23,8 +23,8 @@ bool ArrayLikeType::classof(const Type *T) {
     return false;
 }
 
-ArrayLikeType::ArrayLikeType(TypeKind kind, const Type *_element_type, size_t count)
-    : CompositeType(kind), element_type(_element_type), _count(count) {
+ArrayLikeType::ArrayLikeType(TypeKind kind, const Type *_element_type, size_t count, bool zterm)
+    : CompositeType(kind), element_type(_element_type), _count(count), _zterm(zterm) {
     stride = qualified_size_of(element_type).assert_ok();
 }
 
@@ -47,6 +47,15 @@ size_t ArrayLikeType::count() const {
 bool ArrayLikeType::is_unsized() const {
     return _count == UNSIZED_COUNT;
 }
+
+bool ArrayLikeType::is_zterm() const {
+    return _zterm;
+}
+
+size_t ArrayLikeType::full_count() const {
+    return is_unsized()?0:(_count + (_zterm?1:0));
+}
+
 
 //------------------------------------------------------------------------------
 

@@ -473,6 +473,9 @@ SCOPES_LIBEXPORT sc_void_raises_t sc_typename_type_set_opaque(const sc_type_t *T
 // array types
 
 SCOPES_LIBEXPORT sc_type_raises_t sc_array_type(const sc_type_t *element_type, size_t count);
+SCOPES_LIBEXPORT const sc_type_t *sc_array_type_set_zterm(const sc_type_t *T, bool zterm);
+SCOPES_LIBEXPORT bool sc_array_type_is_zterm(const sc_type_t *T);
+SCOPES_LIBEXPORT const sc_type_t *sc_array_type_set_count(const sc_type_t *T, size_t count);
 
 // vector types
 
