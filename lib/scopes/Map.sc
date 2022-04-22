@@ -88,14 +88,15 @@ typedef Map < Struct
         self._count / (self._mask + 1:u64)
 
     inline insert_entry (self key keyhash value mask)
+        let cls = (typeof self)
         let hash = ((typeof self) . HashFunction)
         let mask =
             static-if (none? mask) (deref self._mask)
             else mask
         assert (self._count <= mask) "map full"
-        local key = key
+        local key : cls.KeyType = key
         local keyhash = keyhash
-        local value = value
+        local value : cls.ValueType = value
         let capacity = (mask + 1:u64)
         let pos = (keypos keyhash mask)
         loop (i dist = 0:u64 0:u64)

@@ -11,7 +11,7 @@ run-stage;
 'set-symbol Name '__macro
     sugar "constructor" ((name as Symbol))
         inline apply-type (str)
-            bitcast str Name
+            bitcast (str as string) Name
         qq
             let [name] =
                 [apply-type] [(name as Symbol as string)]

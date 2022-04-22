@@ -60,7 +60,7 @@ let __test =
             let expr msg =
                 'getarg args 0
                 'getarg args 1
-            if (('typeof msg) != string)
+            #if (('typeof msg) != string)
                 error "string expected as second argument"
             let anchor = ('anchor args)
             'tag `(check-assertion expr anchor msg) anchor
@@ -95,8 +95,7 @@ define-sugar-macro test-error
     inline assertion-error! (msg)
         let assert-msg =
             .. "error test failed: "
-                if (== (typeof msg) string) msg
-                else (repr msg)
+                printrepr msg
         error assert-msg
     let cond body = (decons args)
     let sxcond = cond
@@ -134,8 +133,7 @@ sugar test-compiler-error (args...)
     inline assertion-error! (anchor msg)
         let assert-msg =
             .. "compiler error test failed: "
-                if (== (typeof msg) string) msg
-                else (repr msg)
+                printrepr msg
         hide-traceback;
         error@ anchor "while checking test" assert-msg
     let cond body = (decons args...)

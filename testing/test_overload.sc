@@ -60,7 +60,7 @@ fn... test2
     fn (a)
         .. a a
     # signature pattern
-    Arguments string
+    Arguments (& (array char))
 
 test ((test2 5) == 10)
 test ((test2 "hi") == "hihi")

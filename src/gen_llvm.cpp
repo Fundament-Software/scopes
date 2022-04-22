@@ -2536,9 +2536,12 @@ struct LLVMIRGenerator {
         LLVMTypeRef LLT = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         //auto ET = LLVMGetElementType(LLT);
         auto data = LLVMConstString(node->value->data, node->value->count, true);
+
         LLVMValueRef result = LLVMAddGlobal(module, LLVMTypeOf(data), "");
         LLVMSetInitializer(result, data);
         LLVMSetGlobalConstant(result, true);
+        LLVMSetLinkage(result, LLVMPrivateLinkage);
+        LLVMSetVisibility(result, LLVMHiddenVisibility);
         result = LLVMConstBitCast(result, LLT);
         return result;
     }
@@ -3433,7 +3436,7 @@ SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
         print_disassembly(funcname, pfunc);
     }
 
-    return ref(fn.anchor(), ConstPointer::from(functype, pfunc));
+    return ref(fn.anchor(), ConstPointer::from(functype, pfunc).cast<ConstPointer>());
 }
 
 } // namespace scopes

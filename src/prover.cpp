@@ -459,7 +459,7 @@ void map_arguments_to_block(const ASTContext &ctx, const TypedValueRef &src) {
 static void write_annotation(const ASTContext &ctx,
     const Anchor *anchor, const String *msg, Values values) {
     values.insert(values.begin(),
-        ref(anchor, ConstPointer::string_from(msg)));
+        ref(anchor, ConstString::from(msg)));
     auto expr = ref(anchor,
             CallTemplate::from(
                 ref(anchor, ConstInt::builtin_from(Builtin(FN_Annotate))),
@@ -1311,9 +1311,9 @@ const Type *try_get_const_type(const ValueRef &node) {
 }
 
 const String *try_extract_string(const ValueRef &node) {
-    auto ptr = node.dyn_cast<ConstPointer>();
-    if (ptr && (ptr->get_type() == TYPE_String))
-        return (const String *)ptr->value;
+    auto ptr = node.dyn_cast<ConstString>();
+    if (ptr)
+        return ptr->value;
     return nullptr;
 }
 
@@ -1398,10 +1398,13 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
             auto vkey = ref(anchor, Quote::from(key));
             if (argc == 1) {
                 if (sc_string_count(keydocstr)) {
+
                     tmp = ref(anchor,
                         CallTemplate::from(g_sc_scope_bind_with_docstring, { tmp,  vkey,
                             ref(value_anchor, Quote::from(value)),
-                            ref(anchor, ConstPointer::string_from(keydocstr))
+                            CallTemplate::from(g_sc_const_string_extract, {
+                                Quote::from(ConstString::from(keydocstr))
+                            })
                         }));
                 } else {
                     tmp = ref(anchor,
@@ -1427,7 +1430,10 @@ static SCOPES_RESULT(TypedValueRef) prove_CompileStage(const ASTContext &ctx, co
                 if (sc_string_count(keydocstr)) {
                     tmp = ref(anchor,
                         CallTemplate::from(g_sc_scope_bind_with_docstring, { tmp, vkey, outargs,
-                            ref(anchor, ConstPointer::string_from(keydocstr)) }));
+                            CallTemplate::from(g_sc_const_string_extract, {
+                                Quote::from(ConstString::from(keydocstr))
+                            })
+                        }));
                 } else {
                     tmp = ref(anchor,
                         CallTemplate::from(g_sc_scope_bind, { tmp, vkey, outargs }));
@@ -1548,8 +1554,9 @@ SCOPES_RESULT(const List *) extract_list_constant(const ValueRef &value) {
 
 SCOPES_RESULT(const String *) extract_string_constant(const ValueRef &value) {
     SCOPES_RESULT_TYPE(const String *);
-    ConstPointerRef x = SCOPES_GET_RESULT(extract_typed_constant<ConstPointer>(TYPE_String, value));
-    return (const String *)x->value;
+    auto val = extract_constant<ConstString, VK_ConstString>(value);
+    ConstStringRef x = SCOPES_GET_RESULT(val);
+    return x->value;
 }
 
 SCOPES_RESULT(Builtin) extract_builtin_constant(const ValueRef &value) {

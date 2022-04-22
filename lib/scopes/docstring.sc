@@ -29,10 +29,10 @@ fn... docstring (scope : Scope, name : Symbol)
                 " ("
                 do
                     let count = (sc_template_parameter_count tmpl)
-                    fold (s = "") for i in (range count)
+                    fold (s = str"") for i in (range count)
                         let param = (sc_template_parameter tmpl i)
                         .. s
-                            ? (empty? s) "" " "
+                            ? (empty? s) str"" str" "
                             (sc_parameter_name param) as string
                 ")\n\n"
                 docstr
@@ -69,10 +69,10 @@ sugar help (value)
     sc_write
         try
             let str = (docstring scope value)
-            if (empty? str) "no help available\n"
+            if (empty? str) str"no help available\n"
             else str
         except (err)
-            "no such symbol in scope\n"
+            str"no such symbol in scope\n"
     `()
 
 do

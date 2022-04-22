@@ -68,6 +68,9 @@ for k in str
 # strings objects
 ###################
 
+# construction via prefix
+test (S"qu\x00ack" == "qu\x00ack")
+
 do
     local s : String
     test ((countof s) == 0)

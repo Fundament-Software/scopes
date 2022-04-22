@@ -4,6 +4,7 @@ using import testing
 spice gen-label-merge-test ()
     spice-quote
         fn (k str)
+            str := str as string
             .. "test1-"
                 label test3
                     .. "test2-"
@@ -18,13 +19,14 @@ spice gen-label-merge-test ()
                                     case 2
                                         merge test3 str
                                     default
-                                        return "?"
+                                        return str"?"
 
 run-stage;
 
 do
     let select1 = (gen-label-merge-test)
     fn select2 (k str)
+        str := str as string
         .. "test1-"
             label test3
                 .. "test2-"
@@ -39,7 +41,7 @@ do
                                 case 2
                                     merge test3 str
                                 default
-                                    return "?"
+                                    return str"?"
 
 
     inline testf (select)
@@ -61,6 +63,7 @@ do
 
     let select1 = (gen-label-merge-test)
     fn select2 (k str)
+        str as:= string
         .. "test1-"
             :: test3
             .. "test2-"
@@ -75,7 +78,7 @@ do
                     case 2
                         merge test3 str
                     default
-                        return "?"
+                        return str"?"
                     test1 ::
                 test2 ::
             test3 ::

@@ -32,6 +32,12 @@ using import String
                 name = "Joana"
                 age = 42
 
+fn string-array-ref-type? (T)
+    if (icmp== ('kind T) type-kind-array)
+        & ('refer? T)
+            ptrcmp== ('element@ T 0) i8
+    else false
+
 spice format (str args...)
     using import UTF-8
 
@@ -97,9 +103,10 @@ spice format (str args...)
                     else
                         parse-error (start + k + 1)
                             "invalid character in index expression"
-            T := ('typeof body)
+            QT := ('qualifiersof body)
+            T := ('strip-qualifiers QT)
             'append block
-                if ((T == String) | (T == string)) body
+                if ((T == String) | (T == string) | (string-array-ref-type? QT)) body
                 else `(tostring body)
             _ (i + 1) nextarg
         else

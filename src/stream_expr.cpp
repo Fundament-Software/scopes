@@ -834,6 +834,10 @@ void walk(const ValueRef &_e, const StreamExprFormat &fmt) {
                 ss << val->value;
             }
         } break;
+        case VK_ConstString: {
+            auto val = e.cast<ConstString>();
+            ss << val->value;
+        } break;
         case VK_ConstPointer: {
             auto val = e.cast<ConstPointer>();
             auto T = val->get_type();
@@ -867,7 +871,8 @@ void walk(const ValueRef &_e, const StreamExprFormat &fmt) {
         }
         if (fmt.types && e.isa<TypedValue>()) {
             auto tv = e.cast<TypedValue>();
-            if (!tv.isa<Const>() || !is_default_suffix(tv->get_type())) {
+            if (!tv.isa<ConstString>() &&
+                (!tv.isa<Const>() || !is_default_suffix(tv->get_type()))) {
                 ss << Style_Operator << ":" << Style_None;
                 ss << tv->get_type();
             }
@@ -932,7 +937,7 @@ bool is_default_suffix(const Type *T) {
     if (T == TYPE_List) return true;
     if (T == TYPE_Symbol) return true;
     if (T == TYPE_Type) return true;
-    if (T == TYPE_String) return true;
+    //if (T == TYPE_String) return true;
     if (T == TYPE_Nothing) return true;
     return false;
 }

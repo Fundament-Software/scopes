@@ -226,6 +226,7 @@ typedef+ Rc
         countof (view self)
 
     inline __= (selfT otherT)
+        let otherT = (unqualified otherT)
         static-if (selfT == otherT)
             super-type.__= selfT otherT
         else

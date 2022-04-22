@@ -246,7 +246,7 @@ do
         let n322 = (DemoNode.new n32 "n322")
         ;
 
-    fn... print-tree (node, indent = "")
+    fn... print-tree (node, indent : string = "")
         returning void
         print
             indent .. ('name node)

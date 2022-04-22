@@ -629,7 +629,7 @@ public:
         if (!result.ok()) {
             StyledString ss;
             ss.out << T.getAsString().c_str() << " (" << Ty->getTypeClassName() << ")";
-            auto val = ConstPointer::string_from(ss.str());
+            auto val = ConstString::from(ss.str());
             SCOPES_TRACE_CONVERT_FOREIGN_TYPE(val);
             result.assert_error()->trace(_backtrace);
         }
@@ -876,7 +876,7 @@ static void add_c_macro(clang::Preprocessor & PP,
         const Anchor *anchor = anchor_from_location(PP.getSourceManager(),
             MI->getDefinitionLoc());
 
-        map.insert(name, ref(anchor, ConstPointer::string_from(value)));
+        map.insert(name, ref(anchor, ConstString::from(value)));
         return;
     }
 

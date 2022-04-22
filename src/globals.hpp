@@ -18,7 +18,10 @@ namespace scopes {
     T(g_sc_const_int_words_new, "sc_const_int_words_new") \
     T(g_sc_const_real_new, "sc_const_real_new") \
     T(g_sc_const_aggregate_new, "sc_const_aggregate_new") \
+    T(g_sc_const_string_new, "sc_const_string_new") \
+    T(g_sc_string_new, "sc_string_new") \
     T(g_deref, "deref") \
+    T(g_reftoptr, "reftoptr") \
     T(g_bitcast, "bitcast") \
     T(g_voidstar, "voidstar") \
     T(g_insertvalue, "insertvalue") \
@@ -53,6 +56,7 @@ namespace scopes {
     T(g_sc_const_int_extract_word, "sc_const_int_extract_word") \
     T(g_sc_const_real_extract, "sc_const_real_extract") \
     T(g_sc_const_extract_at, "sc_const_extract_at") \
+    T(g_sc_const_string_extract, "sc_const_string_extract") \
     /*T(g_undef, "undef")*/ \
     T(g_fptrunc, "fptrunc") \
     T(g_fpext, "fpext") \

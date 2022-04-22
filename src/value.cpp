@@ -743,6 +743,9 @@ PureRef PureCast::from(const Type *type, PureRef value) {
             auto node = value.cast<ConstPointer>();
             result = ConstPointer::from(type, node->value);
         } break;
+        case VK_ConstString: {
+            return ref(value.anchor(), new PureCast(type, value));
+        } break;
         default:
             assert (false && "unknown const kind");
             break;
@@ -1862,32 +1865,32 @@ std::size_t ConstPointer::hash() const {
     return hash2(std::hash<const Type *>{}(get_type()), std::hash<const void *>{}(value));
 }
 
-ConstPointerRef ConstPointer::from(const Type *type, const void *pointer) {
-    return constptrs.from(type, pointer);
+ConstRef ConstPointer::from(const Type *type, const void *pointer) {
+    if (pointer && (type == TYPE_String)) {
+        return ConstString::from(static_cast<const String *>(pointer));
+    } else {
+        return constptrs.from(type, pointer);
+    }
 }
 
 ConstPointerRef ConstPointer::type_from(const Type *type) {
-    return from(TYPE_Type, type);
+    return from(TYPE_Type, type).cast<ConstPointer>();
 }
 
 ConstPointerRef ConstPointer::closure_from(const Closure *closure) {
-    return from(TYPE_Closure, closure);
-}
-
-ConstPointerRef ConstPointer::string_from(const String *str) {
-    return from(TYPE_String, str);
+    return from(TYPE_Closure, closure).cast<ConstPointer>();
 }
 
 ConstPointerRef ConstPointer::list_from(const List *list) {
-    return from(TYPE_List, list);
+    return from(TYPE_List, list).cast<ConstPointer>();
 }
 
 ConstPointerRef ConstPointer::scope_from(const Scope *scope) {
-    return from(TYPE_Scope, scope);
+    return from(TYPE_Scope, scope).cast<ConstPointer>();
 }
 
 ConstPointerRef ConstPointer::anchor_from(const Anchor *anchor) {
-    return from(TYPE_Anchor, anchor);
+    return from(TYPE_Anchor, anchor).cast<ConstPointer>();
 }
 
 //------------------------------------------------------------------------------
