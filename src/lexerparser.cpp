@@ -815,10 +815,10 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_prefixed_string() {
     const Anchor *anchor = this->anchor();
     switch (this->token) {
     case tok_string: {
-        return ValueRef(anchor, ConstPointer::string_from(get_unescaped_string()));
+        return ValueRef(anchor, ConstString::from(get_unescaped_string()));
     } break;
     case tok_block_string: {
-        return ValueRef(anchor, ConstPointer::string_from(get_block_string()));
+        return ValueRef(anchor, ConstString::from(get_block_string()));
     } break;
     default: break;
     }
@@ -857,10 +857,10 @@ SCOPES_RESULT(ValueRef) LexerParser::parse_any() {
         SCOPES_ERROR(ParserStrayClosingBracket);
     } break;
     case tok_string: {
-        return ValueRef(anchor, ConstPointer::string_from(get_string()));
+        return ValueRef(anchor, ConstString::from(get_string()));
     } break;
     case tok_block_string: {
-        return ValueRef(anchor, ConstPointer::string_from(get_block_string()));
+        return ValueRef(anchor, ConstString::from(get_block_string()));
     } break;
     case tok_symbol: {
         return ValueRef(anchor, ConstInt::symbol_from(get_symbol()));

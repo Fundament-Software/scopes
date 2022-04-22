@@ -133,3 +133,71 @@ do
     print (storageof i.struct.inotify_event)
     print (sizeof i.struct.inotify_event) (i.extern.query_inotify_event_size)
     test ((sizeof i.struct.inotify_event) == (i.extern.query_inotify_event_size))
+
+do
+    # submitted by `Erik McClure#9999` on #scopes-dev
+    # https://discord.com/channels/793835483708915752/796056890660225064/967005880937742366
+
+    let module =
+        include
+            """"
+                #include <assert.h>
+
+                struct nkc {
+                    int nkcInited;
+                    struct nkc *ctx;
+                    int keepRunning;
+                    struct nkc *window;
+                };
+                struct nkc_key_event {
+                    int type;
+                    int code;
+                    int mod;
+                };
+                typedef union nkc_event {
+                    int type;
+                    struct nkc_key_event key;
+                } nkc_event_t;
+
+                nkc_event_t
+                nkc_poll_events(struct nkc* handle)
+                {
+                    assert (handle->nkcInited == 0x23456789);
+                    assert (handle->ctx == (struct nkc*)0x12345678);
+                    assert (handle->keepRunning == 0x3456789A);
+                    assert (handle->window == (struct nkc*)0x23456789);
+                    nkc_event_t ne;
+                    ne.key.type = 0x12345678;
+                    ne.key.code = 0x23456789;
+                    ne.key.mod = 0x3456789A;
+                    return ne;
+                }
+            #options "-ggdb"
+
+    let nkc = module.struct.nkc
+
+    fn main ()
+        local nkcx = (nkc)
+        nkcx.nkcInited = 0x23456789
+        nkcx.ctx = (inttoptr 0x12345678 (mutable @nkc));
+        nkcx.keepRunning = 0x3456789A
+        nkcx.window = (inttoptr 0x23456789 (mutable @nkc));
+        inline docall ()
+            let val = (module.extern.nkc_poll_events &nkcx)
+            test (val.key.type == 0x12345678)
+            test (val.key.code == 0x23456789)
+            test (val.key.mod == 0x3456789A)
+        docall;
+        docall;
+        docall;
+
+    (main)
+
+    #static-compile
+        static-typify main
+        'dump-module
+
+
+print "ok"
+
+;

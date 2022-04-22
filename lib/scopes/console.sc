@@ -32,7 +32,7 @@ fn parse-number (str)
 fn... read-eval-print-loop
 case (global-scope, show-logo : bool = false, history-path : string = "")
     fn repeat-string (n c)
-        loop (i s = 0:usize "")
+        loop (i s = 0:usize str"")
             if (i == n)
                 return s
             repeat (i + 1:usize)
@@ -138,7 +138,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
             else;
         ;
 
-    loop (preload cmdlist counter eval-scope = "" "" 0 eval-scope)
+    loop (preload cmdlist counter eval-scope = str"" str"" 0 eval-scope)
         autocomplete-scope = eval-scope
 
         sc_prompt_set_autocomplete_handler autocomplete
@@ -179,7 +179,7 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
                 else cmd
                 "\n"
         let preload =
-            if terminated? ""
+            if terminated? str""
             else (leading-spaces cmd)
         if (not terminated?)
             repeat preload cmdlist counter eval-scope
@@ -369,11 +369,11 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
             except (exc)
                 'dump exc
                 _ counter eval-scope
-        repeat "" "" counter eval-scope
+        repeat str"" str"" counter eval-scope
 
 if main-module?
     read-eval-print-loop (globals) true
-        .. cache-dir "/console.history"
+        .. cache-dir str"/console.history"
 
 do
     let read-eval-print-loop

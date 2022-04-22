@@ -160,8 +160,9 @@ spice char32 (value)
 
 run-stage;
 
-inline prefix:c (value)
-    char32 ('unescape value)
+spice prefix:c (str)
+    let str = (sc_string_unescape (sc_const_string_extract str))
+    `(char32 str)
 
 do
     let encoder decoder char32 prefix:c

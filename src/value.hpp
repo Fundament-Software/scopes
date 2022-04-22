@@ -1284,10 +1284,9 @@ struct ConstPointer : Const {
     bool key_equal(const ConstPointer *other) const;
     std::size_t hash() const;
 
-    static ConstPointerRef from(const Type *type, const void *pointer);
+    static ConstRef from(const Type *type, const void *pointer);
     static ConstPointerRef type_from(const Type *type);
     static ConstPointerRef closure_from(const Closure *closure);
-    static ConstPointerRef string_from(const String *str);
     static ConstPointerRef list_from(const List *list);
     static ConstPointerRef scope_from(const Scope *scope);
     static ConstPointerRef anchor_from(const Anchor *anchor);

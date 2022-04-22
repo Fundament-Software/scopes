@@ -102,10 +102,10 @@ inline capture-parser (macroname head body genf)
     let namestr body =
         if symbol?
             _ (head as Symbol as string) body
-        elseif (T == string)
+        elseif ('string-constant? head)
             _ (head as string) body
         else
-            _ "" (cons head body)
+            _ str"" (cons head body)
     let expr =
         sugar-match body
         case ((params...) ('curly-list args...) body...)

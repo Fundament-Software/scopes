@@ -689,7 +689,7 @@ sc_scope_raises_t sc_import_c(const sc_string_t *path,
     SCOPES_RESULT_TYPE(const Scope *);
     std::vector<std::string> args;
     while (arglist) {
-        if (arglist->at.isa<ConstPointer>()) {
+        if (arglist->at.isa<ConstString>()) {
             auto value = SCOPES_C_GET_RESULT(extract_string_constant(arglist->at));
             args.push_back(value->data);
         } else {
@@ -985,8 +985,8 @@ const sc_string_t *sc_string_lslice(const sc_string_t *str, size_t offset) {
 const sc_string_t *sc_string_unescape(const sc_string_t *str) {
     using namespace scopes;
     char *s = strdup(str->data);
-    unescape_string(s);
-    auto result = String::from(s, strlen(s));
+    int sz = unescape_string(s);
+    auto result = String::from(s, sz);
     free(s);
     return result;
 }
@@ -2702,21 +2702,21 @@ void init_globals(int argc, char *argv[]) {
     bind_new_value(KW_None, ConstAggregate::none_from());
     bind_symbol(Symbol("unnamed"), Symbol(SYM_Unnamed));
     bind_new_value(SYM_CacheDir,
-        ConstPointer::string_from(String::from_cstr(get_cache_dir())));
+        ConstString::from(String::from_cstr(get_cache_dir())));
     bind_new_value(SYM_CompilerDir,
-        ConstPointer::string_from(
+        ConstString::from(
             String::from(scopes_compiler_dir, strlen(scopes_compiler_dir))));
     bind_new_value(SYM_CompilerPath,
-        ConstPointer::string_from(
+        ConstString::from(
             String::from(scopes_compiler_path, strlen(scopes_compiler_path))));
     bind_new_value(SYM_WorkingDir,
-        ConstPointer::string_from(
+        ConstString::from(
             String::from(scopes_working_dir, strlen(scopes_working_dir))));
 
     bind_new_value(SYM_DebugBuild,
         ConstInt::from(TYPE_Bool, scopes_is_debug()));
     bind_new_value(SYM_CompilerTimestamp,
-        ConstPointer::string_from(
+        ConstString::from(
             String::from_cstr(scopes_compile_time_date())));
 
 #define T(NAME, STR) \

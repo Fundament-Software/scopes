@@ -74,11 +74,11 @@ fn box-pointer (value)
     sc_const_pointer_new (typeof value)
         bitcast value voidstar
 
-fn error (msg)
+inline error (msg)
     hide-traceback;
     raise (sc_error_new msg)
 
-fn error@ (anchor traceback-msg error-msg)
+inline error@ (anchor traceback-msg error-msg)
     """"Usage example:
 
             :::scopes
@@ -88,7 +88,7 @@ fn error@ (anchor traceback-msg error-msg)
     sc_error_append_calltrace err (sc_valueref_tag anchor `traceback-msg)
     raise err
 
-fn error@+ (error anchor traceback-msg)
+inline error@+ (error anchor traceback-msg)
     """"Usage example:
 
             :::scopes
@@ -98,6 +98,9 @@ fn error@+ (error anchor traceback-msg)
     sc_error_append_calltrace error (sc_valueref_tag anchor `traceback-msg)
     raise error
 
+inline prefix:str (s)
+    sc_string_unescape (sc_const_string_extract `s)
+
 # print an unboxing error given two types
 fn unbox-verify (value wantT)
     let haveT = (sc_value_type value)
@@ -105,27 +108,37 @@ fn unbox-verify (value wantT)
         hide-traceback;
         error@
             sc_value_anchor value
-            "while trying to unbox value"
-            sc_string_join "can't unbox value of type "
+            str"while trying to unbox value"
+            sc_string_join str"can't unbox value of type "
                 sc_string_join
                     sc_value_repr (box-pointer haveT)
-                    sc_string_join " as value of type "
+                    sc_string_join str" as value of type "
                         sc_value_repr (box-pointer wantT)
     if (sc_value_is_constant value)
     else
         hide-traceback;
         error@
             sc_value_anchor value
-            "while trying to unbox value"
-            sc_string_join "constant of type "
+            str"while trying to unbox value"
+            sc_string_join str"constant of type "
                 sc_string_join
                     sc_value_repr (box-pointer haveT)
-                    sc_string_join " expected, got expression of type "
+                    sc_string_join str" expected, got expression of type "
                         sc_value_repr (box-pointer wantT)
 
 inline unbox-integer (value T)
     unbox-verify value T
     itrunc (sc_const_int_extract value) T
+
+inline unbox-string (value)
+    if (icmp!= (sc_value_kind value) value-kind-const-string)
+        hide-traceback;
+        error@
+            sc_value_anchor value
+            str"while trying to unbox value"
+            sc_string_join str"string expected, got expression of type "
+                sc_value_repr (box-pointer (sc_value_type value))
+    sc_const_string_extract value
 
 inline unbox-symbol (value T)
     unbox-verify value T
@@ -139,16 +152,16 @@ fn verify-count (count mincount maxcount)
     if (icmp>=s mincount 0)
         if (icmp<s count mincount)
             error
-                sc_string_join "at least "
+                sc_string_join str"at least "
                     sc_string_join (sc_value_repr (box-integer mincount))
-                        sc_string_join " argument(s) expected, got "
+                        sc_string_join str" argument(s) expected, got "
                             sc_value_repr (box-integer count)
     if (icmp>=s maxcount 0)
         if (icmp>s count maxcount)
             error
-                sc_string_join "at most "
+                sc_string_join str"at most "
                     sc_string_join (sc_value_repr (box-integer maxcount))
-                        sc_string_join " argument(s) expected, got "
+                        sc_string_join str" argument(s) expected, got "
                             sc_value_repr (box-integer count)
 
 fn Value-none? (value)
@@ -160,12 +173,13 @@ let TypeArrayPointer =
 let ValueArrayPointer =
     sc_pointer_type Value pointer-flag-non-writable unnamed
 let SpiceMacroFunction = (sc_type_storage SpiceMacro)
+
 # dynamically construct a new symbol
 let
-    ellipsis-symbol = (sc_symbol_new "...")
-    list-handler-symbol = (sc_symbol_new "#list")
-    symbol-handler-symbol = (sc_symbol_new "#symbol")
-    typed-symbol-handler-symbol = (sc_symbol_new "#typed-symbol")
+    ellipsis-symbol = (sc_symbol_new str"...")
+    list-handler-symbol = (sc_symbol_new str"#list")
+    symbol-handler-symbol = (sc_symbol_new str"#symbol")
+    typed-symbol-handler-symbol = (sc_symbol_new str"#typed-symbol")
 
 # execute until here and treat the remainder as a new translation unit
 run-stage; # 1
@@ -182,10 +196,10 @@ fn build-typify-function (f)
     let result-type = (sc_value_type result)
     if (ptrcmp!= result-type SpiceMacroFunction)
         error
-            sc_string_join "spice macro must have type "
+            sc_string_join str"spice macro must have type "
                 sc_string_join
                     sc_value_repr (box-pointer SpiceMacroFunction)
-                    sc_string_join " but has type "
+                    sc_string_join str" but has type "
                         sc_value_repr (box-pointer result-type)
     let ptr = (sc_const_pointer_extract result)
     bitcast ptr SpiceMacro
@@ -206,7 +220,7 @@ let typify =
                             break;
                         let ty = (sc_getarg args i)
                         if (ptrcmp!= (sc_value_type ty) type)
-                            error "type expected"
+                            error str"type expected"
                         sc_expression_append body
                             `(store ty (getelementptr types j))
                         _ (add i 1) (add j 1)
@@ -347,6 +361,21 @@ let static-error =
             let msg = (unbox-pointer msg string)
             hide-traceback;
             raise (sc_error_new msg)
+
+let string-array? =
+    box-spice-macro
+        fn (args)
+            let argcount = (sc_argcount args)
+            verify-count argcount 1 1
+            let arg = (sc_getarg args 0)
+            let qT = (sc_value_qualified_type arg)
+            let T = (sc_strip_qualifiers qT)
+            let kind = (sc_type_kind T)
+            if (icmp== kind type-kind-array)
+                if (sc_type_is_refer qT)
+                    if (ptrcmp== (sc_type_element_at T 0) i8)
+                        return `true
+            `false
 
 let elementof =
     box-spice-macro
@@ -547,7 +576,7 @@ do
             if (sc_value_is_constant key)
                 if (icmp== (unbox-symbol key Symbol) unnamed)
                     hide-traceback;
-                    error "value is missing key"
+                    error str"value is missing key"
             let value = (sc_getarg args 2)
             return self key value
         else
@@ -555,7 +584,7 @@ do
             let key = (sc_type_key (sc_value_qualified_type arg))
             if (icmp== key unnamed)
                 hide-traceback;
-                error "value is missing key"
+                error str"value is missing key"
             let arg = (sc_keyed_new unnamed arg)
             return self (box-symbol key) arg
 
@@ -577,7 +606,7 @@ do
                             let key = (unbox-symbol key Symbol)
                             fset self key value
                             return `()
-                error "all arguments must be constant"
+                error str"all arguments must be constant"
 
     fn get-key-value-scope-args (args)
         let argcount = (sc_argcount args)
@@ -592,7 +621,7 @@ do
             let key = (sc_type_key (sc_value_qualified_type arg))
             if (icmp== key unnamed)
                 hide-traceback;
-                error "value is missing key"
+                error str"value is missing key"
             let arg = (sc_keyed_new unnamed arg)
             return self (box-symbol key) arg
 
@@ -614,11 +643,11 @@ do
                             let result = (fset self key value)
                             return `result
                         else
-                            error "value argument must be constant"
+                            error str"value argument must be constant"
                     else
-                        error "key argument must be constant"
+                        error str"key argument must be constant"
                 else
-                    error "scope must be constant"
+                    error str"scope must be constant"
 
     # quick assignment of type attributes
     sc_type_set_symbol type 'set-symbol (gen-key-type-set type sc_type_set_symbol)
@@ -683,7 +712,7 @@ inline runtime-aggregate-type-constructor (f)
                         let k = (sc_type_key (sc_value_qualified_type arg))
                         let arg = (sc_keyed_new unnamed arg)
                         if (ptrcmp!= (sc_value_type arg) type)
-                            error "type expected"
+                            error str"type expected"
                         sc_expression_append body
                             `(store
                                 (sc_key_type k arg)
@@ -798,7 +827,7 @@ sc_type_set_symbol Symbol '__typecall
                 verify-count argcount 2 2
                 let value = (sc_getarg args 1)
                 if (sc_value_is_constant value)
-                    `[(sc_symbol_new (unbox-pointer value string))]
+                    `[(sc_symbol_new (unbox-string value))]
                 else
                     `(sc_symbol_new value)
 
@@ -828,7 +857,7 @@ let const.icmp<=.i32.i32 =
                     let b = (unbox-integer b i32)
                     return
                         box-integer (icmp<=s a b)
-            error "arguments must be constant"
+            error str"arguments must be constant"
 
 let const.add.i32.i32 =
     spice-macro
@@ -840,7 +869,7 @@ let const.add.i32.i32 =
                     let b = (unbox-integer b i32)
                     return
                         box-integer (add a b)
-            error "arguments must be constant"
+            error str"arguments must be constant"
 
 let static-branch =
     spice-macro
@@ -853,8 +882,8 @@ let static-branch =
             if (sc_value_is_constant cond)
             else
                 hide-traceback;
-                error@ (sc_value_anchor cond) "while checking condition"
-                    "condition must be constant"
+                error@ (sc_value_anchor cond) str"while checking condition"
+                    str"condition must be constant"
             let value = (unbox-integer cond bool)
             sc_valueref_tag (sc_value_anchor args) `([(? value thenf elsef)])
 
@@ -886,8 +915,8 @@ let
     type> = (spice-macro (type-comparison-func type>))
 
 """"The type of the `null` constant. This type is uninstantiable.
-let NullType = (sc_typename_type "NullType" typename)
-let Accessor = (sc_typename_type "Accessor" typename)
+let NullType = (sc_typename_type str"NullType" typename)
+let Accessor = (sc_typename_type str"Accessor" typename)
 sc_typename_type_set_storage Accessor (sc_type_storage Closure) typename-flag-plain
 
 let cons =
@@ -964,6 +993,18 @@ let decons =
                     break block
                 _ i next
 
+#-------------------------------------------------------------------------------
+
+# unescape at compile time
+let prefix:str =
+    spice-macro
+        fn (args)
+            raising Error
+            let str = (sc_getarg args 0)
+            let str = (sc_string_unescape (sc_const_string_extract str))
+            spice-quote
+                sc_const_string_extract `str
+
 run-stage; # 3
 
 'define-symbol type 'set-symbols
@@ -1016,6 +1057,9 @@ run-stage; # 3
         fn "dekey" (self)
             let k = (sc_type_key ('qualified-typeof self))
             _ k (sc_keyed_new unnamed self)
+    string-constant? =
+        inline (self)
+            icmp== (sc_value_kind self) value-kind-const-string
 
 'define-symbols Scope
     @ = sc_scope_at
@@ -1172,7 +1216,7 @@ let mutable =
                 let T = (unbox-pointer self type)
                 let T = (sc_pointer_type T pointer-flag-non-writable unnamed)
                 return `[('mutable T)]
-            error "syntax: (mutable <pointer-type>) or (mutable pointer <type>)"
+            error str"syntax: (mutable <pointer-type>) or (mutable pointer <type>)"
 
 let mutable@ =
     spice-macro
@@ -1207,7 +1251,7 @@ let signed =
                 let self = (sc_getarg args 1)
                 let width = (unbox-integer self i32)
                 return `[(sc_integer_type width true)]
-            error "syntax: (signed <integer-type>) or (signed integer <size>)"
+            error str"syntax: (signed <integer-type>) or (signed integer <size>)"
 
 let protect =
     spice-macro
@@ -1218,7 +1262,7 @@ let protect =
             let T = (sc_value_type self)
             if (type< T pointer)
                 return `(bitcast self [('immutable T)])
-            error "syntax: (protect pointer-value)"
+            error str"syntax: (protect pointer-value)"
 
 let rawstring = (pointer char)
 
@@ -1227,7 +1271,7 @@ inline not (value)
     bxor value true
 
 # supertype for unique structs
-let Struct = (sc_typename_type "Struct" typename)
+let Struct = (sc_typename_type str"Struct" typename)
 sc_typename_type_set_opaque Struct
 
 """"Generators provide a protocol for iterating the contents of containers and
@@ -1298,15 +1342,15 @@ sc_typename_type_set_opaque Struct
                 # container has one more item; print it
                 print (at state...)
         # we are done; no cleanup necessary
-let Generator = (sc_typename_type "Generator" typename)
+let Generator = (sc_typename_type str"Generator" typename)
 'set-plain-storage Generator ('storageof Closure)
 
 # collector type
-let Collector = (sc_typename_type "Collector" typename)
+let Collector = (sc_typename_type str"Collector" typename)
 'set-plain-storage Collector ('storageof Closure)
 
 # syntax macro type
-let SugarMacro = (sc_typename_type "SugarMacro" typename)
+let SugarMacro = (sc_typename_type str"SugarMacro" typename)
 let SugarMacroFunction =
     pointer
         raises
@@ -1364,7 +1408,7 @@ inline spice-converter-macro (f)
             except (err)
                 hide-traceback;
                 error@+ err (sc_value_anchor self)
-                    sc_string_join "while attempting to convert argument to " (sc_value_repr _T)
+                    sc_string_join str"while attempting to convert argument to " (sc_value_repr _T)
 
 'set-symbols SpiceMacro
     __rimply =
@@ -1411,7 +1455,7 @@ let static-integer->integer =
             if (icmp!= (band u64val 0x8000000000000000:u64) 0:u64)
                 # if the sign bit is set, signedness matters
                 if (icmp!= ('signed? selfST) ('signed? ST))
-                    error "implicit conversion of integer value requires same signedness"
+                    error str"implicit conversion of integer value requires same signedness"
             if (icmp>s 64 destw)
                 let diff = (zext (sub 64 destw) u64)
                 # check if truncation destroys bits
@@ -1419,7 +1463,7 @@ let static-integer->integer =
                 let cmpval =
                     ? ('signed? ST) (ashr cmpval diff) (lshr cmpval diff)
                 if (icmp!= u64val cmpval)
-                    error "integer value does not fit target type"
+                    error str"integer value does not fit target type"
             return (sc_const_int_new T u64val)
 
 let static-integer->real =
@@ -1591,9 +1635,9 @@ fn real-as (vT T)
 inline cast-error (intro-string vT T)
     hide-traceback;
     error
-        sc_string_join intro-string
+        sc_string_join (unbox-string `intro-string)
             sc_string_join ('__repr (box-pointer vT))
-                sc_string_join " to type " ('__repr (box-pointer T))
+                sc_string_join str" to type " ('__repr (box-pointer T))
 
 fn operator-valid? (value)
     ptrcmp!= ('typeof value) void
@@ -1689,14 +1733,18 @@ fn unary-operator (symbol T)
         if (operator-valid? op) (return op)
     return (sc_empty_argument_list)
 
-fn binary-operator (symbol lhsT rhsT)
+fn binary-operator (symbol qlhsT qrhsT)
     """"For an operation performed on two argument types, of which only
         the left type can provide a suitable candidate, find a matching
         operator function. This function only works inside a spice macro.
+    let lhsT = ('strip-qualifiers qlhsT)
+    let rhsT = ('strip-qualifiers qrhsT)
     label next
         let f =
             try ('@ lhsT symbol)
             except (err) (merge next)
+        let op = (sc_prove `(f qlhsT qrhsT))
+        if (operator-valid? op) (return op)
         let op = (sc_prove `(f lhsT rhsT))
         if (operator-valid? op) (return op)
     return (sc_empty_argument_list)
@@ -1705,6 +1753,8 @@ fn binary-operator-r (rsymbol lhsT rhsT)
     """"For an operation performed on two argument types, of which only
         the right type can provide a suitable candidate, find a matching
         operator function. This function only works inside a spice macro.
+    let lhsT = ('strip-qualifiers lhsT)
+    let rhsT = ('strip-qualifiers rhsT)
     label next
         let f =
             try ('@ rhsT rsymbol)
@@ -1717,10 +1767,12 @@ fn balanced-binary-operator (symbol rsymbol lhsT rhsT lhs-static? rhs-static?)
     """"For an operation performed on two argument types, of which either
         type can provide a suitable candidate, return a matching operator.
         This function only works inside a spice macro.
+    let slhsT = ('strip-qualifiers lhsT)
+    let srhsT = ('strip-qualifiers rhsT)
     # try the left type
     let op = (binary-operator symbol lhsT rhsT)
     if (operator-valid? op) (return op)
-    if (ptrcmp!= lhsT rhsT)
+    if (ptrcmp!= slhsT srhsT)
         # asymmetrical types
 
         # try the right type
@@ -1728,7 +1780,7 @@ fn balanced-binary-operator (symbol rsymbol lhsT rhsT lhs-static? rhs-static?)
         if (operator-valid? op) (return op)
 
         # can we cast rhsT to lhsT?
-        let conv = (imply-converter rhsT lhsT rhs-static?)
+        let conv = (imply-converter rhsT slhsT rhs-static?)
         if (operator-valid? conv)
             # is symmetrical op supported for the left type?
             let op = (binary-operator symbol lhsT lhsT)
@@ -1736,7 +1788,7 @@ fn balanced-binary-operator (symbol rsymbol lhsT rhsT lhs-static? rhs-static?)
                 return `(inline (lhs rhs) (op lhs (conv rhs)))
 
         # can we cast lhsT to rhsT?
-        let conv = (imply-converter lhsT rhsT lhs-static?)
+        let conv = (imply-converter lhsT srhsT lhs-static?)
         if (operator-valid? conv)
             # is symmetrical op supported for the right type?
             let op = (binary-operator symbol rhsT rhsT)
@@ -1749,14 +1801,15 @@ fn balanced-lvalue-binary-operator (symbol lhsT rhsT rhs-static?)
     """"For an operation performed on two argument types, of which only the
         left type type can provide a suitable candidate, return a matching operator.
         This function only works inside a spice macro.
+    let slhsT = ('strip-qualifiers lhsT)
+    let srhsT = ('strip-qualifiers rhsT)
     # try the left type
     let op = (binary-operator symbol lhsT rhsT)
     if (operator-valid? op) (return op)
-    if (ptrcmp!= lhsT rhsT)
+    if (ptrcmp!= slhsT srhsT)
         # asymmetrical types
-
         # can we cast rhsT to lhsT?
-        let conv = (imply-converter rhsT lhsT rhs-static?)
+        let conv = (imply-converter rhsT slhsT rhs-static?)
         if (operator-valid? conv)
             # is symmetrical op supported for the left type?
             let op = (binary-operator symbol lhsT lhsT)
@@ -1767,32 +1820,33 @@ fn balanced-lvalue-binary-operator (symbol lhsT rhsT rhs-static?)
 fn unary-op-error (friendly-op-name T)
     hide-traceback;
     error
-        'join "can't "
+        'join str"can't "
             'join friendly-op-name
-                'join " value of type " ('__repr (box-pointer T))
+                'join str" value of type " ('__repr (box-pointer T))
 
 fn binary-op-error (friendly-op-name lhsT rhsT)
     hide-traceback;
     error
-        'join "can't "
+        'join str"can't "
             'join friendly-op-name
-                'join " values of types "
+                'join str" values of types "
                     'join ('__repr (box-pointer lhsT))
-                        'join " and "
+                        'join str" and "
                             '__repr (box-pointer rhsT)
 
 fn balanced-binary-operation (args symbol rsymbol friendly-op-name)
     let argc = ('argcount args)
+    let anchor = ('anchor args)
     verify-count argc 2 2
     let lhs rhs =
         'getarg args 0
         'getarg args 1
-    let lhsT = ('typeof lhs)
-    let rhsT = ('typeof rhs)
+    let lhsT = ('qualified-typeof lhs)
+    let rhsT = ('qualified-typeof rhs)
     let op = (balanced-binary-operator symbol rsymbol lhsT rhsT
         ('constant? lhs) ('constant? rhs))
     if (operator-valid? op)
-        return ('tag `(op lhs rhs) ('anchor args))
+        return ('tag `(op lhs rhs) anchor)
     hide-traceback;
     binary-op-error friendly-op-name lhsT rhsT
 
@@ -1803,7 +1857,7 @@ fn balanced-lvalue-binary-operation (args symbol friendly-op-name)
         'getarg args 0
         'getarg args 1
     let lhsT = ('typeof lhs)
-    let rhsT = ('typeof rhs)
+    let rhsT = ('qualified-typeof rhs)
     let op = (balanced-lvalue-binary-operator symbol lhsT rhsT ('constant? rhs))
     if (operator-valid? op)
         return ('tag `(op lhs rhs) ('anchor args))
@@ -1818,7 +1872,7 @@ fn unbalanced-binary-operation (args symbol rtype friendly-op-name)
         'getarg args 0
         'getarg args 1
     let lhsT = ('typeof lhs)
-    let rhsT = ('typeof rhs)
+    let rhsT = ('qualified-typeof rhs)
     let rhs =
         if (ptrcmp== rhsT rtype) rhs
         else
@@ -1862,33 +1916,33 @@ fn unary-or-unbalanced-binary-operation (args usymbol ufriendly-op-name symbol r
         unbalanced-binary-operation args symbol rtype friendly-op-name
 
 inline unary-op-dispatch (symbol friendly-op-name)
-    spice-macro (fn (args) (unary-operation args symbol friendly-op-name))
+    spice-macro (fn (args) (unary-operation args symbol (unbox-string `friendly-op-name)))
 
 inline unary-or-balanced-binary-op-dispatch (usymbol ufriendly-op-name symbol rsymbol friendly-op-name)
     spice-macro (fn (args) (unary-or-balanced-binary-operation
-        args usymbol ufriendly-op-name symbol rsymbol friendly-op-name))
+        args usymbol (unbox-string `ufriendly-op-name) symbol rsymbol (unbox-string `friendly-op-name)))
 
 inline unary-or-unbalanced-binary-op-dispatch (usymbol ufriendly-op-name symbol rtype friendly-op-name)
     spice-macro (fn (args) (unary-or-unbalanced-binary-operation
-        args usymbol ufriendly-op-name symbol rtype friendly-op-name))
+        args usymbol (unbox-string `ufriendly-op-name) symbol rtype (unbox-string `friendly-op-name)))
 
 inline balanced-binary-op-dispatch (symbol rsymbol friendly-op-name)
     spice-macro
         fn (args)
             hide-traceback;
-            balanced-binary-operation args symbol rsymbol friendly-op-name
+            balanced-binary-operation args symbol rsymbol (unbox-string `friendly-op-name)
 
 inline balanced-lvalue-binary-op-dispatch (symbol friendly-op-name)
     spice-macro
         fn (args)
             hide-traceback;
-            balanced-lvalue-binary-operation args symbol friendly-op-name
+            balanced-lvalue-binary-operation args symbol (unbox-string `friendly-op-name)
 
 inline unbalanced-binary-op-dispatch (symbol rtype friendly-op-name)
     spice-macro
         fn (args)
             hide-traceback;
-            unbalanced-binary-operation args symbol rtype friendly-op-name
+            unbalanced-binary-operation args symbol rtype (unbox-string `friendly-op-name)
 
 inline spice-binary-op-macro (f)
     """"To be used for binary operators of which either type can provide an
@@ -2039,8 +2093,22 @@ fn string@ (self i)
 'set-symbols string
     __== = (box-pointer (simple-binary-op ptrcmp==))
     __!= = (box-pointer (simple-binary-op ptrcmp!=))
-    __.. = (box-pointer (simple-folding-autotype-binary-op sc_string_join
-        (inline (x) (unbox-pointer x string))))
+    __.. =
+        box-pointer
+            spice-binary-op-macro
+                inline (lhsT rhsT)
+                    let f =
+                        spice-macro
+                            fn (args)
+                                let argc = ('argcount args)
+                                verify-count argc 2 2
+                                let lhs = ('getarg args 0)
+                                let rhs = ('getarg args 1)
+                                'tag `(sc_string_join lhs rhs)
+                                    'anchor args
+                    if (ptrcmp== lhsT rhsT)
+                        return `f
+                    `()
     __< = (box-pointer (simple-binary-op (inline (a b) (icmp<s (sc_string_compare a b) 0))))
     __<= = (box-pointer (simple-binary-op (inline (a b) (icmp<=s (sc_string_compare a b) 0))))
     __> = (box-pointer (simple-binary-op (inline (a b) (icmp>s (sc_string_compare a b) 0))))
@@ -2212,6 +2280,16 @@ inline intdiv (a b)
 
 'set-symbols Value
     __== = (box-pointer (simple-binary-op sc_value_compare))
+    __as =
+        box-pointer
+            spice-cast-macro
+                fn (vT T)
+                    if (ptrcmp== T string)
+                        `unbox-string
+                    else
+                        inline Value-as (T)
+                            inline (self) (unbox self T)
+                        `(Value-as T)
 
 'set-symbols Closure
     __== = (box-pointer (simple-folding-autotype-binary-op ptrcmp== sc_const_pointer_extract))
@@ -2489,7 +2567,7 @@ let repr =
                 else
                     let suffix =
                         sc_string_join
-                            sc_default_styler style-operator ":"
+                            sc_default_styler style-operator str":"
                             sc_default_styler style-type ('string T)
                     `(sc_string_join s suffix)
 
@@ -2549,7 +2627,7 @@ let opaque =
         fn "opaque" (args)
             let argc = ('argcount args)
             verify-count argc 1 2
-            let name = (as ('getarg args 0) string)
+            let name = (unbox-string ('getarg args 0))
             let supertype =
                 if (> argc 1) (as ('getarg args 1) type)
                 else typename
@@ -2569,7 +2647,7 @@ do
                     let T = ('storageof ('typeof self))
                     if (not ('plain? T))
                         hide-traceback;
-                        error "cannot copy value of non-plain storage type"
+                        error str"cannot copy value of non-plain storage type"
                     let anchor = ('anchor args)
                     'tag `(dupe (deref self)) anchor
 
@@ -2615,7 +2693,7 @@ do
                     let self = ('getarg args 0)
                     if ('refer? ('qualified-typeof self))
                         return ('tag `(reftoptr self) ('anchor args))
-                    error "can not convert immutable value to pointer"
+                    error str"can not convert immutable value to pointer"
     # dynamic typename constructor
     type = `sc_typename_type
     # static typename constructor
@@ -2629,11 +2707,11 @@ do
                     if (!= cls typename)
                         hide-traceback;
                         error
-                            sc_string_join "typename "
+                            sc_string_join str"typename "
                                 sc_string_join ('__repr `cls)
-                                    " has no constructor"
+                                    str" has no constructor"
                     verify-count argc 2 3
-                    let name = (as ('getarg args 1) string)
+                    let name = (unbox-string ('getarg args 1))
                     let supertype =
                         if (> argc 2) (as ('getarg args 2) type)
                         else typename
@@ -2679,6 +2757,13 @@ inline sugar-macro (f)
 inline empty? (value)
     == (countof value) 0
 
+inline printrepr (value)
+    static-branch
+        (| (== (typeof value) string)
+            (string-array? value))
+        inline () value
+        inline () (repr value)
+
 let print =
     do
         inline print-element (i key value)
@@ -2687,11 +2772,8 @@ let print =
                 inline ()
                 inline ()
                     sc_write " "
-            static-branch (== (typeof value) string)
-                inline ()
-                    sc_write value
-                inline ()
-                    sc_write (repr value)
+            sc_write
+                printrepr value
 
         inline print (values...)
             va-lifold none print-element values...
@@ -2709,7 +2791,7 @@ let report =
 fn extract-integer (value)
     if (== ('kind value) value-kind-const-int)
         return (sc_const_int_extract value)
-    error@ ('anchor value) "while extracting integer" "integer constant expected"
+    error@ ('anchor value) "while extracting integer" str"integer constant expected"
 
 'set-symbol integer '__typecall
     box-pointer
@@ -2741,7 +2823,51 @@ fn extract-integer (value)
             inline ()
                 as value cls
 
+fn string-array-ref-type? (T)
+    if (icmp== ('kind T) type-kind-array)
+        & ('refer? T)
+            ptrcmp== ('element@ T 0) i8
+    else false
+
 'set-symbols string
+    __rimply =
+        box-pointer
+            spice-cast-macro
+                fn (vT T)
+                    let conststring->string =
+                        spice-macro
+                            fn (args)
+                                let argc = ('argcount args)
+                                verify-count argc 1 1
+                                let s = ('getarg args 0)
+                                if ('constant? s)
+                                    spice-quote
+                                        sc_const_string_extract `s
+                                else
+                                    let T = ('typeof s)
+                                    let ET = ('element@ T 0)
+                                    let s = `(& s)
+                                    if ('unsized? T)
+                                        spice-quote
+                                            sc_string_new_from_cstr s
+                                    else
+                                        let sz = ('element-count T)
+                                        spice-quote
+                                            sc_string_new s sz
+                    let rawstring->string =
+                        spice-macro
+                            fn (args)
+                                let argc = ('argcount args)
+                                verify-count argc 1 1
+                                let s = ('getarg args 0)
+                                spice-quote
+                                    sc_string_new_from_cstr s
+                    if (string-array-ref-type? vT)
+                        return `conststring->string
+                    elseif (icmp== ('kind vT) type-kind-pointer)
+                        if (ptrcmp== ('element@ vT 0) i8)
+                            return `rawstring->string
+                    `()
     __imply =
         box-pointer
             spice-cast-macro
@@ -2752,13 +2878,13 @@ fn extract-integer (value)
                                 let argc = ('argcount args)
                                 verify-count argc 1 1
                                 let str = ('getarg args 0)
-                                if ('constant? str)
+                                #if ('constant? str)
                                     let s c = (sc_string_buffer (as str string))
                                     `s
-                                else
-                                    spice-quote
-                                        let s c = (sc_string_buffer str)
-                                        s
+                                #else
+                                spice-quote
+                                    let s c = (sc_string_buffer str)
+                                    s
                     if (ptrcmp== T rawstring)
                         return `string->rawstring
                     `()
@@ -2882,7 +3008,7 @@ fn pointer-ras (T vT)
 # --------------------------------------------------------------------------
 
 fn get-ifx-symbol (name)
-    Symbol (.. "#ifx:" (as name string))
+    Symbol (.. str"#ifx:" (as name string))
 
 fn expand-define-infix (args scope order)
     let prec rest = ('decons args)
@@ -2938,8 +3064,8 @@ inline infix-op (pred)
             except (err)
                 hide-traceback;
                 error@ ('anchor token) "while attempting to parse infix token"
-                    .. "unexpected token '"
-                        .. (tostring token) "' in infix expression"
+                    .. str"unexpected token '"
+                        .. (tostring token) str"' in infix expression"
         let op-prec = (unpack-infix-op op)
         ? (pred op-prec prec) op `none
 
@@ -2951,8 +3077,8 @@ fn rtl-infix-op-eq (infix-table token prec)
         try (get-ifx-op infix-table token)
         except (err)
             error@ ('anchor token) "while attempting to parse infix token"
-                .. "unexpected token '"
-                    .. (tostring token) "' in infix expression"
+                .. str"unexpected token '"
+                    .. (tostring token) str"' in infix expression"
     let op-prec op-order = (unpack-infix-op op)
     if (== op-order '<)
         ? (== op-prec prec) op `none
@@ -3194,7 +3320,7 @@ fn quasiquote-list (x)
 
 fn expand-and-or (expr f)
     if (empty? expr)
-        error "at least one argument expected"
+        error str"at least one argument expected"
     elseif (== (countof expr) 1)
         return ('@ expr)
     let expr = ('reverse expr)
@@ -3305,19 +3431,21 @@ let modules = `(ptrtoref modules)
     `shared-library`. If you update this list dynamically, subsequent loads
     can only be executed in the next run stage.
 let __env =
-    'bind-symbols (Scope)
-        module-search-path =
-            Value
-                list
-                    .. compiler-dir "/lib/scopes/?.sc"
-                    .. compiler-dir "/lib/scopes/?/init.sc"
-        include-search-path =
-            Value
-                list
-                    .. compiler-dir "/lib/scopes/clang/include"
-        library-search-path =
-            Value
-                list;
+    do
+        let compiler-dir = (unbox-string `compiler-dir)
+        'bind-symbols (Scope)
+            module-search-path =
+                Value
+                    list
+                        .. compiler-dir str"/lib/scopes/?.sc"
+                        .. compiler-dir str"/lib/scopes/?/init.sc"
+            include-search-path =
+                Value
+                    list
+                        .. compiler-dir str"/lib/scopes/clang/include"
+            library-search-path =
+                Value
+                    list;
 
 fn clone-scope-contents (a b)
     """"Join two scopes `a` and `b` into a new scope so that the
@@ -3372,7 +3500,7 @@ let
                     'writable? T
                 else
                     hide-traceback;
-                    error "pointer type expected"
+                    error str"pointer type expected"
     signed? =
         make-const-type-property-function
             fn (T)
@@ -3380,7 +3508,7 @@ let
                     'signed? T
                 else
                     hide-traceback;
-                    error "integer type expected"
+                    error str"integer type expected"
     unsized? =
         make-const-type-property-function sc_type_is_unsized
     storageof = (make-const-type-property-function sc_type_storage)
@@ -3429,7 +3557,7 @@ let
                     elseif ('function? T) T
                     else
                         hide-traceback;
-                        error "function type expected"
+                        error str"function type expected"
                 let RT ET = ('return-type T)
                 RT
     raiseof =
@@ -3440,7 +3568,7 @@ let
                     elseif ('function? T) T
                     else
                         hide-traceback;
-                        error "function type expected"
+                        error str"function type expected"
                 let RT ET = ('return-type T)
                 ET
     offsetof =
@@ -3473,7 +3601,7 @@ let Closure->Accessor =
             verify-count argc 1 1
             let self = ('getarg args 0)
             if (not ('constant? self))
-                error "Closure must be constant"
+                error str"Closure must be constant"
             let self = (as self Closure)
             let self = (bitcast self Accessor)
             `self
@@ -3485,7 +3613,7 @@ let Closure->Generator =
             verify-count argc 1 1
             let self = ('getarg args 0)
             if (not ('constant? self))
-                error "Closure must be constant"
+                error str"Closure must be constant"
             let self = (as self Closure)
             let self = (bitcast self Generator)
             `self
@@ -3497,7 +3625,7 @@ let Closure->Collector =
             verify-count argc 1 1
             let self = ('getarg args 0)
             if (not ('constant? self))
-                error "Closure must be constant"
+                error str"Closure must be constant"
             let self = (as self Closure)
             let self = (bitcast self Collector)
             'tag `self ('anchor args)
@@ -3573,9 +3701,9 @@ inline select-op-macro (sop uop fop numargs)
                 elseif (type== ('superof T) real) `fop
                 else
                     error
-                        sc_string_join "invalid argument type: "
+                        sc_string_join str"invalid argument type: "
                             sc_string_join (sc_value_repr (box-pointer T))
-                                ". integer or real vector or scalar expected"
+                                str". integer or real vector or scalar expected"
             `(fun a b)
 
 let sabs =
@@ -3586,7 +3714,7 @@ let sabs =
             let arg = ('getarg args 0)
             let T = ('storageof ('typeof arg))
             if (not (< T integer))
-                error "integer expected"
+                error str"integer expected"
             let bits = ('bitcount T)
             let shift = (sc_const_int_new T (as (- bits 1) u64))
             spice-quote
@@ -3597,7 +3725,7 @@ let pow = **
 let abs = (select-op-macro sabs _ fabs 1)
 let sign = (select-op-macro ssign ssign fsign 1)
 
-let hash = (sc_typename_type "hash" typename)
+let hash = (sc_typename_type str"hash" typename)
 'set-plain-storage hash u64
 
 # semi-final `not` - this one folds the constant
@@ -4041,7 +4169,7 @@ run-stage; # 6
 let question-mark-char = 63:char # "?"
 fn make-module-path (pattern name)
     let sz = (countof pattern)
-    loop (i start result = 0:usize 0:usize "")
+    loop (i start result = 0:usize 0:usize str"")
         if (i == sz)
             return (.. result (rslice pattern start))
         if ((@ pattern i) != question-mark-char)
@@ -4097,7 +4225,7 @@ let slash-char = 47:char # "/"
 let backslash-char = 92:char # "\"
 fn dots-to-slashes (pattern)
     let sz = (countof pattern)
-    loop (i start result = 0:usize 0:usize "")
+    loop (i start result = 0:usize 0:usize str"")
         if (i == sz)
             return (.. result (rslice pattern start))
         let c = (@ pattern i)
@@ -4159,7 +4287,7 @@ fn load-module (module-name module-path env opts...)
     except (err)
         hide-traceback;
         error@+ err unknown-anchor
-            if command? "while executing command"
+            if command? str"while executing command"
             else
                 "while loading module " .. module-path
 
@@ -4168,8 +4296,8 @@ fn patterns-from-namestr (base-dir namestr env)
         we only search base-dir
     if ((@ namestr 0:usize) == slash-char)
         list
-            .. base-dir "?.sc"
-            .. base-dir "?/init.sc"
+            .. base-dir str"?.sc"
+            .. base-dir str"?/init.sc"
     else
         ('@ env 'module-search-path) as list
 
@@ -4186,7 +4314,7 @@ fn find-module-path (base-dir name env)
             error
                 .. "failed to find module '" (repr name) "'\n"
                     \ "no such module '" (as name string) "' in paths:"
-                    loop (patterns str = all-patterns "")
+                    loop (patterns str = all-patterns str"")
                         if (empty? patterns)
                             break str
                         let pattern patterns = (decons patterns)
@@ -4213,7 +4341,7 @@ fn require-from (base-dir name env)
             error
                 .. "failed to import module '" (repr name) "'\n"
                     \ "no such module '" (as name string) "' in paths:"
-                    loop (patterns str = all-patterns "")
+                    loop (patterns str = all-patterns str"")
                         if (empty? patterns)
                             break str
                         let pattern patterns = (decons patterns)
@@ -4265,7 +4393,7 @@ let import =
                     repeat (add i 1:usize) start
             let sxname rest = (decons args)
             let name namestr bind? =
-                if (('typeof sxname) == string)
+                if (('kind sxname) == value-kind-const-string)
                     let name = (sxname as string)
                     _ (Symbol name) name false
                 else
@@ -4404,7 +4532,7 @@ let __assert =
             inline check-assertion (result anchor msg)
                 if (not result)
                     print anchor
-                        .. "assertion failed: " (msg)
+                        .. str"assertion failed: " (msg)
                     sc_set_signal_abort true
                     sc_abort;
 
@@ -4505,6 +4633,11 @@ let verify-stepsize =
                     error@ ('anchor arg) "while checking step size"
                         "step size must be > 0"
             `()
+
+let llvm.memcpy.p0i8.p0i8.i64 =
+    sc_global_new 'llvm.memcpy.p0i8.p0i8.i64
+        function void (mutable rawstring) rawstring i64 bool
+        \ 0:u32 unnamed
 
 run-stage; # 7
 
@@ -4945,6 +5078,11 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                 fn (args)
                     let self = ('getarg args 0)
                     let other = ('getarg args 1)
+                    if
+                        &
+                            ('kind self) == value-kind-const-string
+                            ('kind self) == value-kind-const-string
+                        return ('tag `[(self == other)] ('anchor args))
                     loop (i result = ('element-count ('typeof self)) `true)
                         if (i == 0)
                             break result
@@ -4953,6 +5091,86 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                             sc_cond_new `((self @ i) != (other @ i))
                                 `false
                                 result
+    __.. =
+        box-pointer
+            spice-binary-op-macro
+                inline (lhsT rhsT)
+                    let f =
+                        spice-macro
+                            fn (args)
+                                let argc = ('argcount args)
+                                verify-count argc 2 2
+                                let lhs = ('getarg args 0)
+                                let rhs = ('getarg args 1)
+                                if
+                                    &
+                                        ('kind lhs) == value-kind-const-string
+                                        ('kind rhs) == value-kind-const-string
+                                    return
+                                        sc_const_string_new
+                                            sc_string_join
+                                                sc_const_string_extract lhs
+                                                sc_const_string_extract rhs
+                                let QTL = ('qualified-typeof lhs)
+                                let QTR = ('qualified-typeof rhs)
+                                let T = ('strip-qualifiers QTL)
+                                let TR = ('strip-qualifiers QTR)
+                                let ET = ('element@ T 0)
+                                let sz1 = ('element-count T)
+                                let sz2 = ('element-count TR)
+                                let sz = (sz1 + sz2)
+                                let AT = (sc_pointer_type
+                                    (sc_array_type ET sz)
+                                    pointer-flag-non-writable 'Function)
+                                let block = (sc_expression_new)
+                                let result = `(alloca-array ET sz)
+                                sc_expression_append block result
+                                if ('refer? QTL)
+                                    sc_expression_append block
+                                        spice-quote
+                                            llvm.memcpy.p0i8.p0i8.i64
+                                                bitcast result (mutable rawstring)
+                                                bitcast (& (lhs @ 0)) rawstring
+                                                sz1 as i64
+                                                false
+                                else
+                                    loop (i = 0)
+                                        if (i == sz1)
+                                            break;
+                                        sc_expression_append block
+                                            spice-quote
+                                                store
+                                                    extractvalue lhs i
+                                                    getelementptr result i
+                                        repeat (i + 1)
+                                if ('refer? QTR)
+                                    sc_expression_append block
+                                        spice-quote
+                                            llvm.memcpy.p0i8.p0i8.i64
+                                                bitcast (getelementptr result sz1) (mutable rawstring)
+                                                bitcast (& (rhs @ 0)) rawstring
+                                                sz2 as i64
+                                                false
+                                else
+                                    loop (i = 0)
+                                        if (i == sz2)
+                                            break;
+                                        sc_expression_append block
+                                            spice-quote
+                                                store
+                                                    extractvalue rhs i
+                                                    getelementptr result (sz1 + i)
+                                        repeat (i + 1)
+                                sc_expression_append block
+                                    'tag `(ptrtoref (bitcast result AT)) ('anchor args)
+                                block
+                    if
+                        &
+                            not ('unsized? lhsT)
+                            not ('unsized? rhsT)
+                            ('element@ lhsT 0) == ('element@ rhsT 0)
+                        return `f
+                    `()
     __unpack = __unpack-aggregate
     __countof = __countof-aggregate
     __@ =
@@ -5630,14 +5848,14 @@ fn gen-sugar-matcher (failfunc expr scope params)
                 sc_expression_append outexpr arg
                 let scope = ('bind scope param arg)
                 repeat (i + 1) rest next (| varargs variadic?) scope
-            elseif (T == string)
-                let str = (paramv as string)
+            elseif (('kind paramv) == value-kind-const-string)
+                let str = (unbox-string paramv)
                 sc_expression_append outexpr
                     spice-quote
                         let arg next = (sc_list_decons next)
-                        if (ptrcmp!= ('typeof arg) string)
+                        if (('kind arg) != value-kind-const-string)
                             failfunc;
-                        if ((arg as string) != str)
+                        if ((unbox-string arg) != paramv)
                             failfunc;
                 repeat (i + 1) rest next varargs scope
             elseif (T == list)
@@ -5655,38 +5873,39 @@ fn gen-sugar-matcher (failfunc expr scope params)
                             if ((arg as Symbol) != sym)
                                 failfunc;
                     repeat (i + 1) rest next varargs scope
-                elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'as))
-                    let exprT = (decons mid-rest)
-                    let exprT = (sc_expand exprT '() scope)
+                elseif
+                    and (('typeof mid) == Symbol)
+                        do
+                            let mid = (mid as Symbol)
+                            (mid == 'as) | (mid == 'is)
                     let param = (head as Symbol)
                     if ('variadic? param)
                         error
                             "vararg parameter cannot be typed"
+                    let exprT = (decons mid-rest)
+                    let exprT = (sc_expand exprT '() scope)
                     sc_expression_append outexpr
                         spice-quote
                             let arg next =
                                 sc_list_decons next
-                            let arg =
-                                if (('constant? arg) and (('typeof arg) == exprT))
+                    let check =
+                        if ((('typeof exprT) == type) and (exprT == string))
+                            `(('kind arg) == value-kind-const-string)
+                        else
+                            `(('constant? arg) and (('typeof arg) == exprT))
+                    let arg =
+                        if ((mid as Symbol) == 'as) # as
+                            spice-quote
+                                if check
                                     arg as exprT
                                 else
                                     failfunc;
-                    let scope = ('bind scope param arg)
-                    repeat (i + 1) rest next varargs scope
-                elseif ((('typeof mid) == Symbol) and ((mid as Symbol) == 'is))
-                    # check that argument is of constant type, but don't unbox
-                    let exprT = (decons mid-rest)
-                    let exprT = (sc_expand exprT '() scope)
-                    let param = (head as Symbol)
-                    if ('variadic? param)
-                        error
-                            "vararg parameter cannot be typed"
-                    sc_expression_append outexpr
-                        spice-quote
-                            let arg next =
-                                sc_list_decons next
-                            if (not (('constant? arg) and (('typeof arg) == exprT)))
-                                failfunc;
+                        else # is
+                            spice-quote
+                                if (not check)
+                                    failfunc;
+                                arg
+                    sc_expression_append outexpr arg
                     let scope = ('bind scope param arg)
                     repeat (i + 1) rest next varargs scope
                 else
@@ -6236,6 +6455,25 @@ let nodefault = (opaque "nodefault")
 fn nodefault? (x)
     (('typeof x) == type) and (x as type == nodefault)
 
+fn spice-typematch? (qparamT qargT arg-constant?)
+    let argT = ('strip-qualifiers qargT)
+    let paramT = ('strip-qualifiers qparamT)
+    assert (paramT != Variadic)
+    if (paramT == Unknown)
+        return true
+    elseif (argT <= paramT)
+        return (not (('refer? qparamT) & (not ('refer? qargT))))
+    try
+        let matchfunc = ('@ paramT '__typematch)
+        let result = (sc_prove `(matchfunc paramT argT))
+        if (result as bool)
+            return (not (('refer? qparamT) & (not ('refer? qargT))))
+        else
+            return false
+    else;
+    let conv = (imply-converter qargT paramT arg-constant?)
+    operator-valid? conv
+
 spice overloaded-fn-append (T args...)
     let outtype = (T as type)
     let acount = ('argcount args...)
@@ -6355,28 +6593,9 @@ spice overloaded-fn-append (T args...)
                         else
                             no-match;
                     let qargT = ('qualified-typeof arg)
-                    let argT = ('strip-qualifiers qargT)
                     let qparamT = (sc_arguments_type_getarg FT i)
-                    let paramT = ('strip-qualifiers qparamT)
-                    if (paramT == Unknown)
-                        continue;
-                    elseif (argT <= paramT)
-                        if (('refer? qparamT) & (not ('refer? qargT)))
-                            no-match;
-                        continue;
-                    try
-                        let matchfunc = ('@ paramT '__typematch)
-                        let result = (sc_prove `(matchfunc paramT argT))
-                        if (result as bool)
-                            if (('refer? qparamT) & (not ('refer? qargT)))
-                                no-match;
-                            continue;
-                        else
-                            no-match;
-                    else;
-                    assert (paramT != Variadic)
-                    let conv = (imply-converter argT paramT ('constant? arg))
-                    if (not (operator-valid? conv))
+                    let argT = ('strip-qualifiers qargT)
+                    if (not (spice-typematch? qparamT qargT ('constant? arg)))
                         no-match;
                 if failed
                     continue;
@@ -6398,7 +6617,6 @@ spice overloaded-fn-append (T args...)
                 # complete default values
                 for i in (range count explicit-argcount)
                     let arg = ('getarg defs i)
-                    let argT = ('typeof arg)
                     sc_call_append_argument outargs arg
                 if true
                     return outargs
@@ -6406,17 +6624,19 @@ spice overloaded-fn-append (T args...)
             error
                 .. "could not match argument types ("
                     do
-                        loop (i str = 0 "")
+                        loop (i str = 0 str"")
                             if (i < count)
                                 repeat (i + 1)
                                     .. str
-                                        ? (i == 0) "" " "
+                                        ? (i == 0)
+                                            (& "") as rawstring
+                                            (& " ") as rawstring
                                         repr ('qualified-typeof ('getarg args... i))
                             break str
                     ") to overloaded function with types"
                     do
                         let fcount = ('argcount ftypes)
-                        loop (i str = 0 "")
+                        loop (i str = 0 str"")
                             if (i < fcount)
                                 repeat (i + 1)
                                     .. str
@@ -6432,27 +6652,24 @@ sugar fn... (name...)
                 inline (i)
                     let def = ('getarg defaults... i)
                     let paramT = (sc_arguments_type_getarg atypes i)
-                    if (not ('constant? def))
+                    let defconst? = ('constant? def)
+                    if (not defconst?)
                         hide-traceback;
                         error@ ('anchor def) "while checking default argument"
                             "default argument must be constant"
                     let argT = ('typeof def)
+                    let argqT = ('qualified-typeof def)
                     if (nodefault? def) def
                     elseif (paramT == Unknown) def
                     elseif (paramT == Variadic) def
                     elseif (argT <= paramT) def
                     else
-                        let conv = (as-converter argT paramT true)
+                        let conv = (as-converter argqT paramT defconst?)
                         if (not (operator-valid? conv))
                             hide-traceback;
                             error@ ('anchor def) "while checking default argument"
                                 "default argument does not match argument type"
-                        let def = (sc_prove `(conv def))
-                        if (not ('constant? def))
-                            hide-traceback;
-                            error@ ('anchor def) "while checking default argument"
-                                "default argument must be constant after conversion"
-                        def
+                        'tag `(conv def) ('anchor def)
         `(inline () outargs)
 
     spice init-overloaded-function (T)
@@ -7717,7 +7934,7 @@ sugar include (args...)
 
     let modulename = (('@ sugar-scope 'module-path) as string)
     let env = (('@ sugar-scope '__env) as Scope)
-    loop (args modulename ext opts includestr scope = args... modulename ".c" '() "" (nullof Scope))
+    loop (args modulename ext opts includestr scope = args... modulename str".c" '() str"" (nullof Scope))
         sugar-match args
         case (('using name) rest...)
             let value = ((sc_expand name '() sugar-scope) as Scope)
@@ -7726,7 +7943,7 @@ sugar include (args...)
             if (modulename == ".cpp")
                 hide-traceback;
                 error "duplicate 'extern \"C++\"'"
-            repeat rest... modulename ".cpp" opts includestr scope
+            repeat rest... modulename str".cpp" opts includestr scope
         case (('options opts...) rest...)
             let opts =
                 loop (outopts inopts = '() opts...)
@@ -7737,7 +7954,7 @@ sugar include (args...)
                         do
                             let expr = (sc_expand at '() sugar-scope)
                             sc_prove expr
-                    if (('typeof val) != string)
+                    if (not ('string-constant? val))
                         error "option arguments must evaluate to constant strings"
                     val as:= string
                     outopts := (cons val outopts)
@@ -8394,6 +8611,9 @@ sugar typematch (...)
                         head
                     else `...
 
+spice typematch? (paramT argT arg-constant?)
+    spice-typematch? (paramT as type) (argT as type) (arg-constant? as bool)
+
 #-------------------------------------------------------------------------------
 # extensions to intrinsics
 #-------------------------------------------------------------------------------
@@ -8497,7 +8717,7 @@ fn find-library (name library-search-path)
     hide-traceback;
     error
         .. "failed to find library '" name "' in paths:"
-            loop (paths str = library-search-path "")
+            loop (paths str = library-search-path str"")
                 if (empty? paths)
                     break str
                 let at rest = (decons paths)
@@ -8532,6 +8752,7 @@ sugar static-shared-library (name...)
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
     \ tuple-comparison gen-arrayof MethodsAccessor-typeattr floorf modules
+    \ string-array-ref-type? llvm.memcpy.p0i8.p0i8.i64
 
 run-stage; # 12
 
@@ -8543,13 +8764,13 @@ run-stage; # 12
 fn compiler-version-string ()
     let vmin vmaj vpatch = (sc_compiler_version)
     .. "Scopes " (tostring vmin) "." (tostring vmaj)
-        if (vpatch == 0) ""
+        if (vpatch == 0) str""
         else
             .. "." (tostring vpatch)
         " ("
-        if debug-build? "debug build, "
-        else ""
-        \ compiler-timestamp ")"
+        if debug-build? str"debug build, "
+        else str""
+        \ compiler-timestamp str")"
 
 fn print-logo ()
     static-if true
@@ -8604,16 +8825,16 @@ fn set-project-dir (env path set-paths?)
         'bind-symbols env
             module-search-path =
                 cons
-                    .. path "/lib/scopes/packages/?.sc"
-                    .. path "/lib/scopes/packages/?/init.sc"
+                    .. path str"/lib/scopes/packages/?.sc"
+                    .. path str"/lib/scopes/packages/?/init.sc"
                     ('@ env 'module-search-path) as list
             include-search-path =
                 cons
-                    .. path "/include"
+                    .. path str"/include"
                     ('@ env 'include-search-path) as list
             library-search-path =
                 cons
-                    .. path "/lib"
+                    .. path str"/lib"
                     ('@ env 'library-search-path) as list
     else env
 
@@ -8630,7 +8851,7 @@ fn run-main ()
     let argc argv = (launch-args)
     let exename = (load (getelementptr argv 0))
     let exename = (sc_string_new_from_cstr exename)
-    local sourcearg = ""
+    local sourcearg = str""
     local module? = false
     local command? = false
     local project? = false
@@ -8678,7 +8899,7 @@ fn run-main ()
             k
     let sourcearg module? =
         if ((not command?) & (sourcearg == ""))
-            _ "console" true
+            _ str"console" true
         else
             _ (deref sourcearg) (deref module?)
     let console? = (module? & (sourcearg == "console"))
@@ -8696,7 +8917,7 @@ fn run-main ()
         if project?
             let path = (sc_realpath sourcearg)
             let path =
-                if (command? | module?) working-dir
+                if (command? | module?) (working-dir as string)
                 elseif (sc_is_file path)
                     sc_dirname path
                 else
@@ -8708,7 +8929,7 @@ fn run-main ()
                     if ((not (sc_is_directory path)) | (path == nextpath))
                         print
                             .. "could not find project script (?" project-filename-pattern
-                                ") in any current working directory."
+                                str") in any current working directory."
                         exit 255
                     let filepath = (.. path project-filename-pattern)
                     if (sc_is_file filepath)
@@ -8735,7 +8956,7 @@ fn run-main ()
                                 repr ('typeof result)
                     else (result as Scope)
             _ project-dir env
-        else (_ working-dir core-module-env)
+        else (_ (working-dir as string) core-module-env)
     # global-scope might have since been updated with project-dir
     let scope =
         'bind-symbols

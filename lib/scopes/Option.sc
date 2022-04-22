@@ -51,7 +51,7 @@ inline gen-type (T)
             case Some (val)
                 .. "(" (repr val) " as Option)"
             default
-                .. "(" (tostring (typeof self)) ")"
+                (.. "(" (tostring (typeof self)) ")") as string
 
         inline __tobool (self)
             dispatch (view self)
