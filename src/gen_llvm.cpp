@@ -56,6 +56,8 @@ namespace scopes {
 
 #define SCOPES_GEN_TARGET "IR"
 
+// disabled because it caused odd crashes and i'm not able to maintain what
+// started as a user submitted patch
 #define SCOPES_LLVM_EXTENDED_DEBUG_INFO 0
 
 
@@ -1140,7 +1142,7 @@ struct LLVMIRGenerator {
         } break;
         case TK_Tuple: {
             auto ti = cast<TupleType>(type);
-            auto tuple_name = sc_type_key(ti)._0.name();
+            auto tuple_name = type_key(ti)._0.name();
             return build_debug_struct_type(ti, tuple_name);
         } break;
         case TK_Typename: {
