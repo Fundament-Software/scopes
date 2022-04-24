@@ -33,7 +33,7 @@ print "y=" (deref y)
 fn main (argc argv)
     x @ 3 = 6
     #y = 7
-    printf ("hello world %i %i\n" as rawstring)
+    printf "hello world %i %i\n"
         deref (x @ 3)
         deref y
     #print "hello world"
