@@ -48,7 +48,6 @@ SCOPES_LIBEXPORT const char *scopes_compile_time_date();
 namespace scopes {
     struct Type;
     struct Scope;
-    struct Symbol;
     struct String;
     struct List;
     struct Error;
@@ -63,7 +62,6 @@ extern "C" {
 
 typedef scopes::Type sc_type_t;
 typedef scopes::Scope sc_scope_t;
-typedef scopes::Symbol sc_symbol_t;
 typedef scopes::String sc_string_t;
 typedef scopes::List sc_list_t;
 typedef scopes::Error sc_error_t;
@@ -92,11 +90,14 @@ typedef struct sc_frame_ sc_frame_t;
 typedef struct sc_value_ sc_value_t;
 typedef struct sc_closure_ sc_closure_t;
 
-typedef uint64_t sc_symbol_t;
-
 typedef struct sc_valueref_ { sc_value_t *_0; const sc_anchor_t *_1; } sc_valueref_t;
 
 #endif
+
+// aliasing uint64_t to a struct with a single uint64_t member is UB, and hasn't
+// been a problem on any GCC version we've seen, on any platform, but is known
+// to cause trouble with clang-cl, so we stick to a fixed definition.
+typedef uint64_t sc_symbol_t;
 
 typedef struct sc_bool_string_tuple_ { bool _0; const sc_string_t *_1; } sc_bool_string_tuple_t;
 typedef struct sc_bool_valueref_tuple_ { bool _0; sc_valueref_t _1; } sc_bool_valueref_tuple_t;
