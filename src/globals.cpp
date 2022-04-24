@@ -130,7 +130,10 @@ sc_int_raises_t convert_result(const Result<int> &_result) CRESULT;
 sc_uint_raises_t convert_result(const Result<uint32_t> &_result) CRESULT;
 sc_size_raises_t convert_result(const Result<size_t> &_result) CRESULT;
 
-sc_symbol_raises_t convert_result(const Result<Symbol> &_result) CRESULT;
+sc_symbol_raises_t convert_result(const Result<Symbol> &_result) {
+    return {_result.ok(),
+        (_result.ok()?nullptr:_result.unsafe_error()),
+        _result.unsafe_extract().value()}; }
 
 #undef CRESULT
 #undef VOID_CRESULT
@@ -286,14 +289,14 @@ sc_string_raises_t sc_compile_spirv(int version, sc_symbol_t target, sc_valueref
     using namespace scopes;
     SCOPES_RESULT_TYPE(const String *);
     auto result = SCOPES_C_GET_RESULT(extract_function_constant(srcl));
-    return convert_result(compile_spirv(version, target, result, flags));
+    return convert_result(compile_spirv(version, Symbol::wrap(target), result, flags));
 }
 
 sc_string_raises_t sc_compile_glsl(int version, sc_symbol_t target, sc_valueref_t srcl, uint64_t flags) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(const String *);
     auto result = SCOPES_C_GET_RESULT(extract_function_constant(srcl));
-    return convert_result(compile_glsl(version, target, result, flags));
+    return convert_result(compile_glsl(version, Symbol::wrap(target), result, flags));
 }
 
 const sc_string_t *sc_spirv_to_glsl(const sc_string_t *binary) {
@@ -320,9 +323,10 @@ void sc_enter_solver_cli () {
 // stdin/out
 ////////////////////////////////////////////////////////////////////////////////
 
-const sc_string_t *sc_default_styler(sc_symbol_t style, const sc_string_t *str) {
+const sc_string_t *sc_default_styler(sc_symbol_t _style, const sc_string_t *str) {
     using namespace scopes;
     StyledString ss;
+    auto style = Symbol::wrap(_style);
     if (!style.is_known()) {
         ss.out << str->data;
     } else {
@@ -872,17 +876,17 @@ sc_valueref_i32_tuple_t sc_scope_next_deleted(const sc_scope_t *scope, int index
 
 sc_symbol_t sc_symbol_new(const sc_string_t *str) {
     using namespace scopes;
-    return Symbol(str);
+    return Symbol(str).value();
 }
 
 bool sc_symbol_is_variadic(sc_symbol_t sym) {
     using namespace scopes;
-    return ends_with_parenthesis(sym);
+    return ends_with_parenthesis(Symbol::wrap(sym));
 }
 
 const sc_string_t *sc_symbol_to_string(sc_symbol_t sym) {
     using namespace scopes;
-    return sym.name();
+    return Symbol::wrap(sym).name();
 }
 
 size_t counter = 1;
@@ -890,7 +894,7 @@ sc_symbol_t sc_symbol_new_unique(const sc_string_t *str) {
     using namespace scopes;
     std::stringstream ss;
     ss << "#" << counter++ << "#" << str->data;
-    return Symbol(String::from_stdstring(ss.str()));
+    return Symbol(String::from_stdstring(ss.str())).value();
 }
 
 size_t sc_symbol_count() {
@@ -900,8 +904,8 @@ size_t sc_symbol_count() {
 
 sc_symbol_t sc_symbol_style(sc_symbol_t name) {
     using namespace scopes;
-    auto val = default_symbol_styler(name);
-    return Symbol::wrap(val);
+    auto val = default_symbol_styler(Symbol::wrap(name));
+    return Symbol::wrap(val).value();
 }
 
 // String
@@ -1078,12 +1082,12 @@ bool sc_list_compare(const sc_list_t *a, const sc_list_t *b) {
 
 const sc_anchor_t *sc_anchor_new(sc_symbol_t path, int lineno, int column, int offset) {
     using namespace scopes;
-    return Anchor::from(path, lineno, column, offset);
+    return Anchor::from(Symbol::wrap(path), lineno, column, offset);
 }
 
 sc_symbol_t sc_anchor_path(const sc_anchor_t *anchor) {
     using namespace scopes;
-    return anchor->path;
+    return anchor->path.value();
 }
 
 int sc_anchor_lineno(const sc_anchor_t *anchor) {
@@ -1241,7 +1245,7 @@ const sc_string_t *sc_value_kind_string(int kind) {
 
 sc_valueref_t sc_keyed_new(sc_symbol_t key, sc_valueref_t value) {
     using namespace scopes;
-    return KeyedTemplate::from(key, value);
+    return KeyedTemplate::from(Symbol::wrap(key), value);
 }
 
 sc_valueref_t sc_empty_argument_list() {
@@ -1334,15 +1338,15 @@ sc_valueref_t sc_extract_argument_list_new(sc_valueref_t value, int index) {
 
 sc_valueref_t sc_template_new(sc_symbol_t name) {
     using namespace scopes;
-    return Template::from(name);
+    return Template::from(Symbol::wrap(name));
 }
 void sc_template_set_name(sc_valueref_t fn, sc_symbol_t name) {
     using namespace scopes;
-    fn.cast<Template>()->name = name;
+    fn.cast<Template>()->name = Symbol::wrap(name);
 }
 sc_symbol_t sc_template_get_name(sc_valueref_t fn) {
     using namespace scopes;
-    return fn.cast<Template>()->name;
+    return fn.cast<Template>()->name.value();
 }
 void sc_template_append_parameter(sc_valueref_t fn, sc_valueref_t symbol) {
     using namespace scopes;
@@ -1391,7 +1395,7 @@ void sc_expression_append(sc_valueref_t expr, sc_valueref_t value) {
 sc_valueref_t sc_global_new(sc_symbol_t name, const sc_type_t *type,
     uint32_t flags, sc_symbol_t storage_class) {
     using namespace scopes;
-    return Global::from(type, name, flags, storage_class);
+    return Global::from(type, Symbol::wrap(name), flags, Symbol::wrap(storage_class));
 }
 
 sc_void_raises_t sc_global_set_location(sc_valueref_t value, int location) {
@@ -1532,8 +1536,9 @@ void sc_switch_append_default(sc_valueref_t value, sc_valueref_t body) {
     value.cast<SwitchTemplate>()->append_default(body);
 }
 
-sc_valueref_t sc_parameter_new(sc_symbol_t name) {
+sc_valueref_t sc_parameter_new(sc_symbol_t _name) {
     using namespace scopes;
+    auto name = Symbol::wrap(_name);
     if (ends_with_parenthesis(name)) {
         return ParameterTemplate::variadic_from(name);
     } else {
@@ -1549,9 +1554,9 @@ bool sc_parameter_is_variadic(sc_valueref_t param) {
 sc_symbol_t sc_parameter_name(sc_valueref_t value) {
     using namespace scopes;
     if (value.isa<ParameterTemplate>()) {
-        return value.cast<ParameterTemplate>()->name;
+        return value.cast<ParameterTemplate>()->name.value();
     } else if (value.isa<Parameter>()) {
-        return value.cast<Parameter>()->name;
+        return value.cast<Parameter>()->name.value();
     }
     return SYM_Unnamed;
 }
@@ -1675,7 +1680,7 @@ sc_valueref_t sc_unquote_new(sc_valueref_t value) {
 
 sc_valueref_t sc_label_new(int kind, sc_symbol_t name) {
     using namespace scopes;
-    return LabelTemplate::from((LabelKind)kind, name);
+    return LabelTemplate::from((LabelKind)kind, Symbol::wrap(name));
 }
 void sc_label_set_body(sc_valueref_t label, sc_valueref_t body) {
     using namespace scopes;
@@ -1711,9 +1716,10 @@ sc_valueref_raises_t sc_parse_from_string(const sc_string_t *str) {
 // Types
 ////////////////////////////////////////////////////////////////////////////////
 
-sc_valueref_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
+sc_valueref_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t _key) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(ValueRef);
+    auto key = Symbol::wrap(_key);
     T = strip_qualifiers(T);
     ValueRef result;
     bool ok = T->lookup(key, result);
@@ -1723,9 +1729,10 @@ sc_valueref_raises_t sc_type_at(const sc_type_t *T, sc_symbol_t key) {
     return convert_result(result);
 }
 
-sc_valueref_raises_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key) {
+sc_valueref_raises_t sc_type_local_at(const sc_type_t *T, sc_symbol_t _key) {
     using namespace scopes;
     SCOPES_RESULT_TYPE(ValueRef);
+    auto key = Symbol::wrap(_key);
     T = strip_qualifiers(T);
     ValueRef result;
     bool ok = T->lookup_local(key, result);
@@ -1735,8 +1742,9 @@ sc_valueref_raises_t sc_type_local_at(const sc_type_t *T, sc_symbol_t key) {
     return convert_result(result);
 }
 
-const sc_string_t *sc_type_get_docstring(const sc_type_t *T, sc_symbol_t key) {
+const sc_string_t *sc_type_get_docstring(const sc_type_t *T, sc_symbol_t _key) {
     using namespace scopes;
+    auto key = Symbol::wrap(_key);
     TypeEntry entry;
     if (T->lookup(key, entry) && entry.doc) {
         return entry.doc;
@@ -1744,8 +1752,9 @@ const sc_string_t *sc_type_get_docstring(const sc_type_t *T, sc_symbol_t key) {
     return Symbol(SYM_Unnamed).name();
 }
 
-void sc_type_set_docstring(const sc_type_t *T, sc_symbol_t key, const sc_string_t *str) {
+void sc_type_set_docstring(const sc_type_t *T, sc_symbol_t _key, const sc_string_t *str) {
     using namespace scopes;
+    auto key = Symbol::wrap(_key);
     TypeEntry entry;
     if (!T->lookup_local(key, entry)) {
         return;
@@ -1837,8 +1846,9 @@ sc_type_raises_t sc_type_element_at(const sc_type_t *T, int i) {
     SCOPES_C_RETURN(result);
 }
 
-sc_int_raises_t sc_type_field_index(const sc_type_t *T, sc_symbol_t name) {
+sc_int_raises_t sc_type_field_index(const sc_type_t *T, sc_symbol_t _name) {
     using namespace scopes;
+    auto name = Symbol::wrap(_name);
     SCOPES_RESULT_TYPE(int);
     T = SCOPES_C_GET_RESULT(storage_type(T));
     switch(T->kind()) {
@@ -1935,7 +1945,7 @@ sc_symbol_valueref_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) 
     if (key == SYM_Unnamed) {
         index = 0;
     } else {
-        index = map.find_index(key);
+        index = map.find_index(Symbol::wrap(key));
         if (index < 0)
             index = count;
         else
@@ -1944,12 +1954,12 @@ sc_symbol_valueref_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) 
     while (index != count) {
         auto &&value = map.entries[index].second;
         if (value.expr) {
-            return { map.entries[index].first, value.expr };
+            return { map.entries[index].first.value(), value.expr };
         }
         index++;
     }
     if (index != count) {
-        return { map.entries[index].first, map.entries[index].second.expr };
+        return { map.entries[index].first.value(), map.entries[index].second.expr };
     }
     return { SYM_Unnamed, ValueRef() };
 }
@@ -1957,13 +1967,13 @@ sc_symbol_valueref_tuple_t sc_type_next(const sc_type_t *type, sc_symbol_t key) 
 void sc_type_set_symbol(const sc_type_t *T, sc_symbol_t sym, sc_valueref_t value) {
     using namespace scopes;
     T = strip_qualifiers(T);
-    const_cast<Type *>(T)->bind(sym, value);
+    const_cast<Type *>(T)->bind(Symbol::wrap(sym), value);
 }
 
 void sc_type_del_symbol(const sc_type_t *T, sc_symbol_t sym) {
     using namespace scopes;
     T = strip_qualifiers(T);
-    const_cast<Type *>(T)->unbind(sym);
+    const_cast<Type *>(T)->unbind(Symbol::wrap(sym));
 }
 
 // Qualifier
@@ -1971,12 +1981,13 @@ void sc_type_del_symbol(const sc_type_t *T, sc_symbol_t sym) {
 
 sc_symbol_type_tuple_t sc_type_key(const sc_type_t *T) {
     using namespace scopes;
-    return type_key(T);
+    auto tk = type_key(T);
+    return {tk._0.value(), tk._1};
 }
 
 const sc_type_t *sc_key_type(sc_symbol_t name, const sc_type_t *T) {
     using namespace scopes;
-    return key_type(name, T);
+    return key_type(Symbol::wrap(name), T);
 }
 
 bool sc_type_is_refer(const sc_type_t *T) {
@@ -1994,7 +2005,7 @@ bool sc_type_is_view(const sc_type_t *T) {
 
 const sc_type_t *sc_pointer_type(const sc_type_t *T, uint64_t flags, sc_symbol_t storage_class) {
     using namespace scopes;
-    return pointer_type(T, flags, storage_class);
+    return pointer_type(T, flags, Symbol::wrap(storage_class));
 }
 
 uint64_t sc_pointer_type_get_flags(const sc_type_t *T) {
@@ -2017,7 +2028,7 @@ const sc_type_t *sc_pointer_type_set_flags(const sc_type_t *T, uint64_t flags) {
 sc_symbol_t sc_pointer_type_get_storage_class(const sc_type_t *T) {
     using namespace scopes;
     if (is_kind<TK_Pointer>(T)) {
-        return cast<PointerType>(T)->storage_class;
+        return cast<PointerType>(T)->storage_class.value();
     }
     return SYM_Unnamed;
 }
@@ -2026,7 +2037,7 @@ const sc_type_t *sc_pointer_type_set_storage_class(const sc_type_t *T, sc_symbol
     using namespace scopes;
     if (is_kind<TK_Pointer>(T)) {
         auto pt = cast<PointerType>(T);
-        return pointer_type(pt->element_type, pt->flags, storage_class);
+        return pointer_type(pt->element_type, pt->flags, Symbol::wrap(storage_class));
     }
     return T;
 }
@@ -2262,7 +2273,7 @@ const sc_type_t *sc_mutate_type(const sc_type_t *type) {
 
 const sc_type_t *sc_refer_type(const sc_type_t *type, uint64_t flags, sc_symbol_t storage_class) {
     using namespace scopes;
-    return refer_type(type, flags, storage_class);
+    return refer_type(type, flags, Symbol::wrap(storage_class));
 }
 
 uint64_t sc_refer_flags(const sc_type_t *type) {
@@ -2278,7 +2289,7 @@ sc_symbol_t sc_refer_storage_class(const sc_type_t *type) {
     using namespace scopes;
     auto rq = try_qualifier<ReferQualifier>(type);
     if (rq) {
-        return rq->storage_class;
+        return rq->storage_class.value();
     }
     return SYM_Unnamed;
 }
@@ -2342,7 +2353,8 @@ const sc_type_t *sc_image_type(
     sc_symbol_t _format,
     sc_symbol_t _access) {
     using namespace scopes;
-    return image_type(_type, _dim, _depth, _arrayed, _multisampled, _sampled, _format, _access);
+    return image_type(_type, Symbol::wrap(_dim), _depth, _arrayed,
+        _multisampled, _sampled, Symbol::wrap(_format), Symbol::wrap(_access));
 }
 
 // Sampled Image Type
