@@ -32,7 +32,9 @@ struct KeyQualifier : Qualifier {
 
 const Type *key_type(Symbol key, const Type *type);
 
-sc_symbol_type_tuple_t type_key(const Type *type);
+struct SymbolTypeTuple { Symbol _0; const Type *_1; };
+
+SymbolTypeTuple type_key(const Type *type);
 
 } // namespace scopes
 

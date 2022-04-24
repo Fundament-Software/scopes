@@ -69,7 +69,7 @@ const Type *key_type(Symbol key, const Type *type) {
     return qualify(type, { result });
 }
 
-sc_symbol_type_tuple_t type_key(const Type *type) {
+SymbolTypeTuple type_key(const Type *type) {
     assert(type);
     auto kt = try_qualifier<KeyQualifier>(type);
     if (kt) {
