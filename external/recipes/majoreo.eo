@@ -1,13 +1,35 @@
-version := "0.8"
-url := "https://hg.sr.ht/~duangle/majoreo/raw/eo?rev={version}"
-script := (download url)
+version := "0.9"
+repo-url := "https://hg.sr.ht/~duangle/majoreo/raw"
 update-url "https://hg.sr.ht/~duangle/majoreo/raw/extras/recipes/majoreo.eo?rev=tip"
+SUMMARY := "Major EO - Project Oriented Package Management"
 package majoreo
-    summary "Major EO - Project Oriented Package Management"
+    summary SUMMARY
     version version
 
+    url := "{repo-url}/eo?rev={version}"
+    script := (download url)
     alias "/bin/eo"
         then
             cmd := (shell "." (dict))
-            cmd "chmod a+x \"{script}\""
+            cmd "chmod a+x {script}"
             script
+package majoreo-binary
+    summary SUMMARY
+    version version
+    platform linux
+
+    url := "{repo-url}/build/dist/linux/eo?rev={version}"
+    binary := (download url)
+    alias "/bin/eo"
+        then
+            cmd := (shell "." (dict))
+            cmd "chmod a+x {binary}"
+            binary
+package majoreo-binary
+    summary SUMMARY
+    version version
+    platform windows-mingw
+
+    url := "{repo-url}/build/dist/windows/eo.exe?rev={version}"
+    binary := (download url)
+    alias "/bin/eo.exe" binary
