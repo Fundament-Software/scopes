@@ -4546,7 +4546,7 @@ let __assert =
             inline check-assertion (result anchor msg)
                 if (not result)
                     print anchor
-                        .. str"assertion failed: " (msg)
+                        .. "assertion failed: " (msg)
                     sc_set_signal_abort true
                     sc_abort;
 
