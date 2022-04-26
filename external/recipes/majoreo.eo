@@ -1,4 +1,4 @@
-version := "0.9"
+version := "0.10"
 repo-url := "https://hg.sr.ht/~duangle/majoreo/raw"
 update-url "https://hg.sr.ht/~duangle/majoreo/raw/extras/recipes/majoreo.eo?rev=tip"
 SUMMARY := "Major EO - Project Oriented Package Management"

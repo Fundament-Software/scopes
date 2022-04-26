@@ -42,7 +42,7 @@ import configparser
 import sysconfig
 import subprocess
 
-VERSION = "0.9"
+VERSION = "0.10"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -1504,7 +1504,11 @@ def parse_recipe(project, text, path, packages, update_urls):
     env = env_bind(env, symbol("cpu-core-count"), get_num_cpu_cores())
     rel_recipe_dir = os.path.relpath(project.recipe_dir, project.path)
     env = env_bind(env, symbol("recipe-dir"),rel_recipe_dir)
-    recipe_file = os.path.relpath(recipe_path, project.path)
+    try:
+        recipe_file = os.path.relpath(recipe_path, project.path)
+    except:
+        # use full path when this fails (e.g. on windows)
+        recipe_file = recipe_path
     env = env_bind(env, symbol("recipe-file"),recipe_file)
     env = env_bind(env, symbol("mingw-dir"), MINGW_PATH)
     for expr in ast:
