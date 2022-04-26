@@ -3820,7 +3820,7 @@ let
                     let args = (as args list)
                     qq ([function] [ret] (unquote-splice args))
 
-#define-infix< 40 , _
+define-infix< 50 , _
 
 define-infix< 50 -> inline
 define-infix< 50 =
