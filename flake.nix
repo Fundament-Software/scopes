@@ -69,7 +69,7 @@
               echo $NIX_CFLAGS_COMPILE
 
               # echo make $makeFlags scopes
-              make -j$cores $makeFlags
+              make -j$NIX_BUILD_CORES $makeFlags
               # false
             '';
 
