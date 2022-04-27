@@ -97,7 +97,7 @@ spice format (str args...)
                                 break nextarg arg
                         else
                             parse-error (start + 1)
-                                .. "no argument with key " (repr substr)
+                                .. "no argument with key " (repr `substr)
                     elseif (k == (countof substr)) # index
                         _ nextarg ('getarg args... (val as i32))
                     else
