@@ -3820,7 +3820,7 @@ let
                     let args = (as args list)
                     qq ([function] [ret] (unquote-splice args))
 
-#define-infix< 40 , _
+define-infix< 50 , _
 
 define-infix< 50 -> inline
 define-infix< 50 =
@@ -4546,7 +4546,7 @@ let __assert =
             inline check-assertion (result anchor msg)
                 if (not result)
                     print anchor
-                        .. str"assertion failed: " (msg)
+                        .. "assertion failed: " (msg)
                     sc_set_signal_abort true
                     sc_abort;
 

@@ -42,7 +42,7 @@ import configparser
 import sysconfig
 import subprocess
 
-VERSION = "0.8"
+VERSION = "0.10"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -934,7 +934,12 @@ def builtin_download (ee, url):
 def builtin_extract (ee, archivepath):
     print("extracting {}".format(archivepath))
     tempdir = tempfile.mkdtemp("_eo_archive")
-    shell("tar -xf {} -C {}".format(archivepath, tempdir))
+    # extract file extension of archive path
+    ext = os.path.splitext(archivepath)[1]
+    if ext == ".zip" and not IS_MINGW:
+        shell("unzip \"{}\" -d {}".format(archivepath, tempdir))
+    else:
+        shell("tar -xf \"{}\" -C {}".format(archivepath, tempdir))
     ee.tempdirs.append(tempdir)
     return tempdir
 
@@ -1499,7 +1504,11 @@ def parse_recipe(project, text, path, packages, update_urls):
     env = env_bind(env, symbol("cpu-core-count"), get_num_cpu_cores())
     rel_recipe_dir = os.path.relpath(project.recipe_dir, project.path)
     env = env_bind(env, symbol("recipe-dir"),rel_recipe_dir)
-    recipe_file = os.path.relpath(recipe_path, project.path)
+    try:
+        recipe_file = os.path.relpath(recipe_path, project.path)
+    except:
+        # use full path when this fails (e.g. on windows)
+        recipe_file = recipe_path
     env = env_bind(env, symbol("recipe-file"),recipe_file)
     env = env_bind(env, symbol("mingw-dir"), MINGW_PATH)
     for expr in ast:
@@ -1938,7 +1947,8 @@ cmd.add_argument("name",nargs="*",
 cmd.add_argument("--force",action="store_true",
     help="force building even if package is already built")
 
-cmd = subcommands.add_parser("update", help="update recipes from remote")
+cmd = subcommands.add_parser("update", aliases=["up"],
+    help="update recipes from remote")
 cmd.set_defaults(func=cmd_update)
 
 cmd = subcommands.add_parser("install", help="install package from recipe")

@@ -51,6 +51,8 @@ typedef std::vector<Block *> Blocks;
 const char *get_value_kind_name(ValueKind kind);
 const char *get_value_class_name(ValueKind kind);
 
+const Type *value_type_at_index(const Type *T, int index);
+
 //------------------------------------------------------------------------------
 
 struct ValueIndex {
@@ -1243,11 +1245,12 @@ struct ConstReal : Const {
 struct ConstString : Const {
     static bool classof(const Value *T);
 
-    ConstString(const String *value);
+    ConstString(const Type *type, const String *value);
 
     bool key_equal(const ConstString *other) const;
     std::size_t hash() const;
 
+    static ConstStringRef from(const Type *type, const String *value);
     static ConstStringRef from(const String *value);
 
     const String *value;

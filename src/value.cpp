@@ -744,7 +744,8 @@ PureRef PureCast::from(const Type *type, PureRef value) {
             result = ConstPointer::from(type, node->value);
         } break;
         case VK_ConstString: {
-            return ref(value.anchor(), new PureCast(type, value));
+            auto node = value.cast<ConstString>();
+            result = ConstString::from(type, node->value);
         } break;
         default:
             assert (false && "unknown const kind");
@@ -1362,7 +1363,7 @@ GetElementPtrRef GetElementPtr::from(const TypedValueRef &value, const TypedValu
 
 //------------------------------------------------------------------------------
 
-static const Type *value_type_at_index(const Type *T, int index) {
+const Type *value_type_at_index(const Type *T, int index) {
     T = storage_type(T).assert_ok();
     switch(T->kind()) {
     case TK_Pointer: return cast<PointerType>(T)->element_type;
@@ -1773,25 +1774,30 @@ ConstRealRef ConstReal::from(const Type *type, double value) {
 
 static ConstSet<ConstString> conststrings;
 
-ConstString::ConstString(const String *_value)
-    : Const(VK_ConstString,
-        refer_type(
-            array_type(TYPE_Char, _value->count, true).assert_ok(),
-            PTF_NonWritable,
-            SYM_SPIRV_StorageClassPrivate)),
-        value(_value) {
+ConstString::ConstString(const Type *type, const String *_value)
+    : Const(VK_ConstString, type), value(_value) {
 }
 
 bool ConstString::key_equal(const ConstString *other) const {
-    return value == other->value;
+    return get_type() == other->get_type()
+        && value == other->value;
 }
 
 std::size_t ConstString::hash() const {
-    return std::hash<const void *>{}(value);
+    return hash2(std::hash<const Type *>{}(get_type()), std::hash<const void *>{}(value));
+}
+
+ConstStringRef ConstString::from(const Type *type, const String *_value) {
+    return conststrings.from(type, _value);
 }
 
 ConstStringRef ConstString::from(const String *_value) {
-    return conststrings.from(_value);
+    const Type *T =
+        refer_type(
+                array_type(TYPE_Char, _value->count, true).assert_ok(),
+                PTF_NonWritable,
+                SYM_SPIRV_StorageClassPrivate);
+    return from(T, _value);
 }
 
 //------------------------------------------------------------------------------
@@ -1824,7 +1830,15 @@ std::size_t ConstAggregate::hash() const {
 }
 
 ConstAggregateRef ConstAggregate::from(const Type *type, const ConstantPtrs &fields) {
-    return constaggs.from(type, fields);
+    auto count = fields.size();
+
+    ConstantPtrs castfields;
+    for (int i = 0; i < count; ++i) {
+        auto field = fields[i];
+        auto fieldtype = value_type_at_index(type, i);
+        castfields.push_back(PureCast::from(fieldtype, ref(unknown_anchor(),field)).cast<Const>().unref());
+    }
+    return constaggs.from(type, castfields);
 }
 
 ConstAggregateRef ConstAggregate::none_from() {
@@ -1837,8 +1851,12 @@ ConstAggregateRef ConstAggregate::ast_from(const ValueRef &node) {
 }
 
 ConstRef get_field(const ConstAggregateRef &value, uint32_t i) {
+#if 0
     auto VT = value_type_at_index(value->get_type(), i);
     return PureCast::from(VT, ref(value.anchor(), value->values[i])).cast<Const>();
+#else
+    return ref(value.anchor(), value->values[i]);
+#endif
 }
 
 ConstRef set_field(const ConstAggregateRef &value, const ConstRef &element, uint32_t i) {
@@ -1866,11 +1884,7 @@ std::size_t ConstPointer::hash() const {
 }
 
 ConstRef ConstPointer::from(const Type *type, const void *pointer) {
-    if (pointer && (type == TYPE_String)) {
-        return ConstString::from(static_cast<const String *>(pointer));
-    } else {
-        return constptrs.from(type, pointer);
-    }
+    return constptrs.from(type, pointer);
 }
 
 ConstPointerRef ConstPointer::type_from(const Type *type) {
