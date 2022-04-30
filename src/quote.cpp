@@ -568,7 +568,7 @@ ValueRef unwrap_value(const Type *T, const ValueRef &value) {
     return ValueRef();
 }
 
-static ValueRef wrap_value_inner(const Type *T, const ValueRef &value) {
+static ValueRef wrap_value_inner(const Type *T, const ValueRef &value, bool composite) {
     auto _anchor = value.anchor();
     bool isref = is_reference(T);
     T = strip_qualifiers(T);
@@ -576,9 +576,13 @@ static ValueRef wrap_value_inner(const Type *T, const ValueRef &value) {
     auto kind = ST->kind();
     switch(kind) {
     case TK_Pointer: {
-        return REF(CallTemplate::from(g_sc_const_pointer_new, {
-                REF(ConstPointer::type_from(T)),
-                REF(CallTemplate::from(g_bitcast, { value, g_voidstar })) }));
+        if (!composite && (T == TYPE_String)) {
+            return REF(CallTemplate::from(g_sc_const_string_new, { value }));
+        } else {
+            return REF(CallTemplate::from(g_sc_const_pointer_new, {
+                    REF(ConstPointer::type_from(T)),
+                    REF(CallTemplate::from(g_bitcast, { value, g_voidstar })) }));
+        }
     } break;
     case TK_Integer: {
         auto ti = cast<IntegerType>(ST);
@@ -631,7 +635,7 @@ static ValueRef wrap_value_inner(const Type *T, const ValueRef &value) {
             auto idx = REF(ConstInt::from(TYPE_I32, i));
             auto arg =
                 REF(CallTemplate::from(g_extractelement, { value, idx }));
-            auto wrapped_arg = wrap_value(ET, arg);
+            auto wrapped_arg = wrap_value(ET, arg, true);
             assert(wrapped_arg);
             result->append(
                 REF(CallTemplate::from(g_store, {
@@ -677,7 +681,7 @@ static ValueRef wrap_value_inner(const Type *T, const ValueRef &value) {
                 ValueRef arg =
                     REF(CallTemplate::from(g_extractvalue, { value, idx }));
                 if (!is_stringarray) {
-                    arg = wrap_value(ET, arg);
+                    arg = wrap_value(ET, arg, true);
                     assert(arg);
                 }
                 result->append(
@@ -710,7 +714,7 @@ static ValueRef wrap_value_inner(const Type *T, const ValueRef &value) {
             auto arg =
                 REF(CallTemplate::from(g_extractvalue, { value, idx }));
             auto argT = tt->values[i];
-            auto wrapped_arg = wrap_value(argT, arg);
+            auto wrapped_arg = wrap_value(argT, arg, true);
             assert(wrapped_arg);
             result->append(
                 REF(CallTemplate::from(g_store, {
@@ -728,12 +732,12 @@ static ValueRef wrap_value_inner(const Type *T, const ValueRef &value) {
     return ValueRef();
 }
 
-ValueRef wrap_value(const Type *T, const ValueRef &value) {
+ValueRef wrap_value(const Type *T, const ValueRef &value, bool composite) {
     if (is_value_stage_constant(value)) {
         return ConstAggregate::ast_from(value);
     }
     if (!is_opaque(T)) {
-        auto result = wrap_value_inner(T, value);
+        auto result = wrap_value_inner(T, value, composite);
         if (!is_plain(T) && !is_view(T)) {
             auto _anchor = value.anchor();
             auto expr = REF(Expression::unscoped_from());

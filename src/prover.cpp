@@ -528,7 +528,7 @@ static SCOPES_RESULT(void) build_view(
     return {};
 }
 
-static SCOPES_RESULT(TypedValueRef) build_drop(const ASTContext &ctx,
+static SCOPES_RESULT(TypedValueRef) _build_drop(const ASTContext &ctx,
     const Anchor *anchor, const ValueIndex &arg) {
     SCOPES_RESULT_TYPE(TypedValueRef);
     // generate destructor
@@ -573,6 +573,23 @@ static SCOPES_RESULT(TypedValueRef) build_drop(const ASTContext &ctx,
         return result;
     }
 }
+
+static std::vector<ValueIndex> drop_stack;
+static SCOPES_RESULT(TypedValueRef) build_drop(const ASTContext &ctx,
+    const Anchor *anchor, const ValueIndex &arg) {
+    SCOPES_RESULT_TYPE(TypedValueRef);
+    for (int i = 0; i < drop_stack.size(); ++i) {
+        if (drop_stack[i] == arg) {
+            // strip lifetime qualifiers from arg type
+            SCOPES_ERROR(RecursiveDrop, strip_lifetime(arg.get_type()));
+        }
+    }
+    drop_stack.push_back(arg);
+    auto result = _build_drop(ctx, anchor, arg);
+    drop_stack.pop_back();
+    return result;
+}
+
 
 static SCOPES_RESULT(void) drop_value(const ASTContext &ctx,
     const ValueRef &mover, const ValueIndex &arg) {

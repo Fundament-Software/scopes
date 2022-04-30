@@ -10,6 +10,7 @@ for x y z in (bitdim 2 1 1)
 let binary-range = (range 2)
 local arr =
     arrayof string "yes" "this" "is" "dog?"
+print `arr
 let gen =
     zip
         imap

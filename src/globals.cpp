@@ -119,6 +119,7 @@ sc_valueref_raises_t convert_result(const Result<FunctionRef> &_result) CRESULT;
 sc_valueref_raises_t convert_result(const Result<TemplateRef> &_result) CRESULT;
 sc_valueref_raises_t convert_result(const Result<ConstPointerRef> &_result) CRESULT;
 sc_valueref_raises_t convert_result(const Result<ConstRef> &_result) CRESULT;
+sc_valueref_raises_t convert_result(const Result<ConstAggregateRef> &_result) CRESULT;
 
 sc_type_raises_t convert_result(const Result<const Type *> &_result) CRESULT;
 sc_string_raises_t convert_result(const Result<const String *> &_result) CRESULT;
@@ -1613,11 +1614,21 @@ sc_valueref_t sc_const_real_new(const sc_type_t *type, double value) {
     using namespace scopes;
     return ConstReal::from(type, value);
 }
-sc_valueref_t sc_const_aggregate_new(const sc_type_t *type, int numconsts, sc_valueref_t *consts) {
+sc_valueref_raises_t sc_const_aggregate_new(const sc_type_t *type, int numconsts, sc_valueref_t *consts) {
     using namespace scopes;
+    SCOPES_RESULT_TYPE(ConstAggregateRef);
     ConstantPtrs vals;
-    init_values_arrayT(vals, numconsts, consts);
-    return ConstAggregate::from(type, vals);
+    vals.reserve(numconsts);
+    for (int i = 0; i < numconsts; ++i) {
+        assert(consts[i]);
+        auto fieldtype = value_type_at_index(type, i);
+        auto val = PureCast::from(fieldtype, consts[i].cast<Const>());
+        if (!val.isa<Const>()) {
+            SCOPES_C_ERROR(TypedConstantValueKindMismatch, fieldtype, consts[i]->kind());
+        }
+        vals.push_back(val.cast<Const>().unref());
+    }
+    return convert_result(ConstAggregate::from(type, vals));
 }
 sc_valueref_t sc_const_pointer_new(const sc_type_t *type, const void *pointer) {
     using namespace scopes;
@@ -1665,7 +1676,11 @@ sc_valueref_t sc_const_string_new(const sc_string_t *str) {
 
 const sc_string_t *sc_const_string_extract(sc_valueref_t value) {
     using namespace scopes;
-    return value.cast<ConstString>()->value;
+    if (value.isa<ConstString>()) {
+        return value.cast<ConstString>()->value;
+    } else {
+        return sc_value_tostring(value);
+    }
 }
 
 sc_valueref_t sc_quote_new(sc_valueref_t value) {
@@ -2521,7 +2536,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_new, TYPE_ValueRef, TYPE_Type, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_words_new, TYPE_ValueRef, TYPE_Type, TYPE_I32, TYPE_U64PP);
     DEFINE_EXTERN_C_FUNCTION(sc_const_real_new, TYPE_ValueRef, TYPE_Type, TYPE_F64);
-    DEFINE_EXTERN_C_FUNCTION(sc_const_aggregate_new, TYPE_ValueRef, TYPE_Type, TYPE_I32, TYPE_ValuePP);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_const_aggregate_new, TYPE_ValueRef, TYPE_Type, TYPE_I32, TYPE_ValuePP);
     DEFINE_EXTERN_C_FUNCTION(sc_const_pointer_new, TYPE_ValueRef, TYPE_Type, voidstar);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_const_null_new, TYPE_ValueRef, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_const_int_extract, TYPE_U64, TYPE_ValueRef);

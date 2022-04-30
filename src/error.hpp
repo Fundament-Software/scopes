@@ -188,6 +188,9 @@ formatters:
         PType, PAnchor) \
     T(DropReturnsArguments, \
         "drop operation must not return any arguments") \
+    T(RecursiveDrop, \
+        "drop operation of value of type %0 is reentrant", \
+        PType) \
     T(SwitchPassMovedValue, \
         "skippable switch pass moved value of type %0 out of parent scope", \
         PType) \
