@@ -1084,7 +1084,7 @@ SCOPES_RESULT(const Scope *) import_c_module (
 
             char *errormsg;
             static char filename[PATH_MAX];
-            strncpy(filename, object_file.c_str(), PATH_MAX);
+            strncpy(filename, object_file.c_str(), PATH_MAX - 1);
             if (LLVMTargetMachineEmitToFile(target_machine, M,
                 filename, LLVMObjectFile, &errormsg)) {
                 SCOPES_ERROR(CGenBackendFailed, errormsg);
