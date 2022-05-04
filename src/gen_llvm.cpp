@@ -435,8 +435,8 @@ struct LLVMIRGenerator {
         static char _fname[PATH_MAX];
         static char _dname[PATH_MAX];
         auto str = sf.name();
-        strncpy(_fname, str->data, PATH_MAX);
-        strncpy(_dname, str->data, PATH_MAX);
+        strncpy(_fname, str->data, PATH_MAX - 1);
+        strncpy(_dname, str->data, PATH_MAX - 1);
 
         char *fname = basename(_fname);
         char *dname = dirname(_dname);
@@ -3307,7 +3307,7 @@ SCOPES_RESULT(void) compile_object(const String *triple,
 
     auto tt = LLVMNormalizeTargetTriple(triple->data);
     static char triplestr[1024];
-    strncpy(triplestr, tt, 1024);
+    strncpy(triplestr, tt, 1024 - 1);
     LLVMDisposeMessage(tt);
 
     char *error_message = nullptr;
