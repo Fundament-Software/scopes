@@ -1,6 +1,6 @@
 Original code by Leonard Ritter.
 
-With contributions from
+With patch contributions from
 
 * Rys Sommefeldt
 * James Austin
@@ -8,3 +8,4 @@ With contributions from
 * Westerbly Snaydley
 * Shawn Walker-Salas
 * Russ Powers
+* Erik McClure
