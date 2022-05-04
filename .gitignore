@@ -2,3 +2,7 @@
 /build
 src/known_symbols.hpp
 /result
+/SPIRV-Cross
+/SPIRV-Tools
+/.eo
+/lib/scopes/clang/include
