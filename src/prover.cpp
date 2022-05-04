@@ -3242,7 +3242,7 @@ repeat:
             CHECKARGS(2, 2);
             READ_TYPEOF(A); READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_integer_ops(A, B));
-            ICmpKind pred;
+            ICmpKind pred = ICmpKind(-1);
             switch(b.value()) {
             #define T(NAME, BNAME) case OP_ ## NAME: pred = NAME; break;
             SCOPES_ICMP_KIND()
@@ -3270,7 +3270,7 @@ repeat:
             CHECKARGS(2, 2);
             READ_TYPEOF(A); READ_TYPEOF(B);
             SCOPES_CHECK_RESULT(verify_real_ops(A, B));
-            FCmpKind pred;
+            FCmpKind pred = FCmpKind(-1);
             switch(b.value()) {
             #define T(NAME, BNAME) case OP_ ## NAME: pred = NAME; break;
             SCOPES_FCMP_KIND()
