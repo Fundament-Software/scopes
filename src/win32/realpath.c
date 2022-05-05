@@ -11,6 +11,7 @@ I am placing this in the public domain for anyone to use or modify
 #include <limits.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <math.h>
 
 #ifndef PATH_MAX
 #define PATH_MAX 4096
@@ -138,3 +139,131 @@ char *realpath(const char *path, char *resolved_path)
 
   return return_path;
 }
+
+#ifdef _MSC_VER
+void sincos(double x, double* s, double* c)
+{
+    *s = sin(x);
+    *c = cos(x);
+}
+
+void sincosf(float x, float* s, float* c)
+{
+    *s = sinf(x);
+    *c = cosf(x);
+}
+
+char* basename(char* path) {
+    static char buf[MAX_PATH];
+    strncpy_s(buf, MAX_PATH, path, MAX_PATH - 1);
+    buf[MAX_PATH - 1] = 0;
+
+    if((buf[0] == '/' || buf[0] == '\\') && !buf[1])
+        return buf;
+
+    char* base = strpbrk(buf, "/\\");
+
+    if(!base || !base[0])
+        return buf;
+
+    if(base[1] == '\0') // If the next character is the end of the string, get the previous slash
+    {
+        *base = '\0';
+        base = strpbrk(buf, "/\\");
+
+        if(!base || base[0] == '\0')
+            return buf;
+    }
+
+    return base;
+}
+
+// TODO: Make this work with unicode properly
+struct __DIR
+{
+    HANDLE handle;
+    WIN32_FIND_DATAA data;
+};
+
+DIR* opendir(const char* name)
+{
+    DIR* p = (DIR*)malloc(sizeof(DIR));
+    if(!p || !name || !name[0]) return NULL;
+
+    char buf[MAX_PATH + 3];
+    size_t len = strlen(name);
+    memcpy_s(buf, MAX_PATH + 1, name, len);
+
+    if(buf[len - 1] != '/' && buf[len - 1] != '\\')
+        buf[len++] = '/';
+    buf[len++] = '*';
+    buf[len] = '\0';
+
+    p->handle = FindFirstFileA(buf, &p->data);
+    if(p->handle != INVALID_HANDLE_VALUE)
+        return p;
+
+    free(p);
+    return NULL;
+}
+
+int closedir(DIR* dirp)
+{
+    if(!dirp)
+        return -1;
+
+    int r = 0;
+    if(!FindClose(dirp->handle))
+        r = -1;
+
+    free(dirp);
+    return r;
+}
+
+enum
+{
+    DT_UNKNOWN = 0,
+    DT_FIFO = 1,
+    DT_CHR = 2,
+    DT_DIR = 4,
+    DT_BLK = 6,
+    DT_REG = 8,
+    DT_LNK = 10,
+    DT_SOCK = 12,
+    DT_WHT = 14
+};
+
+struct dirent* readdir(DIR* dirp)
+{
+    static struct dirent curinfo;
+
+    if(!dirp || !dirp->data.cFileName[0])
+        return NULL;
+
+    memset(&curinfo, 0, sizeof(struct dirent));
+    strncpy_s(curinfo.d_name, MAXNAMLEN + 1, dirp->data.cFileName, MAXNAMLEN);
+    curinfo.d_namlen = strlen(curinfo.d_name);
+    curinfo.d_fileno = 0;
+    curinfo.d_reclen = sizeof(struct dirent);
+
+    if(dirp->data.dwFileAttributes == FILE_ATTRIBUTE_NORMAL)
+        curinfo.d_type = DT_REG;
+    else
+    {
+        if(dirp->data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            curinfo.d_type |= DT_DIR;
+        if(dirp->data.dwFileAttributes & FILE_ATTRIBUTE_DEVICE)
+            curinfo.d_type |= DT_BLK;
+        if(dirp->data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)
+            curinfo.d_type |= DT_LNK;
+    }
+
+    if(!FindNextFileA(dirp->handle, &dirp->data))
+    {
+        dirp->data.cFileName[0] = 0;
+    }
+
+    return &curinfo;
+}
+
+#endif
