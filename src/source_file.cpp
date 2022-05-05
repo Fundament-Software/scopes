@@ -4,14 +4,24 @@
     See LICENSE.md for details.
 */
 
-#include "source_file.hpp"
-
 #ifdef SCOPES_WIN32
 #include "mman.h"
+#include <io.h>
+
+#define OPEN_FD _open
+#define CLOSE_FD _close
+#define O_RDONLY _O_RDONLY
+#define LSEEK _lseek
 #else
 #include <sys/mman.h>
 #include <unistd.h>
+
+#define OPEN_FD open
+#define CLOSE_FD close
+#define LSEEK lseek
 #endif
+
+#include "source_file.hpp"
 
 #include <fcntl.h>
 #include <assert.h>
@@ -45,7 +55,7 @@ void SourceFile::close() {
             length = 0;
         }
         if (fd >= 0) {
-            ::close(fd);
+            ::CLOSE_FD(fd);
             fd = -1;
         }
     }
@@ -62,9 +72,9 @@ const char *SourceFile::strptr() {
 
 std::unique_ptr<SourceFile> SourceFile::from_file(Symbol _path) {
     auto file = std::unique_ptr<SourceFile>(new SourceFile(_path));
-    file->fd = ::open(_path.name()->data, O_RDONLY);
+    file->fd = ::OPEN_FD(_path.name()->data, O_RDONLY);
     if (file->fd >= 0) {
-        file->length = lseek(file->fd, 0, SEEK_END);
+        file->length = LSEEK(file->fd, 0, SEEK_END);
         if (file->length) {
             file->ptr = mmap(nullptr,
                 file->length, PROT_READ, MAP_PRIVATE, file->fd, 0);

@@ -14,6 +14,7 @@
 
 #ifdef SCOPES_WIN32
 #include "dlfcn.h"
+#include "stdlib_ex.h"
 #include <math.h>
 #else
 #include <dlfcn.h>
@@ -666,9 +667,13 @@ void init_llvm() {
     // required by LLVM
     LLVMAddSymbol("sincos", (void *)&sincos);
     LLVMAddSymbol("sincosf", (void *)&sincosf);
+    LLVMAddSymbol("getenv", (void *)&getenv);
 
+#ifdef _MSC_VER
+    LLVMAddSymbol("__mingw_vfprintf", (void *)&vfprintf);
+#else
     LLVMAddSymbol("__mingw_vfprintf", (void *)&__mingw_vfprintf);
-
+#endif
 #endif
 
 #if 0

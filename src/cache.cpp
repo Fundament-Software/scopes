@@ -18,8 +18,13 @@
 #else
 #include <wordexp.h>
 #endif
+
+#ifndef _MSC_VER
 #include <dirent.h>
 //#include <libgen.h>
+#else
+#include <direct.h>
+#endif
 
 #include <algorithm>
 #include <memory.h>
@@ -143,7 +148,12 @@ static void init_cache() {
     char *ptr = getenv("LocalAppData");
     assert(ptr);
     strcpy(cache_dir, ptr);
+#ifdef _MSC_VER
+    
+#define SCOPES_MKDIR(PATH, MODE) _mkdir((PATH))
+#else
 #define SCOPES_MKDIR(PATH, MODE) mkdir((PATH))
+#endif
 #else
 #define SCOPES_MKDIR(PATH, MODE) mkdir((PATH),(MODE))
     char *ptr = getenv("SCOPES_CACHE");

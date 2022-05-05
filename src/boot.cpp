@@ -30,8 +30,14 @@
 
 #include "scopes/scopes.h"
 
+#ifndef _MSC_VER
 #include <unistd.h>
 #include <libgen.h>
+#else
+#include <io.h>
+#include <direct.h>
+#endif
+
 #include <fcntl.h>
 #include <cstdlib>
 #include <string.h>

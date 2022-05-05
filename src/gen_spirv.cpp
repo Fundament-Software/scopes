@@ -26,7 +26,11 @@
 #include "glslang/SpvBuilder.h"
 #include "glslang/disassemble.h"
 #include "glslang/GLSL.std.450.h"
+#ifdef CMAKE_INTDIR // This is a hack to find some way to differentiate a cmake build from something else
+#include "spirv_cross/spirv_glsl.hpp"
+#else
 #include "SPIRV-Cross/spirv_glsl.hpp"
+#endif
 #include "spirv-tools/libspirv.hpp"
 #include "spirv-tools/optimizer.hpp"
 

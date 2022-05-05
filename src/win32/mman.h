@@ -15,6 +15,8 @@
 #endif			
 
 #include <_mingw.h>
+#else
+typedef long off_t;
 #endif
 
 #include <sys/types.h>
