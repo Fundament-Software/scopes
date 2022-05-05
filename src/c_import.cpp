@@ -37,8 +37,11 @@
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/LiteralSupport.h"
 
-namespace scopes {
+#ifdef _MSC_VER
+#include "stdlib_ex.h"
+#endif
 
+namespace scopes {
 //------------------------------------------------------------------------------
 // C BRIDGE (CLANG)
 //------------------------------------------------------------------------------

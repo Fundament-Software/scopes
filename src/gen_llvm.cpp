@@ -27,7 +27,10 @@
 #include "stdlib_ex.h"
 #else
 #endif
+
+#ifndef _MSC_VER
 #include <libgen.h>
+#endif
 
 #include <deque>
 

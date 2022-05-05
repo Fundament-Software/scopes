@@ -45,7 +45,10 @@
 #else
 #include <dlfcn.h>
 #endif
+
+#ifndef _MSC_VER
 #include <libgen.h>
+#endif
 
 #include <vector>
 
