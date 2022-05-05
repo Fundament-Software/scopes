@@ -4,6 +4,14 @@
     See LICENSE.md for details.
 */
 
+#ifdef SCOPES_WIN32
+#include "wininclude.h"
+#include "stdlib_ex.h"
+#include "dlfcn.h"
+#else
+#include <dlfcn.h>
+#endif
+
 #include "boot.hpp"
 #include "timer.hpp"
 #include "gc.hpp"
@@ -22,13 +30,6 @@
 
 #include "scopes/scopes.h"
 
-#ifdef SCOPES_WIN32
-#include "stdlib_ex.h"
-#include "dlfcn.h"
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
 #include <unistd.h>
 #include <libgen.h>
 #include <fcntl.h>

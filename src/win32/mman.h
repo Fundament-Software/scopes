@@ -4,14 +4,16 @@
  */
 
 #ifndef _SYS_MMAN_H_
-#define _SYS_MMAN_H_
-
-#ifndef _WIN32_WINNT		// Allow use of features specific to Windows XP or later.                   
-#define _WIN32_WINNT 0x0501	// Change this to the appropriate value to target other versions of Windows.
-#endif						
+#define _SYS_MMAN_H_			
 
 /* All the headers include this file. */
 #ifndef _MSC_VER
+#ifndef _WIN32_WINNT		// Allow use of features specific to Windows XP SP3 or later.                   
+#define WINVER 0x0501 // Change this to the appropriate value to target other versions of Windows.
+#define _WIN32_WINNT 0x0501
+#define NTDDI_VERSION 0x05010300 //NTDDI_WINXPSP3 
+#endif			
+
 #include <_mingw.h>
 #endif
 

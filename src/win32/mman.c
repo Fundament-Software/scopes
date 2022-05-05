@@ -1,9 +1,8 @@
 
-#include <windows.h>
+#include "wininclude.h"
+#include "mman.h"
 #include <errno.h>
 #include <io.h>
-
-#include "mman.h"
 
 #ifndef FILE_MAP_EXECUTE
 #define FILE_MAP_EXECUTE    0x0020

@@ -6,8 +6,8 @@ Copyright (C) September 8, 2005
 I am placing this in the public domain for anyone to use or modify
 */
 
+#include "wininclude.h"
 #include "stdlib_ex.h"
-#include <windows.h>
 #include <limits.h>
 #include <errno.h>
 #include <sys/stat.h>
