@@ -1,9 +1,5 @@
 VERSION := "13.0.1"
-PACKAGE_VERSION := "{VERSION}r2"
-# from https://github.com/llvm/llvm-project/releases/
-#url := "https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.1/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz"
-url := "https://github.com/llvm/llvm-project/releases/download/llvmorg-13.0.1/clang+llvm-13.0.1-x86_64-linux-gnu-ubuntu-18.04.tar.xz"
-rootdir := (commonpath (extract (download url)))
+PACKAGE_VERSION := "{VERSION}r3"
 SUMMARY := "LLVM and clang distribution"
 target-clang-include-dir := "/lib/scopes/clang/include"
 package clang
@@ -11,17 +7,28 @@ package clang
     version PACKAGE_VERSION
     platform linux
 
+    # from https://github.com/llvm/llvm-project/releases/
+    #url := "https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.1/clang+llvm-12.0.1-x86_64-linux-gnu-ubuntu-16.04.tar.xz"
+    url := "https://github.com/llvm/llvm-project/releases/download/llvmorg-13.0.1/clang+llvm-13.0.1-x86_64-linux-gnu-ubuntu-18.04.tar.xz"
+    rootdir := (commonpath (extract (download url)))
     alias "/clang" rootdir
     alias target-clang-include-dir "{rootdir}/lib/clang/{VERSION}/include"
 package clang
-    # this is a hacky package for MSYS2
-    # the msys packages are installed during the build process
     summary SUMMARY
     version PACKAGE_VERSION
     platform windows-mingw
 
-    alias target-clang-include-dir
-        then
-            cmd := (shell mingw-dir (dict))
-            cmd "pacman -S --needed --noconfirm mingw64/mingw-w64-x86_64-llvm mingw64/mingw-w64-x86_64-clang mingw64/mingw-w64-x86_64-polly"
-            "{mingw-dir}/lib/clang/{VERSION}/include"
+    # from https://repo.msys2.org/mingw/x86_64/
+    base-url := "https://repo.msys2.org/mingw/x86_64"
+    clang-url := "{base-url}/mingw-w64-x86_64-clang-13.0.1-3-any.pkg.tar.zst"
+    llvm-url := "{base-url}/mingw-w64-x86_64-llvm-13.0.1-3-any.pkg.tar.zst"
+    clangrootdir := (.. (commonpath (extract (download clang-url))) "/mingw64")
+    llvmrootdir := (.. (commonpath (extract (download llvm-url))) "/mingw64")
+    in "/clang"
+        "{clangrootdir}/bin"
+        "{clangrootdir}/lib"
+        "{clangrootdir}/include"
+        "{llvmrootdir}/bin"
+        "{llvmrootdir}/lib"
+        "{llvmrootdir}/include"
+    alias target-clang-include-dir "{clangrootdir}/lib/clang/{VERSION}/include"
