@@ -1065,6 +1065,7 @@ run-stage; # 3
     @ = sc_scope_at
     local@ = sc_scope_local_at
     next = sc_scope_next
+    any-next = sc_scope_any_next
     next-deleted = sc_scope_next_deleted
     docstring = sc_scope_docstring
     module-docstring = sc_scope_module_docstring
@@ -4717,8 +4718,17 @@ do
             inline (key value index)
                 sc_scope_next self index
 
+    inline any-scope-generator (self)
+        Generator
+            inline () (sc_scope_any_next self -1)
+            inline (scope key value index) (scope != null)
+            inline (scope key value index) (_ key value scope)
+            inline (scope key value index)
+                sc_scope_any_next scope index
+
     'set-symbols Scope
         lineage = lineage-generator
+        all = any-scope-generator
         deleted =
             inline (self)
                 Generator

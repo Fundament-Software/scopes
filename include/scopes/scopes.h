@@ -107,6 +107,7 @@ typedef struct sc_valueref_list_tuple_ { sc_valueref_t _0; const sc_list_t *_1; 
 typedef struct sc_valueref_list_scope_tuple_ { sc_valueref_t _0; const sc_list_t *_1; const sc_scope_t *_2; } sc_valueref_list_scope_tuple_t;
 
 typedef struct sc_valueref_valueref_i32_tuple_ { sc_valueref_t _0; sc_valueref_t _1; int _2; } sc_valueref_valueref_i32_tuple_t;
+typedef struct sc_scope_valueref_valueref_i32_tuple_ { const sc_scope_t *_0; sc_valueref_t _1; sc_valueref_t _2; int _3; } sc_scope_valueref_valueref_i32_tuple_t;
 typedef struct sc_valueref_i32_tuple_ { sc_valueref_t _0; int _1; } sc_valueref_i32_tuple_t;
 
 typedef struct sc_symbol_valueref_tuple_ { sc_symbol_t _0; sc_valueref_t _1; } sc_symbol_valueref_tuple_t;
@@ -367,6 +368,7 @@ SCOPES_LIBEXPORT const sc_scope_t *sc_scope_new_subscope_with_docstring(const sc
 SCOPES_LIBEXPORT const sc_scope_t *sc_scope_get_parent(const sc_scope_t *scope);
 SCOPES_LIBEXPORT const sc_scope_t *sc_scope_unbind(const sc_scope_t *scope, sc_valueref_t sym);
 SCOPES_LIBEXPORT sc_valueref_valueref_i32_tuple_t sc_scope_next(const sc_scope_t *scope, int index);
+SCOPES_LIBEXPORT sc_scope_valueref_valueref_i32_tuple_t sc_scope_any_next(const sc_scope_t *scope, int index);
 SCOPES_LIBEXPORT sc_valueref_i32_tuple_t sc_scope_next_deleted(const sc_scope_t *scope, int index);
 
 // symbols

@@ -857,6 +857,26 @@ sc_valueref_valueref_i32_tuple_t sc_scope_next(const sc_scope_t *scope, int inde
     return { g_none, g_none, -1 };
 }
 
+sc_scope_valueref_valueref_i32_tuple_t sc_scope_any_next(const sc_scope_t *scope, int index) {
+    using namespace scopes;
+    while (scope) {
+        auto &&map = scope->table();
+        int count = map.entries.size();
+        index++;
+        while ((size_t)index < count) {
+            auto &&entry = map.entries[index];
+            auto &&value = entry.second;
+            if (value.value) {
+                return { scope, entry.first, value.value, index };
+            }
+            index++;
+        }
+        scope = scope->parent();
+        index = -1;
+    }
+    return { nullptr, g_none, g_none, -1 };
+}
+
 sc_valueref_i32_tuple_t sc_scope_next_deleted(const sc_scope_t *scope, int index) {
     using namespace scopes;
     auto &&map = scope->table();
@@ -2602,6 +2622,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_scope_get_parent, TYPE_Scope, TYPE_Scope);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_unbind, TYPE_Scope, TYPE_Scope, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_next, arguments_type({TYPE_ValueRef, TYPE_ValueRef, TYPE_I32}), TYPE_Scope, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_scope_any_next, arguments_type({TYPE_Scope, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32}), TYPE_Scope, TYPE_I32);
     DEFINE_EXTERN_C_FUNCTION(sc_scope_next_deleted, arguments_type({TYPE_ValueRef, TYPE_I32}), TYPE_Scope, TYPE_I32);
 
     DEFINE_EXTERN_C_FUNCTION(sc_symbol_new, TYPE_Symbol, TYPE_String);
