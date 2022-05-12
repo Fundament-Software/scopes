@@ -2383,6 +2383,11 @@ const sc_type_t *sc_sampled_image_type(const sc_type_t *_type) {
     return sampled_image_type(cast<ImageType>(_type));
 }
 
+SCOPES_DLL_EXPORT const sc_string_t* sc_getenv(const sc_string_t* name)
+{
+    using namespace scopes;
+    return String::from_stdstring(getenv(name->data));
+}
 
 } // extern "C"
 
@@ -2733,6 +2738,8 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_path, TYPE_ValueRef, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_string, TYPE_ValueRef, TYPE_String);
+
+    DEFINE_EXTERN_C_FUNCTION(sc_getenv, TYPE_String, TYPE_String);
 
 #undef DEFINE_EXTERN_C_FUNCTION
 
