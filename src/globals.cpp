@@ -2388,7 +2388,12 @@ const sc_type_t *sc_sampled_image_type(const sc_type_t *_type) {
 SCOPES_DLL_EXPORT const sc_string_t* sc_getenv(const sc_string_t* name)
 {
     using namespace scopes;
-    return String::from_stdstring(getenv(name->data));
+    const char* var = getenv(name->data);
+    if(!var) {
+        return String::from_cstr("");
+    } else {
+        return String::from_cstr(var);
+    }
 }
 
 } // extern "C"
