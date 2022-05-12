@@ -52,6 +52,9 @@ struct dirent* readdir(DIR* dirp);
 void sincos(double x, double* sin, double* cos);
 void sincosf(float x, float* sin, float* cos);
 
+#define SCOPES_DLL_EXPORT __declspec(dllexport)
+#else
+#define SCOPES_DLL_EXPORT
 #endif
 
 #ifdef __cplusplus

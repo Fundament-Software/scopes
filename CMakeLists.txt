@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(scopes-lib VERSION 0.1.10)
+project(scopes-lib VERSION 0.19.0)
 option(USE_ASAN_UBSAN "Use address sanitizer" OFF)
 option(USE_DEFAULT_FOLDERS "Don't override the cmake output folders with a unified /bin/ folder. Also disables debug postfix." OFF)
 
