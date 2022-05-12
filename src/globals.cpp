@@ -42,7 +42,9 @@
 #ifdef SCOPES_WIN32
 #include "stdlib_ex.h"
 #include "dlfcn.h"
+#define SCOPES_DLL_EXPORT __declspec(dllexport)
 #else
+#define SCOPES_DLL_EXPORT
 #include <dlfcn.h>
 #endif
 
