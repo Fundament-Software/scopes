@@ -13,22 +13,27 @@ package clang
     rootdir := (commonpath (extract (download url)))
     alias "/clang" rootdir
     alias target-clang-include-dir "{rootdir}/lib/clang/{VERSION}/include"
+# from https://repo.msys2.org/mingw/x86_64/
+fn mingw-package (name)
+    .. 
+        commonpath
+            extract
+                download "https://repo.msys2.org/mingw/x86_64/{name}-any.pkg.tar.zst"
+        "/mingw64"
+clangdir := (mingw-package "mingw-w64-x86_64-clang-13.0.1-3")
+llvmdir := (mingw-package "mingw-w64-x86_64-llvm-13.0.1-3")
+libxml2dir := (mingw-package "mingw-w64-x86_64-libxml2-2.9.12-5")
 package clang
     summary SUMMARY
     version PACKAGE_VERSION
     platform windows-mingw
 
-    # from https://repo.msys2.org/mingw/x86_64/
-    base-url := "https://repo.msys2.org/mingw/x86_64"
-    clang-url := "{base-url}/mingw-w64-x86_64-clang-13.0.1-3-any.pkg.tar.zst"
-    llvm-url := "{base-url}/mingw-w64-x86_64-llvm-13.0.1-3-any.pkg.tar.zst"
-    clangrootdir := (.. (commonpath (extract (download clang-url))) "/mingw64")
-    llvmrootdir := (.. (commonpath (extract (download llvm-url))) "/mingw64")
     in "/clang"
-        "{clangrootdir}/bin"
-        "{clangrootdir}/lib"
-        "{clangrootdir}/include"
-        "{llvmrootdir}/bin"
-        "{llvmrootdir}/lib"
-        "{llvmrootdir}/include"
-    alias target-clang-include-dir "{clangrootdir}/lib/clang/{VERSION}/include"
+        "{clangdir}/bin"
+        "{clangdir}/lib"
+        "{clangdir}/include"
+        "{llvmdir}/bin"
+        "{llvmdir}/lib"
+        "{llvmdir}/include"
+        "{libxml2dir}/bin"
+    alias target-clang-include-dir "{clangdir}/lib/clang/{VERSION}/include"
