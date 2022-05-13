@@ -358,7 +358,7 @@ let static-error =
             let argcount = (sc_argcount args)
             verify-count argcount 1 1
             let msg = (sc_getarg args 0)
-            let msg = (unbox-pointer msg string)
+            let msg = (unbox-string msg)
             hide-traceback;
             raise (sc_error_new msg)
 
