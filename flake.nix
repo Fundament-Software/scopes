@@ -95,6 +95,9 @@
 
         });
 
+      checks =
+        forAllSystems (system: { build = self.defaultPackage.${system}; });
+
       defaultPackage = forAllSystems (system: self.packages.${system}.scopes);
     };
 }
