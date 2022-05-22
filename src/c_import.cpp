@@ -1001,39 +1001,45 @@ SCOPES_RESULT(const Scope *) import_c_module (
     aargs.push_back("-fno-common");
 
     // grab compiler args from the nix wrapper variable
-    std::string nixenv = getenv("NIX_CFLAGS_COMPILE");
-    std::vector<std::string> nixargs;
-    size_t last = 0;
-    size_t pos = 0;
-    while((pos = nixenv.find(" ", last)) != std::string::npos)
+    const char* envstr = getenv("NIX_CFLAGS_COMPILE");
+    if(envstr != nullptr)
     {
-        if(last != pos)
+        std::string nixenv(envstr);
+        std::vector<std::string> nixargs;
+        size_t last = 0;
+        size_t pos = 0;
+        while((pos = nixenv.find(" ", last)) != std::string::npos)
         {
-            nixargs.push_back(nixenv.substr(last, pos - last));
+            if(last != pos)
+            {
+                nixargs.push_back(nixenv.substr(last, pos - last));
+            }
+            last = pos + 1;
         }
-        last = pos + 1;
-    }
-    nixargs.push_back(nixenv.substr(last));
-    for (auto &it : nixargs) {
-        aargs.push_back(it.c_str());
+        nixargs.push_back(nixenv.substr(last));
+        for (auto &it : nixargs) {
+            aargs.push_back(it.c_str());
+        }
     }
 #ifdef SCOPES_ADD_IMPORT_CFLAGS
-    std::string addflags = SCOPES_ADD_IMPORT_CFLAGS;
-    std::vector<std::string> addargs;
-    last = 0;
-    pos = 0;
-    //split by ! because defining a symbol to a string containing spaces through escaping and an environment variable was too painful
-    while((pos = addflags.find("!", last)) != std::string::npos)
     {
-        if(last != pos)
+        std::string addflags = SCOPES_ADD_IMPORT_CFLAGS;
+        std::vector<std::string> addargs;
+        size_t last = 0;
+        size_t pos = 0;
+        //split by ! because defining a symbol to a string containing spaces through escaping and an environment variable was too painful
+        while((pos = addflags.find("!", last)) != std::string::npos)
         {
-            addargs.push_back(addflags.substr(last, pos - last));
+            if(last != pos)
+            {
+                addargs.push_back(addflags.substr(last, pos - last));
+            }
+            last = pos + 1;
         }
-        last = pos + 1;
-    }
-    addargs.push_back(addflags.substr(last));
-    for (auto &it : addargs) {
-        aargs.push_back(it.c_str());
+        addargs.push_back(addflags.substr(last));
+        for (auto &it : addargs) {
+            aargs.push_back(it.c_str());
+        }
     }
 #endif
 
