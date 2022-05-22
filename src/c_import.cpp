@@ -1002,10 +1002,10 @@ SCOPES_RESULT(const Scope *) import_c_module (
 
     // grab compiler args from the nix wrapper variable
     const char* envstr = getenv("NIX_CFLAGS_COMPILE");
+    std::vector<std::string> nixargs;
     if(envstr != nullptr)
     {
         std::string nixenv(envstr);
-        std::vector<std::string> nixargs;
         size_t last = 0;
         size_t pos = 0;
         while((pos = nixenv.find(" ", last)) != std::string::npos)
@@ -1022,9 +1022,9 @@ SCOPES_RESULT(const Scope *) import_c_module (
         }
     }
 #ifdef SCOPES_ADD_IMPORT_CFLAGS
+    std::vector<std::string> addargs;
     {
         std::string addflags = SCOPES_ADD_IMPORT_CFLAGS;
-        std::vector<std::string> addargs;
         size_t last = 0;
         size_t pos = 0;
         //split by ! because defining a symbol to a string containing spaces through escaping and an environment variable was too painful
