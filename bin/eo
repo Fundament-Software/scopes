@@ -40,9 +40,11 @@ import shutil
 import hashlib
 import configparser
 import sysconfig
+import glob
 import subprocess
+import shlex
 
-VERSION = "0.10"
+VERSION = "0.11"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -99,20 +101,30 @@ def verify_dir(cwd):
         error("no such directory: {}", cwd)
     return cwd
 
-def shell(cmd, retry=1, silent=False):
+def shell(cmd, retry=1, silent=False, capture=False):
     for i in range(retry):
         if not silent:
             if i == 0:
                 print(cmd)
             else:
                 print('attempt #{}: {}'.format(i+1,cmd))
-        result = os.system(cmd)
-        if result == 0:
-            return True
+        # run shell command and return output
+        if capture:
+            try:
+                output = subprocess.check_output(cmd, stderr=subprocess.STDOUT,
+                    encoding = "utf-8", universal_newlines = True, shell = True)
+                return output.strip()
+            except subprocess.CalledProcessError as e:
+                print(e.output)
+                pass
+        else:
+            result = os.system(cmd)
+            if result == 0:
+                return True
         if retry > 1:
             print("Failed, retrying...")
             time.sleep(1)
-    raise OSError("command failed.")
+    error("shell command failed")
 
 def gen_rotator():
     while True:
@@ -662,9 +674,21 @@ def trace(anchor):
     global _active_anchor
     _active_anchor = anchor
 
+class EOError(Exception):
+    def __init__(self, msg):
+        self.history = []
+        self.msg = msg
+
+    def print(self):
+        for msg in self.history:
+            print(msg)
+        print("error: " + self.msg)
+
+    def append(self, msg):
+        self.history.append(msg)
+
 def error(msg, *args):
-    print(msg.format(*args))
-    sys.exit(255)
+    raise EOError(msg.format(*args))
 
 def tag(anchor, obj):
     return obj
@@ -833,9 +857,10 @@ class Parser:
 ################################################################################
 
 class Macro:
-    def __init__(self, name, func):
+    def __init__(self, name, func, closure = False):
         self.name = name
         self.func = func
+        self.closure = closure
 
     def __repr__(self):
         return "<{}>".format(self.name)
@@ -917,6 +942,40 @@ def macro_plain(env, expr):
         error("plain: expected string, not " + repr(type(arg)))
     return env,arg
 
+def macro_fn(env, expr):
+    # syntax: macro <name> (<arg> ...) <body>
+    name = expr[1]
+    autobind = True
+    if type(name) == str:
+        autobind = False
+        name = symbol(name)
+    if not isinstance(name, Symbol):
+        error("macro: expected symbol for function name, not " + repr(type(name)))
+    params = expr[2]
+    if type(params) != tuple:
+        error("macro: expected tuple of arguments, not " + repr(type(params)))
+    for param in params:
+        if not isinstance(param, Symbol):
+            error("macro: expected symbol for parameter, not " + repr(type(param)))
+    body = expr[3]
+    typename = "fn " + name.string + " (" + " ".join(param.string for param in params) + ")"
+    macro_env = env
+    orig_env = macro_env
+    def func (env, expr):
+        args = expr[1:]
+        env,args = expand_args(env,args)
+        if len(args) != len(params):
+            error("{}: expected {} arguments, not {}", typename, len(params), len(args))
+        body_env = macro_env
+        for param,arg in zip(params,args):
+            body_env = env_bind(body_env, param, arg)
+        body_env,result = expand_expr(body_env, body)
+        return env,result
+    macro = Macro(typename, func, closure=True)
+    if autobind:
+        env = env_bind(env,name,macro)
+    return env,macro
+
 def builtin_join (ee, *args):
     return ''.join([str(arg) for arg in args])
 
@@ -938,6 +997,8 @@ def builtin_extract (ee, archivepath):
     ext = os.path.splitext(archivepath)[1]
     if ext == ".zip" and not IS_MINGW:
         shell("unzip \"{}\" -d {}".format(archivepath, tempdir))
+    elif archivepath.endswith(".tar.zst"):
+        shell("unzstd --stdout \"{}\" | tar -xf - -C {}".format(archivepath, tempdir))
     else:
         shell("tar -xf \"{}\" -C {}".format(archivepath, tempdir))
     ee.tempdirs.append(tempdir)
@@ -965,10 +1026,11 @@ def builtin_download_svn(ee, url, revision):
     return filepath
 
 class Shell(Builtin):
-    def __init__(self, cwd, env):
+    def __init__(self, cwd, env, capture = False):
         self.name = "shell"
         self.cwd = cwd
         self.static = False
+        self.capture = capture
         if env:
             assert(isinstance(env, WrappedDict))
             self.env = env.dict
@@ -982,23 +1044,47 @@ class Shell(Builtin):
         if self.env:
             os.environ.update(self.env.items())
         try:
-            shell(command)
+            result = shell(command, capture = self.capture)
         finally:
             os.environ.clear()
             os.environ.update(old_environ)
             os.chdir(old_cwd)
+        return result
 
 def builtin_shell(ee, cwd, env = {}):
     return Shell(cwd, env)
 
+def builtin_rshell(ee, cwd, env = {}):
+    return Shell(cwd, env, capture = True)
+
 def builtin_then(ee, *args):
     return args[-1]
+
+def builtin_dump(ee, *args):
+    print("dump:", *(format_expr(arg) for arg in args))
+    if args:
+        return args[0]
+
+def builtin_report(ee, *args):
+    for arg in args:
+        print(arg)
+    if args:
+        return args[0]
+
+def builtin_firstfile(ee, pattern):
+    # search directory for files matching pattern and sort by modification time
+    files = sorted(glob.glob(pattern), key=os.path.getmtime)
+    if not files:
+        error("firstfile: no files matching {}", pattern)
+    # return most recently modified file
+    return files[-1]
 
 class Macros:
     Dict = Macro("dict", macro_dict)
     Tempdir = Macro("tempdir", macro_tempdir)
     Tempfile = Macro("tempfile", macro_tempfile)
     Plain = Macro("plain", macro_plain)
+    Fn = Macro("fn", macro_fn)
 
 class Builtins:
     Join = Builtin('..', builtin_join, static = True)
@@ -1009,6 +1095,10 @@ class Builtins:
     Extract = Builtin("extract", builtin_extract)
     Mkdir = Builtin("mkdir", builtin_mkdir)
     Shell = Builtin("shell", builtin_shell)
+    RShell = Builtin("rshell", builtin_rshell)
+    Dump = Builtin("dump", builtin_dump)
+    Report = Builtin("report", builtin_report)
+    FirstFile = Builtin("firstfile", builtin_firstfile)
 
 class ExecutionEnv:
     def __init__(self, package = None):
@@ -1321,7 +1411,11 @@ def expand_string(env, s):
                     i += 1
                 if i == L:
                     error("unterminated variable")
-                result.append(env_get(env, symbol(s[start:i])))
+                try:
+                    result.append(env_get(env, symbol(s[start:i])))
+                except EOError as e:
+                    e.append("while resolving string variable")
+                    raise
                 i += 1
             else:
                 # read string chunk up to the next variable and append to result
@@ -1376,9 +1470,17 @@ def expand_expr(env, expr):
                 env = env_bind(env,name,arg)
                 return env,()
         if len(expr) >= 1:
-            env,dest = expand_expr(env,expr[0])
+            try:
+                env,dest = expand_expr(env,expr[0])
+            except EOError as e:
+                e.append("while evaluating expression " + format_expr(expr))
+                raise
             if type(dest) == Macro:
-                return dest.func(env,expr)
+                try:
+                    return dest.func(env,expr)
+                except EOError as e:
+                    e.append("while applying macro " + dest.name)
+                    raise
             else:
                 return expand_args(env, expr)
         return env,()
@@ -1398,13 +1500,23 @@ def expand_args(env, args):
             result.append(arg)
     return orig_env,tuple(result)
 
-def parse_recipe(project, text, path, packages, update_urls):
+def parse_recipe(project, text, path, packages, update_urls, import_urls):
     recipe_path = path
     static_env = ()
+
+    def apply_shortcut(orig_env, args):
+        env = orig_env
+        env,name = expand_expr(env, args[1])
+        name = eval_expr(static_ee, name)
+        env,url = expand_expr(env, args[2])
+        url = eval_expr(static_ee, url)
+        add_import_url(import_urls, name, url)
+        return env,()
 
     def apply_update_url(orig_env, args):
         env = orig_env
         env,url = expand_expr(env, args[1])
+        url = eval_expr(static_ee, url)
         if path in update_urls:
             error("duplicate update-url in recipe {}", path)
         update_urls[path] = url
@@ -1501,6 +1613,7 @@ def parse_recipe(project, text, path, packages, update_urls):
         env = env_bind(env, symbol(platform.name), platform)
     env = env_bind(env, symbol("package"), Macro("package", apply_package))
     env = env_bind(env, symbol("update-url"), Macro("update-url", apply_update_url))
+    env = env_bind(env, symbol("shortcut"), Macro("shortcut", apply_shortcut))
     env = env_bind(env, symbol("cpu-core-count"), get_num_cpu_cores())
     rel_recipe_dir = os.path.relpath(project.recipe_dir, project.path)
     env = env_bind(env, symbol("recipe-dir"),rel_recipe_dir)
@@ -1517,6 +1630,7 @@ def parse_recipe(project, text, path, packages, update_urls):
 def eval_new_expr(ee, expr):
     if type(expr) == tuple:
         # evaluate expression arguments
+        orig_expr = expr
         expr = [eval_expr(ee, arg) for arg in expr]
         # apply the first argument of the expression to the remaining arguments
         if len(expr) >= 1:
@@ -1525,8 +1639,11 @@ def eval_new_expr(ee, expr):
                 if ee.is_static() and not func.static:
                     error("builtin {} not available in static environment", func.name)
                 return func(ee, *expr[1:])
+            elif isinstance(func, Macro) and func.closure:
+                env,result = expand_expr((), tuple(expr))
+                return eval_expr(ee, result)
             else:
-                error("cannot apply value of type {} to function", type(func))
+                error("cannot apply value of type {} to expression {}", type(func), orig_expr)
         else:
             return ()
     else:
@@ -1600,6 +1717,11 @@ def wrap_words(words, width = 80, indent = "  "):
         result.append(indent + line)
     return result
 
+def add_import_url(import_urls, name, url):
+    if name in import_urls:
+        error("duplicate shortcut {}", name)
+    import_urls[name] = url
+
 class Project:
     def __init__(self, path):
         self.path = path
@@ -1615,6 +1737,12 @@ class Project:
             rc.read(rcpath)
         project_recipe_dir = rc.get("eo", "recipedir",
             fallback=PROJECT_RECIPE_DIR)
+        # enumerate entries in shortcuts section of config file
+        self.import_urls = dict(PRESET_IMPORT_URLS)
+        for section in rc.sections():
+            if section == "shortcuts":
+                for name,value in rc.items(section):
+                    add_import_url(self.import_urls, name, value)
         self.recipe_dir = self.path + project_recipe_dir
         self.install_state_dir = self.path + PROJECT_INSTALL_STATE_DIR
 
@@ -1680,33 +1808,54 @@ class Project:
                 filepath = os.path.join(self.recipe_dir, path)
                 if filepath.endswith('.eo') and os.path.isfile(filepath):
                     with open(filepath, 'r') as f:
-                        parse_recipe(self, f.read(), filepath, self.packages, self.update_urls)
+                        try:
+                            packages = collections.OrderedDict(self.packages)
+                            update_urls = dict(self.update_urls)
+                            import_urls = dict(self.import_urls)
+                            parse_recipe(self, f.read(), filepath, packages, update_urls, import_urls)
+                            self.packages.update(packages)
+                            self.update_urls.update(update_urls)
+                            self.import_urls.update(import_urls)
+                        except EOError as e:
+                            # print error and skip it
+                            e.print()
+                            print("skipping broken recipe", filepath)
             if not self.packages:
                 print("no packages available.")
         else:
             print("recipe directory {} not found.".format(self.recipe_dir))
 
     def import_recipe(self, url, install = False, for_update = False, filepath = None):
+        orig_url = url
+        foreign = False
         if not for_update:
-            if url not in PRESET_IMPORT_URLS:
-                print(RECIPE_WARNING)
-                user_confirmation()
-            url = PRESET_IMPORT_URLS.get(url, url)
+            if url not in self.import_urls:
+                foreign = True
+            url = self.import_urls.get(url, url)
         filename = url_filename(url)
         if not filename.endswith(".eo"):
-            error("don't know how to import {}", filename)
+            msg = "don't know how to import {}\n".format(orig_url)
+            msg += "available shortcuts:\n"
+            for name in sorted(self.import_urls.keys()):
+                url = self.import_urls[name]
+                msg += "  {} => {}\n".format(name, url)
+            error(msg)
+        if foreign:
+            print(RECIPE_WARNING)
+            user_confirmation()
         if filepath is None:
             filepath = os.path.join(self.recipe_dir, filename)
             if not for_update:
                 if os.path.isfile(filepath):
-                    error("file {} already exists.", filepath)
+                    print("file",filepath,"already exists, skipping")
+                    return
             os.makedirs(self.recipe_dir, exist_ok=True)
         try:
             tmpfilepath = download_tempfile(url, filename, silent = for_update)
         except:
             error("failed to download {}", url)
         with open(tmpfilepath, 'r') as f:
-            parse_recipe(self, f.read(), tmpfilepath, self.packages, self.update_urls)
+            parse_recipe(self, f.read(), tmpfilepath, self.packages, self.update_urls, self.import_urls)
         shutil.copy2(tmpfilepath, filepath)
         if not for_update:
             names = []
@@ -1872,6 +2021,7 @@ def cmd_init(args):
 
 def cmd_import(args):
     project = Project.find(".")
+    project.read_packages()
     project.import_recipe(args.url, install=args.install)
 
 def cmd_update(args):
@@ -1977,7 +2127,11 @@ cmd.add_argument("--keep-deps",action="store_true",
 if __name__ == '__main__':
     args = arguments.parse_args()
     if args.subcommand:
-        args.func(args)
+        try:
+            args.func(args)
+        except EOError as e:
+            e.print()
+            sys.exit(255)
     else:
         print_program_header()
         print("Major EO reporting for duty. Try `eo --help` for more info.")

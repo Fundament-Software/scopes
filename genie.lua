@@ -12,10 +12,11 @@ if os.is("windows") then
 end
 local MINGW_BASE_PATH = MSYS_BASE_PATH .. "/mingw64"
 local MSYS_BIN_PATH = MSYS_BASE_PATH .. "/usr/bin"
+local MINGW_BIN_PATH = MINGW_BASE_PATH .. "/bin"
 if os.is("linux") then
     CLANG_PATH = THISDIR .. "/clang/bin:" .. os.getenv("PATH")
 elseif os.is("windows") then
-    CLANG_PATH = MINGW_BASE_PATH .. "/bin"
+    CLANG_PATH = THISDIR .. "/clang/bin;" .. os.getenv("PATH")
 elseif os.is("macosx") then
     CLANG_PATH = "/clang/bin:" .. os.outputof("brew --prefix llvm|tr -d '\n'") .. "/bin"
 else
@@ -61,7 +62,7 @@ local function finddir(name, searchpath)
 end
 
 local function dllpath(name, searchpath)
-    searchpath = searchpath or CLANG_PATH
+    searchpath = searchpath or MINGW_BIN_PATH
     assert(os.is("windows"))
     name = name .. ".dll"
     local path = os.pathsearch(name, searchpath)

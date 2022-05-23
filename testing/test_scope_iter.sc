@@ -13,3 +13,8 @@ for scope in ('lineage (globals))
     for k v in scope
         print k "=" v
         assert (('typeof k) == Symbol)
+
+print;
+for k v scope in ('all (globals))
+    print k "=" v
+    assert (('typeof k) == Symbol)
