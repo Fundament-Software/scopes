@@ -44,7 +44,7 @@ import glob
 import subprocess
 import shlex
 
-VERSION = "0.11"
+VERSION = "0.12"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -885,6 +885,15 @@ class WrappedDict:
     def __repr__(self):
         return repr(self.dict)
 
+def builtin_dict(ee, wdict):
+    env = {}
+    for k,v in wdict.dict.items():
+        k = eval_expr(ee, k)
+        v = eval_expr(ee, v)
+        env[k] = v
+    return WrappedDict(env)
+builtin_dict = Builtin("dict", builtin_dict)
+
 def macro_dict(env, expr):
     result = {}
     for entry in expr[1:]:
@@ -905,7 +914,7 @@ def macro_dict(env, expr):
         env,val = expand_expr(env, entry)
         if val != ():
             error("`key : value` or `name = value` expected")
-    return env,WrappedDict(result)
+    return env,(builtin_dict, WrappedDict(result))
 
 class Tempdir(Builtin):
     def __init__(self):
