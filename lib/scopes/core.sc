@@ -2882,6 +2882,20 @@ fn string-array-ref-type? (T)
                         if (ptrcmp== ('element@ vT 0) i8)
                             return `rawstring->string
                     `()
+    __static-imply =
+        box-pointer
+            spice-cast-macro
+                fn (vT T)
+                    let string->zarray =
+                        spice-macro
+                            fn (args)
+                                let argc = ('argcount args)
+                                verify-count argc 1 1
+                                let str = ('getarg args 0)
+                                sc_const_string_new (unbox str string)
+                    if (ptrcmp== T zarray)
+                        return `string->zarray
+                    `()
     __imply =
         box-pointer
             spice-cast-macro
@@ -5327,17 +5341,19 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
             inline passthru (self) self
             spice-cast-macro
                 fn "array.__rimply" (cls T)
-                    if ('unsized? T)
-                        if (T == ('set-element-count cls))
-                            return `passthru
+                    if (not ('opaque? T))
+                        if ('unsized? T)
+                            if (T == ('set-element-count cls))
+                                return `passthru
                     `()
 
     __typematch =
         spice-cast-macro
             fn "array.__typematch" (cls T)
-                if ('unsized? cls) # unsized array
-                    if (cls == ('set-element-count T))
-                        return `true
+                if (not ('opaque? T))
+                    if ('unsized? cls) # unsized array
+                        if (cls == ('set-element-count T))
+                            return `true
                 `false
 
 inline gen-arrayof (gentypef insertop)
