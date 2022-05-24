@@ -42,6 +42,8 @@ let square-list = spice-unquote-arguments
 # first we alias u64 to the integer type that can hold a pointer
 let intptr = u64
 
+let rawstring = (sc_pointer_type char pointer-flag-non-writable unnamed)
+
 inline swap (a b)
     """"Safely exchanges the contents of two references.
     let tmp = (deref (dupe b))
@@ -1005,6 +1007,16 @@ let prefix:str =
             spice-quote
                 sc_const_string_extract `str
 
+# rawstring conversion
+let prefix:& =
+    spice-macro
+        fn (args)
+            raising Error
+            let str = (sc_getarg args 0)
+            let str = (sc_string_unescape (sc_const_string_extract str))
+            spice-quote
+                bitcast (reftoptr str) rawstring
+
 run-stage; # 3
 
 'define-symbol type 'set-symbols
@@ -1277,8 +1289,6 @@ let protect =
             if (type< T pointer)
                 return `(bitcast self [('immutable T)])
             error str"syntax: (protect pointer-value)"
-
-let rawstring = (pointer char)
 
 # cheap version of `not` - to be replaced further down
 inline not (value)
