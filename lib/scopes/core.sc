@@ -6882,6 +6882,8 @@ sugar fn... (name...)
 let inline... = fn...
 
 sugar from (src 'let params...)
+    let params... = ('reverse params...)
+
     let keyparams valueparams =
         loop (params keyparams valueparams = params... '() '())
             sugar-match params
