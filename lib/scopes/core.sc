@@ -5232,6 +5232,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                 block
                     if
                         &
+                            rhsT < array
                             not ('unsized? lhsT)
                             not ('unsized? rhsT)
                             ('element@ lhsT 0) == ('element@ rhsT 0)
