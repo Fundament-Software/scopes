@@ -669,6 +669,7 @@ void init_llvm() {
 #endif
 #ifdef SCOPES_TARGET_AARCH64
     LLVMInitializeAArch64Target();
+    LLVMInitializeAArch64TargetMC();
     LLVMInitializeAArch64TargetInfo();
     LLVMInitializeAArch64AsmPrinter();
     LLVMInitializeAArch64AsmParser();
@@ -676,6 +677,7 @@ void init_llvm() {
 #endif
 #ifdef SCOPES_TARGET_RISCV
     LLVMInitializeRISCVTarget();
+    LLVMInitializeRISCVTargetMC();
     LLVMInitializeRISCVTargetInfo();
     LLVMInitializeRISCVAsmPrinter();
     LLVMInitializeRISCVAsmParser();
