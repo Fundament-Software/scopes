@@ -58,6 +58,7 @@
 #include "minilibs/regexp.cpp"
 
 #include <llvm-c/Support.h>
+#include "llvm/Support/TargetRegistry.h"
 
 #include "dyn_cast.inc"
 #include "verify_tools.inc"
@@ -319,6 +320,10 @@ sc_void_raises_t sc_compile_object(const sc_string_t *target_triple,
     int file_kind, const sc_string_t *path, const sc_scope_t *table, uint64_t flags) {
     using namespace scopes;
     return convert_result(compile_object(target_triple, (CompilerFileKind)file_kind, path, table, flags));
+}
+
+void sc_show_targets() {
+    llvm::TargetRegistry::printRegisteredTargetsForVersion(llvm::outs());
 }
 
 void sc_enter_solver_cli () {
@@ -2482,6 +2487,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_spirv_to_glsl, TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_default_target_triple, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_object, _void, TYPE_String, TYPE_I32, TYPE_String, TYPE_Scope, TYPE_U64);
+    DEFINE_EXTERN_C_FUNCTION(sc_show_targets, _void);
     DEFINE_EXTERN_C_FUNCTION(sc_enter_solver_cli, _void);
     DEFINE_EXTERN_C_FUNCTION(sc_launch_args, arguments_type({TYPE_I32,native_ro_pointer_type(rawstring)}));
     DEFINE_EXTERN_C_FUNCTION(sc_set_typecast_handler, _void, TYPE_typecast_func);

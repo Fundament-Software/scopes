@@ -86,16 +86,44 @@ local function print_list(l)
     end
 end
 
+local SCOPES_TARGETS = os.getenv "SCOPES_TARGETS"
+if not SCOPES_TARGETS then SCOPES_TARGETS = "native webassembly" end
+local targets = {}
+for target in string.gmatch(SCOPES_TARGETS, "%w+") do
+    table.insert(targets, target)
+end
+-- new known targets must also be handled elsewhere; grep SCOPES_KNOWN_TARGETS to find them
+-- ensure these names match llvm-config component names
+local known_targets = {
+    "native",
+    "webassembly",
+    "aarch64",
+    "riscv",
+}
+for i, v in ipairs(known_targets) do
+    known_targets[v] = i --include reverse lookup
+end
+local target_defines = {}
+local target_components = {}
+for i, target in ipairs(targets) do
+    if not known_targets[target] then
+        error(string.format("unknown target %q; the known targets are: %s", target, table.concat(known_targets, "")))
+    end
+    target_defines[i] = "SCOPES_TARGET_" .. string.upper(target)
+    target_components[i] = target
+end
+
+
 local CLANG_CXX = toolpath("clang++", CLANG_PATH)
 local CLANG_CC = toolpath("clang", CLANG_PATH)
 local LLVM_CONFIG = toolpath("llvm-config", CLANG_PATH)
 
 local LLVM_LDFLAGS = pkg_config(LLVM_CONFIG .. " --ldflags")
 local LLVM_CXXFLAGS = pkg_config(LLVM_CONFIG .. " --cxxflags")
-local TARGET_COMPONENTS = ""
+local TARGET_COMPONENTS = table.concat(target_components, " ")
 local LLVM_LIBS = pkg_config(LLVM_CONFIG .. " --link-static --libs orcjit"
     .. " engine passes option objcarcopts coverage support lto coroutines"
-    .. " webassembly frontendopenmp native orcshared orctargetprocess jitlink"
+    .. " frontendopenmp orcshared orctargetprocess jitlink"
     .. " " .. TARGET_COMPONENTS)
 local LLVM_INCLUDEDIR = pkg_config(LLVM_CONFIG .. " --includedir")
 
@@ -253,6 +281,7 @@ project "scopesrt"
         "SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS",
         "SCOPESRT_IMPL"
     }
+    defines(target_defines)
 
     configuration { "linux" }
         defines { "SCOPES_LINUX" }

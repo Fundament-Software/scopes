@@ -35,6 +35,8 @@
 #include "llvm/ExecutionEngine/JITEventListener.h"
 #include "llvm/Object/SymbolSize.h"
 
+#include "llvm/Support/TargetSelect.h"
+
 #include <limits.h>
 
 #include <stdio.h>
@@ -649,16 +651,38 @@ void init_llvm() {
 
     // remove crash message
     //LLVMEnablePrettyStackTrace();
+
+    // new known targets must also be handled elsewhere; grep SCOPES_KNOWN_TARGETS to find them
+#ifdef SCOPES_TARGET_NATIVE
     LLVMInitializeNativeTarget();
     LLVMInitializeNativeAsmPrinter();
     LLVMInitializeNativeAsmParser();
     LLVMInitializeNativeDisassembler();
+#endif
+#ifdef SCOPES_TARGET_WEBASSEMBLY
     LLVMInitializeWebAssemblyTargetInfo();
     LLVMInitializeWebAssemblyTarget();
     LLVMInitializeWebAssemblyTargetMC();
     LLVMInitializeWebAssemblyAsmPrinter();
     LLVMInitializeWebAssemblyAsmParser();
     LLVMInitializeWebAssemblyDisassembler();
+#endif
+#ifdef SCOPES_TARGET_AARCH64
+    LLVMInitializeAArch64Target();
+    LLVMInitializeAArch64TargetInfo();
+    LLVMInitializeAArch64AsmPrinter();
+    LLVMInitializeAArch64AsmParser();
+    LLVMInitializeAArch64Disassembler();
+#endif
+#ifdef SCOPES_TARGET_RISCV
+    LLVMInitializeRISCVTarget();
+    LLVMInitializeRISCVTargetInfo();
+    LLVMInitializeRISCVAsmPrinter();
+    LLVMInitializeRISCVAsmParser();
+    LLVMInitializeRISCVDisassembler();
+#endif
+
+
 
 #ifdef SCOPES_WIN32
     // from mingwex.a
