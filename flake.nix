@@ -31,67 +31,80 @@
             '';
           };
 
-          scopes = pkgs.stdenv.mkDerivation {
-            pname = "scopes";
-            version = "0.18";
-            src = ./.;
-            enableParallelBuilding = true;
+          scopes = let
+            withTargets = targets:
+              pkgs.stdenv.mkDerivation {
+                pname = "scopes";
+                version = "0.18";
+                src = ./.;
+                enableParallelBuilding = true;
 
-            buildInputs = [
-              llvmpkgs.clang
-              llvmpkgs.libclang
-              llvmpkgs.llvm.dev
-              # llvmpkgs.llvm-polly
-              pkgs.spirv-tools
-              selfpkgs.genie
-              pkgs.makeWrapper
-            ];
+                buildInputs = [
+                  llvmpkgs.clang
+                  llvmpkgs.libclang
+                  llvmpkgs.llvm.dev
+                  # llvmpkgs.llvm-polly
+                  pkgs.spirv-tools
+                  selfpkgs.genie
+                  pkgs.makeWrapper
+                ];
 
-            configurePhase = ''
-              # Only source is needed of spirv-cross
-              ln --symbolic ${spirv-cross-src} SPIRV-Cross
+                SCOPES_TARGETS = targets;
 
-              # Pretend that we built spirv-tools
-              mkdir --parents SPIRV-Tools/build/source/opt
-              ln --symbolic --target-directory=SPIRV-Tools/build/source     ${pkgs.spirv-tools}/lib/libSPIRV-Tools.a
-              ln --symbolic --target-directory=SPIRV-Tools/build/source/opt ${pkgs.spirv-tools}/lib/libSPIRV-Tools-opt.a
+                configurePhase = ''
+                  # Only source is needed of spirv-cross
+                  ln --symbolic ${spirv-cross-src} SPIRV-Cross
 
-              genie gmake
-            '';
+                  # Pretend that we built spirv-tools
+                  mkdir --parents SPIRV-Tools/build/source/opt
+                  ln --symbolic --target-directory=SPIRV-Tools/build/source     ${pkgs.spirv-tools}/lib/libSPIRV-Tools.a
+                  ln --symbolic --target-directory=SPIRV-Tools/build/source/opt ${pkgs.spirv-tools}/lib/libSPIRV-Tools-opt.a
 
-            makeFlags = [ "-C build" "config=release" ];
+                  genie gmake
+                '';
 
-            buildPhase = ''
-              NIX_CFLAGS_COMPILE+=\ -DSCOPES_ADD_IMPORT_CFLAGS=\"-isystem!${llvmpkgs.clang}/resource-root/include/!-isystem!${
-                nixpkgs.lib.getDev pkgs.stdenv.cc.libc
-              }/include/\"
+                makeFlags = [ "-C build" "config=release" ];
 
-              echo $NIX_CFLAGS_COMPILE
+                buildPhase = ''
+                  NIX_CFLAGS_COMPILE+=\ -DSCOPES_ADD_IMPORT_CFLAGS=\"-isystem!${llvmpkgs.clang}/resource-root/include/!-isystem!${
+                    nixpkgs.lib.getDev pkgs.stdenv.cc.libc
+                  }/include/\"
 
-              # echo make $makeFlags scopes
-              make -j$NIX_BUILD_CORES $makeFlags
-              # false
-            '';
+                  echo $NIX_CFLAGS_COMPILE
 
-            installPhase = ''
-              install -D --target-directory="$out/bin" bin/scopes
-              # wrapProgram $out/bin/scopes --suffix NIX_CFLAGS_COMPILE "" " -isystem ${llvmpkgs.clang}/resource-root/include/ -isystem ${
-                nixpkgs.lib.getDev pkgs.stdenv.cc.libc
-              }/include/"
-              install -D --target-directory="$out/lib" bin/libscopesrt.so
-              cp -r ./lib/scopes $out/lib/scopes
-              # echo ${llvmpkgs.clang} >> $out/clangpath
-              # mkdir -p $out
-              # cp -r ./ $out/builddump
-            '';
+                  # echo make $makeFlags scopes
+                  make -j$NIX_BUILD_CORES $makeFlags
+                  # false
+                '';
 
-            checkInputs = [ pkgs.glibc.dev ];
+                installPhase = ''
+                  install -D --target-directory="$out/bin" bin/scopes
+                  # wrapProgram $out/bin/scopes --suffix NIX_CFLAGS_COMPILE "" " -isystem ${llvmpkgs.clang}/resource-root/include/ -isystem ${
+                    nixpkgs.lib.getDev pkgs.stdenv.cc.libc
+                  }/include/"
+                  install -D --target-directory="$out/lib" bin/libscopesrt.so
+                  cp -r ./lib/scopes $out/lib/scopes
+                  # echo ${llvmpkgs.clang} >> $out/clangpath
+                  # mkdir -p $out
+                  # cp -r ./ $out/builddump
+                '';
 
-            checkPhase = ''
-              SCOPES_CACHE=./scopes_cache bin/scopes testing/test_all.sc
-            '';
-            doCheck = false;
-          };
+                checkInputs = [ pkgs.glibc.dev ];
+
+                checkPhase = ''
+                  SCOPES_CACHE=./scopes_cache bin/scopes testing/test_all.sc
+                '';
+                doCheck = false;
+
+                passthru = { inherit withTargets; };
+              };
+          in withTargets [ "native" "webassembly" ];
+          scopesAllTargets = selfpkgs.scopes.withTargets [
+            "native"
+            "webassembly"
+            "aarch64"
+            "riscv"
+          ];
 
         });
 
