@@ -112,5 +112,13 @@
         forAllSystems (system: { build = self.defaultPackage.${system}; });
 
       defaultPackage = forAllSystems (system: self.packages.${system}.scopes);
+
+      templates = {
+        minimal = {
+          description =
+            "a minimal scopes project that pulls in scopes as a dep but doesn't define any packages";
+          path = ./nix/templates/minimal;
+        };
+      };
     };
 }
