@@ -257,9 +257,9 @@ fn build-repr-switch-case (litT self allow-dupes? style? field-types)
             if style?
                 sc_default_styler style-number name
             else name
-        sc_switch_append_case sw lit name
+        sc_switch_append_case sw lit `(string name)
         i
-    sc_switch_append_default sw "?invalid?"
+    sc_switch_append_default sw `(string "?invalid?")
     sw
 
 # constructor for unit tags without payload

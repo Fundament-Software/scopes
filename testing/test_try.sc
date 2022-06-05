@@ -94,3 +94,11 @@ do
         ;
 
     One.test-refcount-balanced;
+
+# test wrong syntax (previously crashed)
+test-compiler-error
+    try
+        if true
+            error "we meant to error here"
+    catch (ex)
+        report ex
