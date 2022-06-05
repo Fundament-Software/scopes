@@ -42,6 +42,8 @@ let square-list = spice-unquote-arguments
 # first we alias u64 to the integer type that can hold a pointer
 let intptr = u64
 
+let rawstring = (sc_pointer_type char pointer-flag-non-writable unnamed)
+
 inline swap (a b)
     """"Safely exchanges the contents of two references.
     let tmp = (deref (dupe b))
@@ -1005,6 +1007,16 @@ let prefix:str =
             spice-quote
                 sc_const_string_extract `str
 
+# rawstring conversion
+let prefix:& =
+    spice-macro
+        fn (args)
+            raising Error
+            let str = (sc_getarg args 0)
+            let str = (sc_string_unescape (sc_const_string_extract str))
+            spice-quote
+                bitcast (reftoptr str) rawstring
+
 run-stage; # 3
 
 'define-symbol type 'set-symbols
@@ -1277,8 +1289,6 @@ let protect =
             if (type< T pointer)
                 return `(bitcast self [('immutable T)])
             error str"syntax: (protect pointer-value)"
-
-let rawstring = (pointer char)
 
 # cheap version of `not` - to be replaced further down
 inline not (value)
@@ -2881,6 +2891,20 @@ fn string-array-ref-type? (T)
                     elseif (icmp== ('kind vT) type-kind-pointer)
                         if (ptrcmp== ('element@ vT 0) i8)
                             return `rawstring->string
+                    `()
+    __static-imply =
+        box-pointer
+            spice-cast-macro
+                fn (vT T)
+                    let string->zarray =
+                        spice-macro
+                            fn (args)
+                                let argc = ('argcount args)
+                                verify-count argc 1 1
+                                let str = ('getarg args 0)
+                                sc_const_string_new (unbox str string)
+                    if (ptrcmp== T zarray)
+                        return `string->zarray
                     `()
     __imply =
         box-pointer
@@ -5208,6 +5232,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                 block
                     if
                         &
+                            rhsT < array
                             not ('unsized? lhsT)
                             not ('unsized? rhsT)
                             ('element@ lhsT 0) == ('element@ rhsT 0)
@@ -5327,17 +5352,19 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
             inline passthru (self) self
             spice-cast-macro
                 fn "array.__rimply" (cls T)
-                    if ('unsized? T)
-                        if (T == ('set-element-count cls))
-                            return `passthru
+                    if (not ('opaque? T))
+                        if ('unsized? T)
+                            if (T == ('set-element-count cls))
+                                return `passthru
                     `()
 
     __typematch =
         spice-cast-macro
             fn "array.__typematch" (cls T)
-                if ('unsized? cls) # unsized array
-                    if (cls == ('set-element-count T))
-                        return `true
+                if (not ('opaque? T))
+                    if ('unsized? cls) # unsized array
+                        if (cls == ('set-element-count T))
+                            return `true
                 `false
 
 inline gen-arrayof (gentypef insertop)
@@ -6866,6 +6893,8 @@ sugar fn... (name...)
 let inline... = fn...
 
 sugar from (src 'let params...)
+    let params... = ('reverse params...)
+
     let keyparams valueparams =
         loop (params keyparams valueparams = params... '() '())
             sugar-match params

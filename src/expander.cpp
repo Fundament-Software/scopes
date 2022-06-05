@@ -659,7 +659,7 @@ struct Expander {
             it = SCOPES_GET_RESULT(extract_list_constant(next->at));
             if (it != EOL) {
                 auto tok = try_extract_symbol(it->at);
-                switch (tok.known_value()) {
+                switch (tok.value()) {
                 case KW_Else: {
                     auto except_anchor = it->at.anchor();
                     LabelTemplateRef except_label = ref(except_anchor, LabelTemplate::except_all_from(
