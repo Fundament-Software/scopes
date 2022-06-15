@@ -362,6 +362,7 @@ typedef Map < Struct
         (deref self._count) as usize
 
     fn __drop (self)
+        returning void
         for i in (range 0:u64 (self._mask + 1:u64))
             if (valid-slot? self i)
                 __drop (self._keys @ i)
@@ -369,6 +370,7 @@ typedef Map < Struct
         free self._valid
         free self._keys
         free self._values
+        _;
 
     fn __copy (self)
         local other : (typeof self)

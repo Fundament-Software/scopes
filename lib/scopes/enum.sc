@@ -376,13 +376,9 @@ fn finalize-enum-runtime (T storage)
         inline... drop-any
         case (arg : Nothing,)
         case (args...)
+            returning void
             va-map __drop args...
-            ;
-        inline... drop-any
-        case (arg : Nothing,)
-        case (args...)
-            va-map __drop args...
-            ;
+            _;
         inline cmp-default () false
         inline hash-default () (nullof hash)
         # build repr function
@@ -430,6 +426,7 @@ fn finalize-enum-runtime (T storage)
                                                     va-map copy args...
             fn __drop (self)
                 viewing self
+                returning void
                 #print "dropping option" self
                 '__dispatch self
                     spice-unquote

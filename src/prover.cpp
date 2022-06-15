@@ -566,7 +566,10 @@ static SCOPES_RESULT(TypedValueRef) _build_drop(const ASTContext &ctx,
             ref(anchor, CallTemplate::from(handler, { val }));
         auto result = SCOPES_GET_RESULT(prove(ctx, expr));
         auto RT = result->get_type();
-        if (!is_returning(RT) || is_returning_value(RT)) {
+        if (!is_returning(RT)) {
+            SCOPES_ERROR(DropDiverges);
+        }
+        if (is_returning_value(RT)) {
             SCOPES_ERROR(DropReturnsArguments);
         }
         SCOPES_CHECK_RESULT(verify_valid(ctx, ids, "drop"));
