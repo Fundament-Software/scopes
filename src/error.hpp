@@ -188,6 +188,8 @@ formatters:
         PType, PAnchor) \
     T(DropReturnsArguments, \
         "drop operation must not return any arguments") \
+    T(DropDiverges, \
+        "drop operation must finish and not diverge") \
     T(RecursiveDrop, \
         "drop operation of value of type %0 is reentrant", \
         PType) \
