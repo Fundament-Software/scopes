@@ -653,12 +653,10 @@ void init_llvm() {
     //LLVMEnablePrettyStackTrace();
 
     // new known targets must also be handled elsewhere; grep SCOPES_KNOWN_TARGETS to find them
-#ifdef SCOPES_TARGET_NATIVE
     LLVMInitializeNativeTarget();
     LLVMInitializeNativeAsmPrinter();
     LLVMInitializeNativeAsmParser();
     LLVMInitializeNativeDisassembler();
-#endif
 #ifdef SCOPES_TARGET_WEBASSEMBLY
     LLVMInitializeWebAssemblyTargetInfo();
     LLVMInitializeWebAssemblyTarget();
