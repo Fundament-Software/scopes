@@ -6,3 +6,5 @@ src/known_symbols.hpp
 /SPIRV-Tools
 /.eo
 /lib/scopes/clang/include
+testing/_test.wasm
+testing/test.o

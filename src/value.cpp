@@ -1710,7 +1710,6 @@ ConstIntRef ConstInt::from(const Type *type, std::vector<uint64_t> values) {
     auto w = T->width;
     auto issigned = T->issigned;
     auto numwords = (w + 63) / 64;
-    std::cout << "in: " << values.size() << " out: " << numwords << std::endl;
     if (values.size() > numwords) {
         // truncate
         values.resize(numwords);
