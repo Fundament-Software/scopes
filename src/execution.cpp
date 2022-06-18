@@ -45,6 +45,7 @@
 #include <vector>
 
 #include <zlib.h>
+#include "absl/container/flat_hash_map.h"
 
 #define SCOPES_CACHE_KEY_BITCODE 1
 #define SCOPES_LLVM_SUPPORT_DISASSEMBLY 1
@@ -116,7 +117,7 @@ public:
 
     DisassemblyListener() {}
 
-    std::unordered_map<std::string, size_t> sizes;
+    absl::flat_hash_map<std::string, size_t> sizes;
 
     void InitializeDebugData(
         llvm::StringRef name,
@@ -232,7 +233,7 @@ static LLVMOrcJITDylibRef jit_dylib = nullptr;
 static LLVMTargetMachineRef jit_target_machine = nullptr;
 static LLVMTargetMachineRef object_target_machine = nullptr;
 //static std::vector<void *> loaded_libs;
-static std::unordered_map<Symbol, void *, Symbol::Hash> cached_dlsyms;
+static absl::flat_hash_map<Symbol, void *, Symbol::Hash> cached_dlsyms;
 
 const String *get_default_target_triple() {
     auto str = LLVMGetDefaultTargetTriple();

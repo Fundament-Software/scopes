@@ -18,7 +18,7 @@
 #include "prover.hpp"
 
 #include <assert.h>
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -686,7 +686,7 @@ struct ConstSet {
         }
     };
 
-    std::unordered_set<T *, Hash, Equal> map;
+    absl::flat_hash_set<T *, Hash, Equal> map;
 
     template<typename ... Args>
     TValueRef<T> from(Args ... args) {
@@ -1710,6 +1710,7 @@ ConstIntRef ConstInt::from(const Type *type, std::vector<uint64_t> values) {
     auto w = T->width;
     auto issigned = T->issigned;
     auto numwords = (w + 63) / 64;
+    std::cout << "in: " << values.size() << " out: " << numwords << std::endl;
     if (values.size() > numwords) {
         // truncate
         values.resize(numwords);
@@ -2197,7 +2198,7 @@ struct Equal {
 
 } // namespace ClosureSet
 
-static std::unordered_set<Closure *, ClosureSet::Hash, ClosureSet::Equal> closures;
+static absl::flat_hash_set<Closure *, ClosureSet::Hash, ClosureSet::Equal> closures;
 
 Closure::Closure(const TemplateRef &_func, const FunctionRef &_frame) :
     func(_func), frame(_frame) {}

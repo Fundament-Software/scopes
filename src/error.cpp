@@ -153,7 +153,7 @@ static void format_error(StyledStream &ss, void (*f)(StyledStream&, FuncTypes ..
 #if 0
 static std::vector<Symbol> find_closest_match(Symbol name, const Symbols &symbols) {
     const String *s = name.name();
-    std::unordered_set<Symbol, Symbol::Hash> done;
+    absl::flat_hash_set<Symbol, Symbol::Hash> done;
     done.insert(SYM_Unnamed);
     std::vector<Symbol> best_syms;
     size_t best_dist = (size_t)-1;

@@ -52,6 +52,7 @@
 //#include "llvm/Support/raw_os_ostream.h"
 
 #include "dyn_cast.inc"
+#include "absl/container/flat_hash_map.h"
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
@@ -86,7 +87,7 @@ struct PointerNamespace {
     size_t name = 0;
     size_t next_pointer_id = 1;
     char kind = '?';
-    std::unordered_map<const void *, std::string> ptr2id;
+    absl::flat_hash_map<const void *, std::string> ptr2id;
 
     std::string get_pointer_id(const void *ptr) {
         auto it = ptr2id.find(ptr);
@@ -192,12 +193,12 @@ struct LLVMIRGenerator {
         }
     };
 
-    std::unordered_map<Label *, LLVMValueRef> label2func;
-    std::unordered_map< std::pair<LLVMValueRef, Label *>,
+    absl::flat_hash_map<Label *, LLVMValueRef> label2func;
+    absl::flat_hash_map< std::pair<LLVMValueRef, Label *>,
         LLVMBasicBlockRef, HashFuncLabelPair> label2bb;
     std::vector< std::pair<Label *, Label *> > bb_label_todo;
 
-    std::unordered_map< ParamKey, LLVMValueRef, HashFuncParamPair> param2value;
+    absl::flat_hash_map< ParamKey, LLVMValueRef, HashFuncParamPair> param2value;
 
 
     Label::UserMap user_map;
@@ -207,21 +208,21 @@ struct LLVMIRGenerator {
     typedef std::vector<LLVMTypeRef> LLVMTypeRefs;
     typedef std::vector<LLVMMetadataRef> LLVMMetadataRefs;
 
-    std::unordered_map<Symbol, LLVMMetadataRef, Symbol::Hash> file2value;
-    std::unordered_map<void *, LLVMValueRef> ptr2global;
-    std::unordered_map<ValueIndex, LLVMValueRef, ValueIndex::Hash> ref2value;
-    std::unordered_map<Function *, LLVMMetadataRef> func2md;
-    std::unordered_map<Function *, Symbol> func_export_table;
-    std::unordered_map<Global *, LLVMValueRef> global2global;
+    absl::flat_hash_map<Symbol, LLVMMetadataRef, Symbol::Hash> file2value;
+    absl::flat_hash_map<void *, LLVMValueRef> ptr2global;
+    absl::flat_hash_map<ValueIndex, LLVMValueRef, ValueIndex::Hash> ref2value;
+    absl::flat_hash_map<Function *, LLVMMetadataRef> func2md;
+    absl::flat_hash_map<Function *, Symbol> func_export_table;
+    absl::flat_hash_map<Global *, LLVMValueRef> global2global;
     std::vector<LLVMValueRef> constructors;
     LLVMValueRef constructor_function = nullptr;
     std::deque<FunctionRef> function_todo;
     static Types type_todo;
-    static std::unordered_map<const Type *, LLVMTypeRef> type_cache;
-    static std::unordered_map<Function *, std::string> func_cache;
-    static std::unordered_map<Global *, std::string> global_cache;
+    static absl::flat_hash_map<const Type *, LLVMTypeRef> type_cache;
+    static absl::flat_hash_map<Function *, std::string> func_cache;
+    static absl::flat_hash_map<Global *, std::string> global_cache;
 
-    static std::unordered_map<size_t, PointerNamespaces *> pointer_namespaces;
+    static absl::flat_hash_map<size_t, PointerNamespaces *> pointer_namespaces;
 
     PointerNamespaces *_ns;
 
@@ -292,7 +293,7 @@ struct LLVMIRGenerator {
         }
     };
 
-    std::unordered_map< PMIntrinsicKey, LLVMValueRef, HashPMIntrinsicKey > pm_intrinsics;
+    absl::flat_hash_map< PMIntrinsicKey, LLVMValueRef, HashPMIntrinsicKey > pm_intrinsics;
 
 #if SCOPES_LLVM_EXTENDED_DEBUG_INFO
     LLVMMetadataRef debug_voidT;
@@ -309,7 +310,7 @@ struct LLVMIRGenerator {
     LLVMMetadataRef debug_f128T;
     LLVMMetadataRef debug_rawstringT;
     LLVMMetadataRef debug_noneT;
-    std::unordered_map<const Type *, LLVMMetadataRef> debug_type_cache;
+    absl::flat_hash_map<const Type *, LLVMMetadataRef> debug_type_cache;
     std::vector<const Type *> debug_type_todo;
     std::vector<std::pair<LLVMMetadataRef, LLVMMetadataRef>> debug_type_to_replace;
     LLVMMetadataRef current_debug_block = nullptr;
@@ -3238,10 +3239,10 @@ struct LLVMIRGenerator {
 };
 
 Error *LLVMIRGenerator::last_llvm_error = nullptr;
-std::unordered_map<const Type *, LLVMTypeRef> LLVMIRGenerator::type_cache;
-std::unordered_map<Function *, std::string> LLVMIRGenerator::func_cache;
-std::unordered_map<Global *, std::string> LLVMIRGenerator::global_cache;
-std::unordered_map<size_t, PointerNamespaces *> LLVMIRGenerator::pointer_namespaces;
+absl::flat_hash_map<const Type *, LLVMTypeRef> LLVMIRGenerator::type_cache;
+absl::flat_hash_map<Function *, std::string> LLVMIRGenerator::func_cache;
+absl::flat_hash_map<Global *, std::string> LLVMIRGenerator::global_cache;
+absl::flat_hash_map<size_t, PointerNamespaces *> LLVMIRGenerator::pointer_namespaces;
 Types LLVMIRGenerator::type_todo;
 LLVMTypeRef LLVMIRGenerator::voidT = nullptr;
 LLVMTypeRef LLVMIRGenerator::i1T = nullptr;

@@ -17,8 +17,8 @@
 #include "qualifier/unique_qualifiers.hpp"
 
 #include <vector>
-#include <unordered_map>
-#include <unordered_set>
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -59,7 +59,7 @@ struct ValueIndex {
     struct Hash {
         std::size_t operator()(const ValueIndex & s) const;
     };
-    typedef std::unordered_set<ValueIndex, ValueIndex::Hash> Set;
+    typedef absl::flat_hash_set<ValueIndex, ValueIndex::Hash> Set;
 
     ValueIndex(const TypedValueRef &_value, int _index = 0);
     bool operator ==(const ValueIndex &other) const;
@@ -117,7 +117,7 @@ protected:
 //------------------------------------------------------------------------------
 
 struct Block {
-    typedef std::unordered_map<TypedValue *, ConstRef> DataMap;
+    typedef absl::flat_hash_map<TypedValue *, ConstRef> DataMap;
 
     Block();
     void append(const InstructionRef &node);
@@ -140,7 +140,7 @@ struct Block {
 
     DataMap &get_channel(Symbol name);
 
-    std::unordered_map<Symbol, DataMap *, Symbol::Hash> channels;
+    absl::flat_hash_map<Symbol, DataMap *, Symbol::Hash> channels;
 
     int depth;
     int insert_index;
@@ -519,7 +519,7 @@ struct Label : Instruction {
     Block body;
     Merges merges;
     LabelKind label_kind;
-    std::unordered_set<TypedValue *> splitpoints;
+    absl::flat_hash_set<TypedValue *> splitpoints;
 };
 
 const char *get_label_kind_name(LabelKind kind);
@@ -1143,7 +1143,7 @@ struct Function : Pure {
         UniqueInfo(const ValueIndex& value);
     };
     // map of known uniques within the function (any state)
-    typedef std::unordered_map<int, UniqueInfo> UniqueMap;
+    typedef absl::flat_hash_map<int, UniqueInfo> UniqueMap;
 
     static bool classof(const Value *T);
 
@@ -1187,7 +1187,7 @@ struct Function : Pure {
     TypedValueRef resolve_local(const ValueRef &node) const;
     SCOPES_RESULT(TypedValueRef) resolve(const ValueRef &node,
         const FunctionRef &boundary) const;
-    std::unordered_map<Value *, TypedValueRef> map;
+    absl::flat_hash_map<Value *, TypedValueRef> map;
     Returns returns;
     Raises raises;
 
@@ -1195,7 +1195,7 @@ struct Function : Pure {
     IDSet original_valid;
     IDSet valid;
     // expressions that moved a unique
-    std::unordered_map<int, ValueRef> movers;
+    absl::flat_hash_map<int, ValueRef> movers;
 
     const Anchor *get_best_mover_anchor(int id);
     void hint_mover(int id, const ValueRef &where);

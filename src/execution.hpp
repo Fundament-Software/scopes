@@ -12,7 +12,7 @@
 #include <llvm-c/ExecutionEngine.h>
 
 #include <stdint.h>
-#include <unordered_map>
+#include "absl/container/flat_hash_map.h"
 #include <string>
 
 #include "result.hpp"
@@ -25,7 +25,7 @@ struct String;
 //extern LLVMOrcJITStackRef orc;
 //extern LLVMTargetMachineRef target_machine;
 
-typedef std::unordered_map<std::string, const void *> PointerMap;
+typedef absl::flat_hash_map<std::string, const void *> PointerMap;
 
 const String *get_default_target_triple();
 SCOPES_RESULT(void) init_execution();

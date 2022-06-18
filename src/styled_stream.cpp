@@ -20,7 +20,7 @@
 
 #include <string.h>
 #include <assert.h>
-#include <unordered_map>
+#include "absl/container/flat_hash_map.h"
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
@@ -331,7 +331,7 @@ void stream_uid(StyledStream &ss, uint64_t uid) {
 #endif
 
 #if 1
-static std::unordered_map<const void *, const String *> address_names;
+static absl::flat_hash_map<const void *, const String *> address_names;
 
 void set_address_name(const void *ptr, const String *name) {
     if (!name) {

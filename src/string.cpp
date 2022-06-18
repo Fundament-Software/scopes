@@ -19,7 +19,7 @@
 
 #include <locale>
 #include <codecvt>
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
@@ -216,7 +216,7 @@ int escape_string(char *buf, const char *str, int strcount, const char *quote_ch
 // STRING
 //------------------------------------------------------------------------------
 
-static std::unordered_set<const String *, String::Hash, String::KeyEqual> string_map;
+static absl::flat_hash_set<const String *, String::Hash, String::KeyEqual> string_map;
 
 //------------------------------------------------------------------------------
 
@@ -233,6 +233,53 @@ bool String::KeyEqual::operator()( const String *lhs, const String *rhs ) const 
 
 //------------------------------------------------------------------------------
 
+struct GreedyAlloc
+{
+public:
+  GreedyAlloc() : left(0), size(0), heap(nullptr) {
+    _grow(1 << 14);
+  }
+  ~GreedyAlloc() { clean(); }
+
+  void* get(size_t size) {
+    if (size > left)
+      _grow(size);
+    assert(size < left);
+    left -= size;
+    void* ptr = heap + left;
+    track(ptr, size);
+    return ptr;
+  }
+
+  void clean() {
+    cleanup.push_back(heap);
+    heap = 0;
+    left = 0;
+    size = 0;
+    for (auto p : cleanup)
+      free(p);
+  }
+
+private:
+  void _grow(size_t min) {
+    if (heap != nullptr)
+      cleanup.push_back(heap);
+    if (size < min)
+      size = min;
+
+    size *= 2;
+    heap = (uint8_t*)malloc(size);
+    left = size;
+  }
+
+  size_t left;
+  size_t size;
+  uint8_t* heap;
+  std::vector<uint8_t*> cleanup;
+};
+
+static GreedyAlloc string_pool;
+
 std::size_t String::hash() const {
     return hash_bytes(data, count);
 }
@@ -246,7 +293,9 @@ const String *String::from(const char *buf, size_t count) {
     if (it != string_map.end()) {
         return *it;
     }
-    char *s = (char *)tracked_malloc(sizeof(char) * (count + 1));
+    //char *s = (char *)tracked_malloc(sizeof(char) * (count + 1));
+    char* s = (char *)string_pool.get(sizeof(char) * (count + 1));
+
     memcpy(s, buf, count * sizeof(char));
     s[count] = 0;
     const String *str = new String(s, count);

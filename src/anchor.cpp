@@ -8,7 +8,7 @@
 #include "source_file.hpp"
 #include "hash.hpp"
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -31,7 +31,7 @@ struct KeyEqual {
 };
 } // namespace AnchorSet
 
-static std::unordered_set<const Anchor *, AnchorSet::Hash, AnchorSet::KeyEqual> anchors;
+static absl::flat_hash_set<const Anchor *, AnchorSet::Hash, AnchorSet::KeyEqual> anchors;
 
 static const Anchor *_builtin_anchor = nullptr;
 static const Anchor *_unknown_anchor = nullptr;

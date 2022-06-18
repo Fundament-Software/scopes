@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#ifdef SCOPES_WIN32
+#if defined(SCOPES_WIN32) && !defined(_MSC_VER)
 #include <setjmpex.h>
 #else
 #include <setjmp.h>
