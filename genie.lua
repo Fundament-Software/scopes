@@ -126,6 +126,7 @@ local LLVM_LIBS = pkg_config(LLVM_CONFIG .. " --link-static --libs orcjit"
     .. " frontendopenmp orcshared orctargetprocess jitlink"
     .. " " .. TARGET_COMPONENTS)
 local LLVM_INCLUDEDIR = pkg_config(LLVM_CONFIG .. " --includedir")
+local ABSL_DIR = ""
 
 local CLANG_DEPS = {
     "-lclangCodeGen",
@@ -315,6 +316,32 @@ project "scopesrt"
 
         links {
             "pthread", "m", "tinfo", "dl", "z",
+            "absl_cord",
+            "absl_hash",
+            "absl_city",
+            "absl_bad_variant_access",
+            "absl_raw_hash_set",
+            "absl_bad_optional_access",
+            "absl_hashtablez_sampler",
+            "absl_exponential_biased",
+            "absl_synchronization",
+            "absl_stacktrace",
+            "absl_graphcycles_internal",
+            "absl_symbolize",
+            "absl_malloc_internal",
+            "absl_debugging_internal",
+            "absl_demangle_internal",
+            "absl_time",
+            "absl_strings",
+            "absl_throw_delegate",
+            "absl_strings_internal",
+            "absl_base",
+            "absl_spinlock_wait",
+            "absl_raw_logging_internal",
+            "absl_log_severity",
+            "absl_int128",
+            "absl_civil_time",
+            "absl_time_zone"
         }
 
         linkoptions {
@@ -323,6 +350,7 @@ project "scopesrt"
             --"-Wl,--stack,67108864", -- 64 GB
             "-Wl,-soname,libscopesrt.so",
             "-Wl,--version-script=" .. THISDIR .. "/src/libscopesrt.map",
+            "-Wl,-soname,libscopesrt.so",
         }
 
         linkoptions {
@@ -335,7 +363,7 @@ project "scopesrt"
             --"-rdynamic",
 
             THISDIR .. "/SPIRV-Tools/build/source/opt/libSPIRV-Tools-opt.a",
-            THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a"
+            THISDIR .. "/SPIRV-Tools/build/source/libSPIRV-Tools.a",
         }
         linkoptions(LLVM_LDFLAGS)
         linkoptions(CLANG_DEPS)

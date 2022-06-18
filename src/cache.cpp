@@ -251,13 +251,13 @@ const char *get_cache_file(const String *key) {
         } else if ( s.st_mode & S_IFREG ) {
             // exists
             //StyledStream ss;
-            std::cout << "reusing " << filepath << std::endl;
+            //std::cout << "reusing " << filepath << std::endl;
             return filepath;
         }
     }
 
     //StyledStream ss;
-    std::cout << "generating " << filepath << std::endl;
+    //std::cout << "generating " << filepath << std::endl;
     cache_misses++;
     return nullptr;
 }
