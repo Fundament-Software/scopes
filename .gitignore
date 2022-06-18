@@ -1,6 +1,7 @@
 /bin
 /build
 src/known_symbols.hpp
+src/internalizedfiles.cpp
 /result
 /SPIRV-Cross
 /SPIRV-Tools

@@ -59,11 +59,12 @@ include(CheckSymbolExists)
 include(CMakePushCheckState)
 include(CheckLibraryExists)
 
+set(KNOWN_SYMBOLS_HPP "${CMAKE_SOURCE_DIR}/src/known_symbols.hpp")
 add_custom_command(
-  OUTPUT "${CMAKE_SOURCE_DIR}/src/known_symbols.hpp"
+  OUTPUT "${KNOWN_SYMBOLS_HPP}"
   DEPENDS
     gensyms
-  COMMAND gensyms ">" "${CMAKE_SOURCE_DIR}/src/known_symbols.hpp"
+  COMMAND gensyms ">" "${KNOWN_SYMBOLS_HPP}"
   VERBATIM
 )
 
@@ -73,6 +74,18 @@ find_package(Clang REQUIRED)
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 include(HandleLLVMOptions)
 add_definitions(${LLVM_DEFINITIONS})
+
+# TODO: LLVM 15 removes this and replaces it with per-project paths, which will need to be updated: https://reviews.llvm.org/D117977
+foreach(ROOT ${CMAKE_PREFIX_PATH})
+  set(CLANG_RESOURCE_DIR "${ROOT}/${LLVM_TOOLS_INSTALL_DIR}/lib/clang/${LLVM_PACKAGE_VERSION}")
+  if(NOT EXISTS ${CLANG_RESOURCE_DIR})
+    unset(CLANG_RESOURCE_DIR)
+  endif()
+endforeach()
+
+if(MSVC)
+  file(GLOB_RECURSE scopesrt_SOURCES "./*.h" "./*.hpp")
+endif()
 
 list(APPEND scopesrt_SOURCES
     "globalsyms.c"
@@ -140,6 +153,26 @@ list(APPEND scopesrt_SOURCES
     #"${CMAKE_SOURCE_DIR}/SPIRV-Cross/spirv_cfg.cpp"
 )
 
+set(INTERNALIZED_FILES_CPP "${CMAKE_SOURCE_DIR}/src/internalizedfiles.cpp")
+  
+if(NOT DEFINED CLANG_RESOURCE_DIR)
+  message(WARNING "Clang header files could not be found!")
+else()
+  message(STATUS "CLANG_RESOURCE_DIR=${CLANG_RESOURCE_DIR}")
+
+  file(GLOB_RECURSE CLANG_HEADERS LIST_DIRECTORIES false ${CLANG_RESOURCE_DIR}/*.h ${CLANG_RESOURCE_DIR}/*.modulemap)
+  
+  add_custom_command(
+    OUTPUT "${INTERNALIZED_FILES_CPP}"
+    DEPENDS
+      gensyms
+    COMMAND gensyms "${CLANG_RESOURCE_DIR}" ${CLANG_HEADERS} ">" "${INTERNALIZED_FILES_CPP}"
+    VERBATIM
+  )
+  
+  list(APPEND scopesrt_SOURCES "${INTERNALIZED_FILES_CPP}")
+endif()
+
 if(MSVC)
   string(REGEX REPLACE "/EH[a-z]+" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CPP_WARNINGS}")
@@ -165,7 +198,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
   )
 endif()
 
-add_library(scopesrt ${scopesrt_SOURCES} "${CMAKE_SOURCE_DIR}/src/known_symbols.hpp")
+add_library(scopesrt ${scopesrt_SOURCES} ${KNOWN_SYMBOLS_HPP} ${INTERNALIZED_FILES_CPP})
 target_include_directories(scopesrt PRIVATE ${LLVM_INCLUDE_DIRS})
 #target_include_directories(scopesrt PRIVATE "${LLVM_BUILD_MAIN_SRC_DIR}/../polly/include")
 target_include_directories(scopesrt PUBLIC ${CMAKE_SOURCE_DIR}/external/linenoise-ng/include)
@@ -203,7 +236,6 @@ if(ZLIB_FOUND)
   cmake_pop_check_state()
 endif()
 
-find_package(ZLIB REQUIRED)
 find_package(spirv_cross_core CONFIG REQUIRED)
 find_package(spirv_cross_glsl CONFIG REQUIRED)
 find_package(spirv_cross_hlsl CONFIG REQUIRED)

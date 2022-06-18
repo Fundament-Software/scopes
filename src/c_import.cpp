@@ -21,12 +21,11 @@
 #include "timer.hpp"
 #include "compiler_flags.hpp"
 #include "ordered_map.hpp"
-
 #include "scopes/scopes.h"
-
 #include <llvm-c/Core.h>
 
 #include "llvm/IR/Module.h"
+#include "llvm/Support/Errc.h"
 
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/MultiplexConsumer.h"
@@ -45,6 +44,9 @@ namespace scopes {
 //------------------------------------------------------------------------------
 // C BRIDGE (CLANG)
 //------------------------------------------------------------------------------
+  extern const char* headerfile_names[];
+  extern const uint8_t* headerfile_contents[];
+  extern int headerfile_sizes[];
 
 static const Anchor *anchor_from_location(clang::SourceManager &SM, clang::SourceLocation loc) {
     auto PLoc = SM.getPresumedLoc(loc);
@@ -73,6 +75,98 @@ struct CNamespaces {
     PureMap externs;
     PureMap defines;
 };
+
+class ScopesProvidedFile : public llvm::vfs::File {
+private:
+  std::string Name;
+  llvm::vfs::Status Status;
+  llvm::StringRef Buffer;
+
+public:
+  ScopesProvidedFile(const std::string& Name_, const llvm::vfs::Status& Status_,
+    const llvm::StringRef& Buffer_)
+    : Name(Name_), Status(Status_), Buffer(Buffer_) {}
+  virtual ~ScopesProvidedFile() override {}
+  virtual llvm::ErrorOr<llvm::vfs::Status> status() override { return Status; }
+  virtual llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> getBuffer(
+    const llvm::Twine& Name, int64_t FileSize, bool RequiresNullTerminator,
+    bool IsVolatile) override {
+    return llvm::MemoryBuffer::getMemBuffer(Buffer, "", RequiresNullTerminator);
+  }
+  virtual std::error_code close() override { return std::error_code(); }
+};
+
+class InternalFileSystem : public llvm::vfs::FileSystem
+{
+private:
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> RFS;
+  static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> _instance;
+
+public:
+  InternalFileSystem() : RFS(llvm::vfs::getRealFileSystem()) {}
+  static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> Instance() { return _instance; }
+
+  bool GetFile(const llvm::Twine& Path, llvm::vfs::Status* status,
+    llvm::StringRef* contents)
+  {
+    size_t size = 0;
+    const char* data = "";
+
+    *status = llvm::vfs::Status(Path.str(), llvm::vfs::getNextVirtualUniqueID(),
+      std::chrono::system_clock::from_time_t(0), 0, 0, size, llvm::sys::fs::file_type::regular_file,
+      llvm::sys::fs::all_all);
+    *contents = llvm::StringRef(data, size);
+    return true;
+  }
+  virtual ~InternalFileSystem() {}
+
+  virtual llvm::ErrorOr<llvm::vfs::Status> status(const llvm::Twine& Path) override
+  {
+    static const std::error_code noSuchFileErr =
+      std::make_error_code(std::errc::no_such_file_or_directory);
+    llvm::ErrorOr<llvm::vfs::Status> RealStatus = RFS->status(Path);
+    if(RealStatus || RealStatus.getError() != noSuchFileErr) return RealStatus;
+    llvm::vfs::Status Status;
+    llvm::StringRef Buffer;
+    if(GetFile(Path, &Status, &Buffer))
+    {
+      return Status;
+    }
+    return llvm::errc::no_such_file_or_directory;
+  }
+
+  virtual llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>> openFileForRead(
+    const llvm::Twine& Path) override
+  {
+    llvm::ErrorOr<std::unique_ptr<llvm::vfs::File>> ec = RFS->openFileForRead(Path);
+    if(ec || ec.getError() != llvm::errc::no_such_file_or_directory) return ec;
+    llvm::vfs::Status Status;
+    llvm::StringRef Buffer;
+    if(GetFile(Path, &Status, &Buffer))
+    {
+      return std::unique_ptr<llvm::vfs::File>(
+        new ScopesProvidedFile(Path.str(), Status, Buffer));
+    }
+    return llvm::errc::no_such_file_or_directory;
+  }
+
+  virtual llvm::vfs::directory_iterator dir_begin(const llvm::Twine& Dir,
+    std::error_code& EC) override
+  {
+    return RFS->dir_begin(Dir, EC);
+  }
+
+  llvm::ErrorOr<std::string> getCurrentWorkingDirectory() const override
+  {
+    return std::string("cwd");
+  }
+  std::error_code setCurrentWorkingDirectory(const llvm::Twine& Path) override
+  {
+    return std::error_code();
+  }
+};
+
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> InternalFileSystem::_instance = new InternalFileSystem();
 
 class CVisitor : public clang::RecursiveASTVisitor<CVisitor> {
 public:
@@ -1056,6 +1150,7 @@ SCOPES_RESULT(const Scope *) import_c_module (
 
     CompilerInstance compiler;
     compiler.setInvocation(createInvocationFromCommandLine(aargs));
+    compiler.setFileManager(new clang::FileManager(clang::FileSystemOptions{}, InternalFileSystem::Instance()));
 
     if (buffer) {
         auto &opts = compiler.getPreprocessorOpts();
