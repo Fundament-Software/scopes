@@ -51,7 +51,7 @@
 #include "spvIR.h"
 
 #include <cassert>
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 using spv::Block;
 using spv::Id;
@@ -103,7 +103,7 @@ public:
 private:
     std::function<void(Block*)> callback_;
     // Whether a block has already been visited or is being delayed.
-    std::unordered_set<Block *> visited_, delayed_;
+    absl::flat_hash_set<Block *> visited_, delayed_;
 };
 }
 

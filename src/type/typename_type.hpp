@@ -10,7 +10,7 @@
 #include "../type.hpp"
 #include "../result.hpp"
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -25,7 +25,7 @@ enum TypenameFlags {
 //------------------------------------------------------------------------------
 
 struct TypenameType : Type {
-    static std::unordered_set<Symbol, Symbol::Hash> used_names;
+    static absl::flat_hash_set<Symbol, Symbol::Hash> used_names;
 
     void stream_name(StyledStream &ss) const;
     const String *name() const;

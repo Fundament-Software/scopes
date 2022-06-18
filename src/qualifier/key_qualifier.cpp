@@ -13,7 +13,7 @@
 
 #include <assert.h>
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -32,7 +32,7 @@ namespace KeyedSet {
     };
 } // namespace TupleSet
 
-static std::unordered_set<const KeyQualifier *, KeyedSet::Hash, KeyedSet::KeyEqual> keyeds;
+static absl::flat_hash_set<const KeyQualifier *, KeyedSet::Hash, KeyedSet::KeyEqual> keyeds;
 
 //------------------------------------------------------------------------------
 // KEY QUALIFIER

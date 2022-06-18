@@ -14,6 +14,7 @@
 #include "dyn_cast.inc"
 #include "qualifier.inc"
 #include "qualifiers.hpp"
+#include "absl/container/flat_hash_set.h"
 
 #include <memory.h>
 #include <algorithm>
@@ -115,7 +116,7 @@ const Type::Map &Type::get_symbols() const {
 
 std::vector<Symbol> Type::find_closest_match(Symbol name) const {
     const String *s = name.name();
-    std::unordered_set<Symbol, Symbol::Hash> done;
+    absl::flat_hash_set<Symbol, Symbol::Hash> done;
     std::vector<Symbol> best_syms;
     size_t best_dist = (size_t)-1;
     const Type *self = this;

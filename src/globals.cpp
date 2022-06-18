@@ -62,6 +62,7 @@
 
 #include "dyn_cast.inc"
 #include "verify_tools.inc"
+#include "absl/container/flat_hash_map.h"
 
 #pragma GCC diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 
@@ -646,7 +647,7 @@ struct MemoHash {
     }
 };
 
-typedef std::unordered_map<Value *, ValueRef, MemoHash, MemoKeyEqual> MemoMap;
+typedef absl::flat_hash_map<Value *, ValueRef, MemoHash, MemoKeyEqual> MemoMap;
 static MemoMap memo_map;
 
 }
@@ -958,7 +959,7 @@ const sc_string_t *sc_string_join(const sc_string_t *a, const sc_string_t *b) {
 }
 
 namespace scopes {
-    static std::unordered_map<const String *, regexp::Reprog *> pattern_cache;
+    static absl::flat_hash_map<const String *, regexp::Reprog *> pattern_cache;
 }
 sc_bool_i32_i32_raises_t sc_string_match(const sc_string_t *pattern, const sc_string_t *text) {
     using namespace scopes;

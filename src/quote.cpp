@@ -27,6 +27,7 @@
 
 #include "qualifier/refer_qualifier.hpp"
 #include "qualifier.inc"
+#include "absl/container/flat_hash_map.h"
 
 //#pragma GCC diagnostic ignored "-Wvla-extension"
 
@@ -455,7 +456,7 @@ struct Quoter {
     SCOPES_PURE_VALUE_KIND()
     #undef T
 
-    std::unordered_map<Value *, TypedValueRef> map;
+    absl::flat_hash_map<Value *, TypedValueRef> map;
     const ASTContext &ctx;
 };
 

@@ -8,7 +8,7 @@
 #include "../error.hpp"
 #include "../hash.hpp"
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -32,7 +32,7 @@ struct KeyEqual {
 };
 } // namespace ArraySet
 
-static std::unordered_set<const ArrayType *, ArraySet::Hash, ArraySet::KeyEqual> arrays;
+static absl::flat_hash_set<const ArrayType *, ArraySet::Hash, ArraySet::KeyEqual> arrays;
 
 //------------------------------------------------------------------------------
 // ARRAY TYPE

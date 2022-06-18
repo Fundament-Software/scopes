@@ -12,7 +12,7 @@
 #include "../hash.hpp"
 #include "../utils.hpp"
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -34,7 +34,7 @@ struct KeyEqual {
 };
 } // namespace MatrixSet
 
-static std::unordered_set<const MatrixType *, MatrixSet::Hash, MatrixSet::KeyEqual> matrices;
+static absl::flat_hash_set<const MatrixType *, MatrixSet::Hash, MatrixSet::KeyEqual> matrices;
 
 //------------------------------------------------------------------------------
 // MATRIX TYPE

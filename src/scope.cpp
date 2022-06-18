@@ -9,7 +9,7 @@
 #include "error.hpp"
 
 #include <algorithm>
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 #include <cstring>
 
 namespace scopes {
@@ -151,7 +151,7 @@ const Scope *Scope::from(const String *doc, const Scope *parent) {
 
 std::vector<Symbol> Scope::find_closest_match(Symbol name) const {
     const String *s = name.name();
-    std::unordered_set<Symbol, Symbol::Hash> done;
+    absl::flat_hash_set<Symbol, Symbol::Hash> done;
     std::vector<Symbol> best_syms;
     size_t best_dist = (size_t)-1;
     const Scope *self = this;
@@ -205,7 +205,7 @@ std::vector<Symbol> Scope::find_closest_match(Symbol name) const {
 std::vector<Symbol> Scope::find_elongations(Symbol name) const {
     const String *s = name.name();
 
-    std::unordered_set<Symbol, Symbol::Hash> done;
+    absl::flat_hash_set<Symbol, Symbol::Hash> done;
     std::vector<Symbol> found;
     const Scope *self = this;
     do {

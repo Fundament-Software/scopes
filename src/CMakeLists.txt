@@ -69,10 +69,15 @@ add_custom_command(
 
 find_package(LLVM REQUIRED CONFIG HINTS ${LLVM_HINTS})
 find_package(Clang REQUIRED)
+find_package(absl CONFIG REQUIRED)
 
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 include(HandleLLVMOptions)
 add_definitions(${LLVM_DEFINITIONS})
+
+if(MSVC)
+  file(GLOB_RECURSE scopesrt_SOURCES "./*.h" "./*.hpp")
+endif()
 
 list(APPEND scopesrt_SOURCES
     "globalsyms.c"
@@ -256,11 +261,11 @@ add_compile_definitions(SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS SCOPESRT_IMPL)
 target_link_directories(scopesrt PRIVATE ${LLVM_LIBRARY_DIR})
 
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
-  target_link_libraries(scopesrt ZLIB::ZLIB ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs})
+  target_link_libraries(scopesrt ZLIB::ZLIB ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs} absl::flat_hash_map absl::flat_hash_set)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
-  target_link_libraries(scopesrt ZLIB::ZLIB ${Threads} ${CMAKE_DL_LIBS} ${TINFO_LIBRARY} ${EXTRA_LIBS} ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs})
+  target_link_libraries(scopesrt ZLIB::ZLIB ${Threads} ${CMAKE_DL_LIBS} ${TINFO_LIBRARY} ${EXTRA_LIBS} ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs} absl::flat_hash_map absl::flat_hash_set)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-  target_link_libraries(scopesrt ZLIB::ZLIB ${Threads} ${CMAKE_DL_LIBS} ${TINFO_LIBRARY} ${EXTRA_LIBS} ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs})
+  target_link_libraries(scopesrt ZLIB::ZLIB ${Threads} ${CMAKE_DL_LIBS} ${TINFO_LIBRARY} ${EXTRA_LIBS} ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs} absl::flat_hash_map absl::flat_hash_set)
 endif()
 
 # ---------------------------------

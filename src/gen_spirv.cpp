@@ -35,6 +35,7 @@
 #include "spirv-tools/optimizer.hpp"
 
 #include "dyn_cast.inc"
+#include "absl/container/flat_hash_map.h"
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
@@ -235,15 +236,15 @@ struct SPIRVGenerator {
 
     typedef std::vector<spv::Id> Ids;
 
-    std::unordered_map<ValueIndex, spv::Id, ValueIndex::Hash> ref2value;
-    std::unordered_map<Function *, spv::Function *> func2func;
+    absl::flat_hash_map<ValueIndex, spv::Id, ValueIndex::Hash> ref2value;
+    absl::flat_hash_map<Function *, spv::Function *> func2func;
     std::deque<FunctionRef> function_todo;
-    std::unordered_map<TypeFlagPair, spv::Id, HashTypeFlagsPair> type_cache;
+    absl::flat_hash_map<TypeFlagPair, spv::Id, HashTypeFlagsPair> type_cache;
 
-    std::unordered_map<int, ExecutionMode *> execution_modes;
+    absl::flat_hash_map<int, ExecutionMode *> execution_modes;
 
-    std::unordered_map<Symbol, spv::Id, Symbol::Hash> intrinsics;
-    std::unordered_map<Symbol, spv::Id, Symbol::Hash> intrinsic_ops;
+    absl::flat_hash_map<Symbol, spv::Id, Symbol::Hash> intrinsics;
+    absl::flat_hash_map<Symbol, spv::Id, Symbol::Hash> intrinsic_ops;
 
     spv::SpvBuildLogger logger;
     spv::Builder builder;

@@ -90,6 +90,7 @@
                     pkgs.spirv-tools
                     selfpkgs.genie
                     pkgs.makeWrapper
+                    pkgs.abseil-cpp
                   ];
 
                   SCOPES_TARGETS = targets;

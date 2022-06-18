@@ -29,8 +29,9 @@
 #include "lifetime.hpp"
 
 #include <algorithm>
-#include <unordered_set>
 #include <deque>
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
 #pragma GCC diagnostic ignored "-Wgnu-statement-expression"
@@ -114,7 +115,7 @@ namespace FunctionSet {
     };
 } // namespace FunctionSet
 
-static std::unordered_set<Function *, FunctionSet::Hash, FunctionSet::KeyEqual> functions;
+static absl::flat_hash_set<Function *, FunctionSet::Hash, FunctionSet::KeyEqual> functions;
 
 //------------------------------------------------------------------------------
 
@@ -1871,7 +1872,7 @@ static const Type *canonical_return_type(const FunctionRef &fn, const Type *rett
     bool is_except = false) {
     if (!is_returning_value(rettype))
         return rettype;
-    std::unordered_map<int, int> idmap;
+    absl::flat_hash_map<int, int> idmap;
     Types rettypes;
     int acount = get_argument_count(rettype);
     for (int i = 0; i < acount; ++i) {
@@ -3607,7 +3608,7 @@ static SCOPES_RESULT(TypedValueRef) prove_SwitchTemplate(const ASTContext &ctx,
     // protect against pointer invalidation
     _switch->cases.reserve(cases.size() + indirect_cases.size());
 
-    std::unordered_set<uint64_t> seen_literals;
+    absl::flat_hash_set<uint64_t> seen_literals;
 
     // handle indirect cases
     for (auto &&_case : indirect_cases) {

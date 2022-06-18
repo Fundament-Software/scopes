@@ -13,13 +13,13 @@
 #include <string.h>
 #include <assert.h>
 
-#include <unordered_map>
-#include <unordered_set>
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
-static std::unordered_map<Symbol, const String *, Symbol::Hash> map_symbol_name;
-static std::unordered_map<const String *, Symbol> map_name_symbol;
+static absl::flat_hash_map<Symbol, const String *, Symbol::Hash> map_symbol_name;
+static absl::flat_hash_map<const String *, Symbol> map_name_symbol;
 
 static uint64_t num_symbols = 0;
 
@@ -198,7 +198,7 @@ void Symbol::_init_symbols() {
 #undef T
 
 #if 0
-    std::unordered_set<Symbol, Symbol::Hash> defined;
+    absl::flat_hash_set<Symbol, Symbol::Hash> defined;
     StyledStream ss;
 #define T(NAME) \
     ss << "T(" << #NAME << ", " << Symbol(NAME).name() << ") \\" << std::endl; \

@@ -10,7 +10,7 @@
 #include "error.hpp"
 #include "globals.hpp"
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -32,7 +32,7 @@ std::size_t List::Hash::operator()(const List *l) const {
         ), std::hash<const List *>{}(l->next));
 }
 
-static std::unordered_set<const List *, List::Hash, List::KeyEqual> list_map;
+static absl::flat_hash_set<const List *, List::Hash, List::KeyEqual> list_map;
 
 List::List(const ValueRef &_at, const List *_next, size_t count) :
     at(_at),
