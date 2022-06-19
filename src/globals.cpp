@@ -1634,12 +1634,7 @@ sc_valueref_t sc_const_int_new(const sc_type_t *type, uint64_t value) {
 }
 sc_valueref_t sc_const_int_words_new(const sc_type_t *type, int numwords, uint64_t *words) {
     using namespace scopes;
-    std::vector<uint64_t> values;
-    values.resize(numwords);
-    for (int i = 0; i < numwords; ++i) {
-        values[i] = words[i];
-    }
-    return ConstInt::from(type, values);
+    return ConstInt::from(type, words, numwords);
 }
 sc_valueref_t sc_const_real_new(const sc_type_t *type, double value) {
     using namespace scopes;

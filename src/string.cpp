@@ -8,6 +8,7 @@
 #include "gc.hpp"
 #include "utils.hpp"
 #include "hash.hpp"
+#include "alloc.hpp"
 
 #define STB_SPRINTF_DECORATE(name) stb_##name
 #define STB_SPRINTF_NOUNALIGNED
@@ -233,52 +234,7 @@ bool String::KeyEqual::operator()( const String *lhs, const String *rhs ) const 
 
 //------------------------------------------------------------------------------
 
-struct GreedyAlloc
-{
-public:
-  GreedyAlloc() : left(0), size(0), heap(nullptr) {
-    _grow(1 << 14);
-  }
-  ~GreedyAlloc() { clean(); }
-
-  void* get(size_t size) {
-    if (size > left)
-      _grow(size);
-    assert(size < left);
-    left -= size;
-    void* ptr = heap + left;
-    track(ptr, size);
-    return ptr;
-  }
-
-  void clean() {
-    cleanup.push_back(heap);
-    heap = 0;
-    left = 0;
-    size = 0;
-    for (auto p : cleanup)
-      free(p);
-  }
-
-private:
-  void _grow(size_t min) {
-    if (heap != nullptr)
-      cleanup.push_back(heap);
-    if (size < min)
-      size = min;
-
-    size *= 2;
-    heap = (uint8_t*)malloc(size);
-    left = size;
-  }
-
-  size_t left;
-  size_t size;
-  uint8_t* heap;
-  std::vector<uint8_t*> cleanup;
-};
-
-static GreedyAlloc string_pool;
+static GreedyAlloc<&track> string_pool;
 
 std::size_t String::hash() const {
     return hash_bytes(data, count);
@@ -294,7 +250,7 @@ const String *String::from(const char *buf, size_t count) {
         return *it;
     }
     //char *s = (char *)tracked_malloc(sizeof(char) * (count + 1));
-    char* s = (char *)string_pool.get(sizeof(char) * (count + 1));
+    char* s = (char *)string_pool.alloc(sizeof(char) * (count + 1));
 
     memcpy(s, buf, count * sizeof(char));
     s[count] = 0;
