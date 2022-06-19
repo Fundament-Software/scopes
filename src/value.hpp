@@ -13,12 +13,13 @@
 #include "type.hpp"
 #include "value_kind.hpp"
 #include "valueref.inc"
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+#include "span.h"
 
 #include "qualifier/unique_qualifiers.hpp"
 
 #include <vector>
-#include "absl/container/flat_hash_map.h"
-#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -1206,17 +1207,23 @@ struct Function : Pure {
 struct ConstInt : Const {
     static bool classof(const Value *T);
 
-    ConstInt(const Type *type, const std::vector<uint64_t> &value);
+    ConstInt(const Type* type, const uint64_t* value, size_t count);
+    ConstInt(const ConstInt&) = delete;
+    ConstInt(ConstInt&&) = delete;;
+    ~ConstInt();
 
     bool key_equal(const ConstInt *other) const;
     std::size_t hash() const;
 
+    static ConstIntRef from(const Type* type, const uint64_t* values, size_t n_values);
     static ConstIntRef from(const Type *type, uint64_t value);
-    static ConstIntRef from(const Type *type, std::vector<uint64_t> value);
     static ConstIntRef symbol_from(Symbol value);
     static ConstIntRef builtin_from(Builtin value);
 
-    std::vector<uint64_t> words;
+    ConstInt& operator=(const ConstInt&) = delete;
+    ConstInt& operator=(ConstInt&&) = delete;;
+    std::span<uint64_t> words;
+    uint64_t word;
 
     // return most significant word
     uint64_t msw() const;
