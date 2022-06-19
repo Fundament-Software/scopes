@@ -1671,7 +1671,6 @@ Const::Const(ValueKind _kind, const Type *type)
 //------------------------------------------------------------------------------
 
 static ConstSet<ConstInt> constints;
-static GreedyAlloc<&no_tracking> constint_pool;
 
 ConstInt::ConstInt(const Type *type, const uint64_t* _value, size_t count)
     : Const(VK_ConstInt, type), words(nullptr, count) {
@@ -1683,7 +1682,7 @@ ConstInt::ConstInt(const Type *type, const uint64_t* _value, size_t count)
   }
   else
   {
-    words = std::span<uint64_t>((uint64_t*)constint_pool.alloc(sizeof(uint64_t) * count), count);
+    words = std::span<uint64_t>((uint64_t*)malloc(sizeof(uint64_t) * count), count);
     memcpy(words.data(), _value, count * sizeof(uint64_t));
   }
 }
