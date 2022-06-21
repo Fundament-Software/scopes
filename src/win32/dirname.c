@@ -24,6 +24,7 @@
 #include "stdlib_ex.h"
 #include <string.h>
 #include <locale.h>
+#include "../vla.h"
 
 #ifndef __cdecl  /* If compiling on any non-Win32 platform ... */
 #define __cdecl  /* this may not be defined.                   */
@@ -46,7 +47,7 @@ dirname(char *path)
     {
       /* allocate sufficient local storage space,
        * in which to create a wide character reference copy of path.  */
-      wchar_t refcopy[1 + (len = mbstowcs (NULL, path, 0))];
+			VLA(wchar_t, refcopy, 1 + (len = mbstowcs(NULL, path, 0)));
       /* create the wide character reference copy of path */
       wchar_t *refpath = refcopy;
 

@@ -64,7 +64,9 @@
 #include "verify_tools.inc"
 #include "absl/container/flat_hash_map.h"
 
+#ifndef _MSC_VER
 #pragma GCC diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
+#endif
 
 namespace scopes {
 

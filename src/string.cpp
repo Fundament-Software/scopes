@@ -21,8 +21,11 @@
 #include <locale>
 #include <codecvt>
 #include "absl/container/flat_hash_set.h"
+#include "vla.h"
 
+#ifndef _MSC_VER
 #pragma GCC diagnostic ignored "-Wvla-extension"
+#endif
 
 namespace scopes {
 
@@ -265,9 +268,9 @@ const String *String::from_cstr(const char *s) {
 
 // small strings on the stack, big strings on the heap
 #define SCOPES_BEGIN_TEMP_STRING(NAME, SIZE) \
-    bool NAME ## _use_stack = ((SIZE) < 1024); \
+    bool NAME ## _use_stack = ((SIZE) < 1024); \ 
     char stack ## NAME[NAME ## _use_stack?((SIZE)+1):1]; \
-    char *NAME = (NAME ## _use_stack?stack ## NAME:((char *)malloc(sizeof(char) * ((SIZE)+1))));
+      char *NAME = (NAME##_use_stack?stack##NAME:((char *)malloc(sizeof(char) * ((SIZE)+1))));
 
 #define SCOPES_END_TEMP_STRING(NAME) \
     if (!NAME ## _use_stack) free(NAME);

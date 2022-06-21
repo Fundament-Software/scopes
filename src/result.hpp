@@ -9,8 +9,10 @@
 
 #include <assert.h>
 
+#ifndef _MSC_VER
 #pragma GCC diagnostic error "-Wunused-result"
 #pragma GCC diagnostic ignored "-Wgnu-statement-expression"
+#endif
 
 namespace scopes {
 
@@ -20,7 +22,11 @@ void print_error(const Error *value);
 
 // use this as return type; together with the attribute and the warning-as-error
 // setting above, we get a good trap for any ignores of result values
+#ifdef _MSC_VER
+#define SCOPES_RESULT(T) Result<T>
+#else
 #define SCOPES_RESULT(T) Result<T> __attribute__ ((warn_unused_result))
+#endif
 
 // declared at top of function so the subsequent macros all work
 #define SCOPES_RESULT_TYPE(T) \

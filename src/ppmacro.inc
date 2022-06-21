@@ -7,17 +7,22 @@
 #ifndef SCOPES_PPMACRO_INC
 #define SCOPES_PPMACRO_INC
 
+#if defined(_MSC_VER)
+#define SCOPES_PP_NARG(FN, ...) SCOPES_PP_NARG_CAT( SCOPES_PP_NARG_A, ( 0, ##__VA_ARGS__, FN ## 10, FN ## 9, FN ## 8, FN ## 7, FN ## 6, FN ## 5, FN ## 4, FN ## 3, FN ## 2, FN ## 1, FN ## 0 ) )
+#define SCOPES_PP_NARG_CAT( a, b ) a b
+#define SCOPES_PP_NARG_A( a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, n, ... ) n
+#else
 #pragma GCC diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 #pragma GCC diagnostic ignored "-Wextra-semi"
+#define SCOPES_PP_NARG(FN, ...) \
+    SCOPES_PP_NARG_(FN,##__VA_ARGS__,9,8,7,6,5,4,3,2,1,0)
+#define SCOPES_PP_NARG_(FN,N0,N1,N2,N3,N4,N5,N6,N7,N8,N,...) FN ## N
+#endif
 
 #define SCOPES_STRINGIFY(X) #X
 
 #define SCOPES_CAT(a, ...) SCOPES_PRIMITIVE_CAT(a, __VA_ARGS__)
 #define SCOPES_PRIMITIVE_CAT(a, ...) a ## __VA_ARGS__
-
-#define SCOPES_PP_NARG(FN, ...) \
-    SCOPES_PP_NARG_(FN,##__VA_ARGS__,9,8,7,6,5,4,3,2,1,0)
-#define SCOPES_PP_NARG_(FN,N0,N1,N2,N3,N4,N5,N6,N7,N8,N,...) FN ## N
 
 #define SCOPES_EACH_ARG0(F, TOK)
 #define SCOPES_EACH_ARG1(F, TOK, A1) \

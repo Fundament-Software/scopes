@@ -10,8 +10,11 @@
 #define STB_SPRINTF_NOUNALIGNED
 #include "stb_sprintf.h"
 #include "string.hpp"
+#include "vla.h"
 
+#ifndef _MSC_VER
 #pragma GCC diagnostic ignored "-Wvla-extension"
+#endif
 
 #if SCOPES_USE_WCHAR
 #include <locale>
@@ -22,8 +25,10 @@
 #include <assert.h>
 #include "absl/container/flat_hash_map.h"
 
+#ifndef _MSC_VER
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wunused-const-variable"
+#endif
 
 namespace scopes {
 
@@ -177,7 +182,8 @@ StyledStream& StyledStream::stream_number(uint8_t x) {
 
 StyledStream& StyledStream::stream_number(double x, const char *fmt) {
     size_t size = stb_snprintf( nullptr, 0, fmt, x );
-    char dest[size+1];
+    VLA(char, dest, size + 1);
+    //char dest[size+1];
     stb_snprintf( dest, size + 1, fmt, x );
     // count exact characters
     size = strlen(dest);
