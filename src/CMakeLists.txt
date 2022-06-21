@@ -29,8 +29,6 @@ endfunction()
 project(gensyms LANGUAGES CXX VERSION ${PROJECT_VERSION})
 
 set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 list(APPEND gensyms_SOURCES
     hash.cpp
@@ -44,7 +42,7 @@ retarget_output(gensyms)
 if(MSVC)
   # Cmake does not support linking with a static library
   set_target_properties(gensyms PROPERTIES COMPILE_PDB_NAME "$(TargetName)")
-  set_target_properties(gensyms PROPERTIES VS_PLATFORM_TOOLSET ClangCL)
+  #set_target_properties(gensyms PROPERTIES VS_PLATFORM_TOOLSET ClangCL)
 endif()
 
 # ---------------------------------
@@ -52,8 +50,6 @@ endif()
 project(scopesrt LANGUAGES CXX VERSION ${PROJECT_VERSION})
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(CheckSymbolExists)
 include(CMakePushCheckState)
@@ -145,21 +141,6 @@ list(APPEND scopesrt_SOURCES
     #"${CMAKE_SOURCE_DIR}/SPIRV-Cross/spirv_cfg.cpp"
 )
 
-if(MSVC)
-  string(REGEX REPLACE "/EH[a-z]+" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CPP_WARNINGS}")
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Oi /Ot /GL")
-  set(CMAKE_CXX_FLAGS_MINSIZEREL ${CMAKE_CXX_FLAGS_RELEASE})
-  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_DEBUG})
-else()
-  string(REPLACE "-fexceptions" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -fno-exceptions -fno-rtti ${CPP_WARNINGS}")
-  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -DDEBUG -O0")
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -msse -msse2 -msse3 -mmmx -m3dnow -mcx16 -DNDEBUG")
-  set(CMAKE_CXX_FLAGS_MINSIZEREL ${CMAKE_CXX_FLAGS_RELEASE})
-  set(CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_DEBUG})
-endif()
-
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")  
   list(APPEND scopesrt_SOURCES
     "win32/mman.c"
@@ -173,11 +154,18 @@ endif()
 add_library(scopesrt ${scopesrt_SOURCES} "${CMAKE_SOURCE_DIR}/src/known_symbols.hpp")
 target_include_directories(scopesrt PRIVATE ${LLVM_INCLUDE_DIRS})
 #target_include_directories(scopesrt PRIVATE "${LLVM_BUILD_MAIN_SRC_DIR}/../polly/include")
-target_include_directories(scopesrt PUBLIC ${CMAKE_SOURCE_DIR}/external/linenoise-ng/include)
-target_include_directories(scopesrt PUBLIC ${CMAKE_SOURCE_DIR}/external)
+target_include_directories(scopesrt PRIVATE ${CMAKE_SOURCE_DIR}/external/linenoise-ng/include)
+target_include_directories(scopesrt PRIVATE ${CMAKE_SOURCE_DIR}/external)
 target_include_directories(scopesrt PUBLIC ${CMAKE_SOURCE_DIR}/include)
-#target_include_directories(scopesrt PUBLIC ${SPIRV_CROSS_INCLUDE_DIRS})
+#target_include_directories(scopesrt PRIVATE ${SPIRV_CROSS_INCLUDE_DIRS})
 retarget_output(scopesrt)
+
+if(MSVC)
+target_compile_options(scopesrt PRIVATE "-Wno-error=date-time" "-Wno-unused-but-set-variable" "-Wno-sign-compare" "-Wno-vla" "-Wno-enum-compare" "-Wno-comment" "-Wno-misleading-indentation" "-Wno-pragmas" "-Wno-variadic-macros" "-Wno-int-in-bool-context" "-Wno-unused-variable" "-Wno-unused-function" "-Wno-unused-parameter")
+else()
+target_compile_options(scopesrt PRIVATE "-pedantic" "-fno-exceptions" "-fno-rtti" "-Wno-error=date-time" "-Wno-unused-but-set-variable" "-Wno-sign-compare" "-Wno-vla" "-Wno-enum-compare" "-Wno-comment" "-Wno-misleading-indentation" "-Wno-pragmas" "-Wno-variadic-macros" "-Wno-int-in-bool-context" "-Wno-unused-variable" "-Wno-unused-function" "-Wno-unused-parameter" "$<$<CONFIG:Debug>:-O0>" "$<$<NOT:$<CONFIG:Debug>>:-O3>")
+target_compile_definitions(scopesrt PUBLIC "$<IF:$<CONFIG:DEBUG>,DEBUG,NDEBUG>")
+endif()
 
 # Find the libraries that correspond to the LLVM components that we wish to use
 #llvm_map_components_to_libnames(llvm_libs orcjit engine passes option objcarcopts coverage support lto coroutines frontendopenmp native WebAssembly X86)
@@ -222,8 +210,10 @@ find_package(SPIRV-Tools-opt CONFIG REQUIRED)
 find_package(SPIRV-Tools-link CONFIG REQUIRED)
 
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+  find_package(mimalloc CONFIG REQUIRED)
+  
   add_compile_definitions(SCOPES_WIN32)
-  target_include_directories(scopesrt PUBLIC ${CMAKE_SOURCE_DIR}/src/win32)
+  target_include_directories(scopesrt PRIVATE ${CMAKE_SOURCE_DIR}/src/win32)
 else()
   find_package(Threads REQUIRED)
   find_library(TINFO_LIBRARY REQUIRED)
@@ -261,7 +251,7 @@ add_compile_definitions(SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS SCOPESRT_IMPL)
 target_link_directories(scopesrt PRIVATE ${LLVM_LIBRARY_DIR})
 
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
-  target_link_libraries(scopesrt ZLIB::ZLIB ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs} absl::flat_hash_map absl::flat_hash_set)
+  target_link_libraries(scopesrt ZLIB::ZLIB ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs} absl::flat_hash_map absl::flat_hash_set mimalloc-static)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
   target_link_libraries(scopesrt ZLIB::ZLIB ${Threads} ${CMAKE_DL_LIBS} ${TINFO_LIBRARY} ${EXTRA_LIBS} ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs} absl::flat_hash_map absl::flat_hash_set)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
@@ -273,8 +263,6 @@ endif()
 project(scopes LANGUAGES CXX VERSION ${PROJECT_VERSION})
 
 set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 list(APPEND scopes_SOURCES
     main.cpp
@@ -282,17 +270,17 @@ list(APPEND scopes_SOURCES
 
 add_executable(scopes ${scopes_SOURCES})
 target_link_libraries(scopes scopesrt)
-target_include_directories(scopes PUBLIC ${CMAKE_SOURCE_DIR}/external)
+target_include_directories(scopes PRIVATE ${CMAKE_SOURCE_DIR}/external)
 retarget_output(scopes)
 
 if(MSVC)
-  set_target_properties(scopes PROPERTIES VS_PLATFORM_TOOLSET ClangCL)
+  #set_target_properties(scopes PROPERTIES VS_PLATFORM_TOOLSET ClangCL)
   set_target_properties(scopes PROPERTIES COMPILE_PDB_NAME "$(TargetName)")
 endif()
 
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
   add_compile_definitions(SCOPES_WIN32)
-  target_include_directories(scopes PUBLIC ${CMAKE_SOURCE_DIR}/src/win32)
+  target_include_directories(scopes PRIVATE ${CMAKE_SOURCE_DIR}/src/win32)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
   add_compile_definitions(SCOPES_LINUX)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")

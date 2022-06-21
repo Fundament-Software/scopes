@@ -282,10 +282,10 @@ ASTContext ASTContext::with_frame(const FunctionRef &frame) const {
 ASTContext::ASTContext() {}
 
 ASTContext::ASTContext(const FunctionRef &_function, const FunctionRef &_frame,
-    const LoopLabelRef &_loop, const LabelRef &_except,
+    const LoopLabelRef &_loop, const LabelRef &_exception,
     const LabelRef &xbreak, Block *_block) :
     function(_function), frame(_frame), loop(_loop),
-    except(_except), _break(xbreak), block(_block) {
+    except(_exception), _break(xbreak), block(_block) {
 }
 
 const Type *ASTContext::fix_merge_type(const Type *T) const {
