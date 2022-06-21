@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <locale.h>
+#include "../vla.h"
 
 char* basename (char *path)
 {
@@ -42,7 +43,8 @@ char* basename (char *path)
       /* allocate sufficient local storage space,
        * in which to create a wide character reference copy of path
        */
-      wchar_t refcopy[1 + (len = mbstowcs (NULL, path, 0))];
+			VLA(wchar_t, refcopy, 1 + (len = mbstowcs(NULL, path, 0)));
+      //wchar_t refcopy[1 + (len = mbstowcs (NULL, path, 0))];
       /* create the wide character reference copy of path,
        * and step over the drive designator, if present ...
        */

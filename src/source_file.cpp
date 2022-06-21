@@ -26,8 +26,11 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <memory.h>
+#include "vla.h"
 
+#ifndef _MSC_VER
 #pragma GCC diagnostic ignored "-Wvla-extension"
+#endif
 
 namespace scopes {
 
@@ -134,7 +137,8 @@ StyledStream &SourceFile::stream_buffer(StyledStream &ost, int offset,
         send = send + 1;
     }
     auto linelen = send - start;
-    char line[linelen + 1];
+    VLA(char, line, linelen + 1);
+    //char line[linelen + 1];
     memcpy(line, str + start, linelen);
     line[linelen] = 0;
     ost << indent << line << std::endl;
