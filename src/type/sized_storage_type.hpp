@@ -21,7 +21,7 @@ struct CompositeType : Type {
 
 //------------------------------------------------------------------------------
 
-enum {
+enum : unsigned long long {
     UNSIZED_COUNT = -1ull,
 };
 

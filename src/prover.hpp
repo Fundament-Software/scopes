@@ -34,7 +34,7 @@ struct ASTContext {
     ASTContext();
 
     ASTContext(const FunctionRef &_function, const FunctionRef &_frame,
-        const LoopLabelRef &_loop, const LabelRef &_except,
+        const LoopLabelRef &_loop, const LabelRef & _exception,
         const LabelRef &_break,
         Block *_block);
 
