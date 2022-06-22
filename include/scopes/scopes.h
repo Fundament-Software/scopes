@@ -75,7 +75,11 @@ typedef scopes::ValueRef sc_valueref_t;
 
 // some of the return types are technically illegal in C, but we take care
 // that the alignment is correct
+#if !defined(__clang__) && defined(_MSC_VER)
+#pragma warning( disable : 4190 )
+#else
 #pragma GCC diagnostic ignored "-Wreturn-type-c-linkage"
+#endif
 
 #else
 
