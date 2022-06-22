@@ -7,8 +7,10 @@
 #ifndef SCOPES_PPMACRO_INC
 #define SCOPES_PPMACRO_INC
 
+#if defined(__clang__) || !defined(_MSC_VER)
 #pragma GCC diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 #pragma GCC diagnostic ignored "-Wextra-semi"
+#endif
 
 #define SCOPES_STRINGIFY(X) #X
 
