@@ -1022,6 +1022,12 @@ SCOPES_RESULT(const Scope *) import_c_module (
             aargs.push_back(it.c_str());
         }
     }
+
+#ifdef SCOPES_WIN32
+    // Unfuck the windows stdio header
+    aargs.push_back("-D_NO_CRT_STDIO_INLINE=1");
+#endif
+
 #ifdef SCOPES_ADD_IMPORT_CFLAGS
     std::vector<std::string> addargs;
     {
