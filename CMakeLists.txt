@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.15)
 project(scopes-lib VERSION 0.19.0)
 option(USE_ASAN_UBSAN "Use address sanitizer" OFF)
 option(USE_DEFAULT_FOLDERS "Don't override the cmake output folders with a unified /bin/ folder. Also disables debug postfix." OFF)
+option(TARGET_WEBASSEMBLY "Enable WebAssembly target" OFF)
+option(TARGET_AARCH64 "Enable AArch64 target" OFF)
+option(TARGET_RISCV "Enable RISC-V target" OFF)
 
 if(MSVC)
   # This ensures that we default to static but let vcpkg configure things the way it wants
