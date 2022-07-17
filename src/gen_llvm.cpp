@@ -1024,7 +1024,7 @@ struct LLVMIRGenerator {
                 SCOPES_CHECK_RESULT(abi_transform_parameter(AT, elements));
             }
             return LLVMFunctionType(rettype,
-                &elements[0], elements.size(), fi->vararg());
+                elements.data(), elements.size(), fi->vararg());
         } break;
         case TK_SampledImage: {
             SCOPES_ERROR(CGenTypeUnsupportedInTarget, TYPE_SampledImage);
@@ -2128,7 +2128,7 @@ struct LLVMIRGenerator {
                 constant = LLVMConstInt(ET, width - 1, false);
                 std::vector<LLVMValueRef> comps;
                 comps.resize(count, constant);
-                constant = LLVMConstVector(&comps[0], count);
+                constant = LLVMConstVector(comps.data(), count);
             } else {
                 assert(LLVMGetTypeKind(T) == LLVMIntegerTypeKind);
                 int width = LLVMGetIntTypeWidth(T);
@@ -2146,7 +2146,7 @@ struct LLVMIRGenerator {
                 constant = LLVMConstInt(ET, -1ull, true);
                 std::vector<LLVMValueRef> comps;
                 comps.resize(count, constant);
-                constant = LLVMConstVector(&comps[0], count);
+                constant = LLVMConstVector(comps.data(), count);
             } else {
                 assert(LLVMGetTypeKind(T) == LLVMIntegerTypeKind);
                 constant = LLVMConstInt(T, -1ull, true);
@@ -2698,7 +2698,7 @@ struct LLVMIRGenerator {
         auto T = SCOPES_GET_RESULT(type_to_llvm_type(node->get_type()));
         return LLVMConstIntOfArbitraryPrecision(T,
                                               node->words.size(),
-                                              &node->words[0]);
+                                              node->words.data());
     }
 
     SCOPES_RESULT(LLVMValueRef) ConstReal_to_value(const ConstRealRef &node) {
@@ -2851,7 +2851,7 @@ struct LLVMIRGenerator {
             set_debug_location(diloc);
         }
 
-        auto ret = LLVMBuildCall(builder, func, &values[0], values.size(), "");
+        auto ret = LLVMBuildCall(builder, func, values.data(), values.size(), "");
         for (auto idx : memptrs) {
             auto i = idx + 1;
             LLVMAddCallSiteAttribute(ret, i, attr_nonnull);
