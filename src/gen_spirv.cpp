@@ -2492,14 +2492,14 @@ SCOPES_RESULT(const String *) compile_spirv(int version, Symbol target, const Fu
 
     size_t bytesize = sizeof(unsigned int) * result.size();
 
-    return String::from((char *)&result[0], bytesize);
+    return String::from((char *)result.data(), bytesize);
 }
 
 const String *spirv_to_glsl(const String *binary) {
     std::vector<unsigned int> bytes;
     unsigned int sz = binary->count / sizeof(unsigned int);
     bytes.resize(sz);
-    memcpy(&bytes[0], binary->data, binary->count);
+    memcpy(bytes.data(), binary->data, binary->count);
 
 	spirv_cross::CompilerGLSL glsl(std::move(bytes));
 
