@@ -653,6 +653,13 @@ struct LLVMIRGenerator {
         return intrinsics[op];
     }
 
+    static LLVMTypeRef ScopesPointerType(LLVMTypeRef ElementType, unsigned AddressSpace) {
+      if (ElementType == voidT)
+        ElementType = i8T;
+
+      return LLVMPointerType(ElementType, AddressSpace);
+    }
+
     static void static_init() {
         if (voidT) return;
         voidT = LLVMVoidType();
@@ -674,7 +681,7 @@ struct LLVMIRGenerator {
         f128T = LLVMFP128Type();
         noneV = LLVMConstStruct(nullptr, 0, false);
         noneT = LLVMTypeOf(noneV);
-        rawstringT = LLVMPointerType(LLVMInt8Type(), 0);
+        rawstringT = ScopesPointerType(LLVMInt8Type(), 0);
         falseV = LLVMConstInt(i1T, 0, false);
         trueV = LLVMConstInt(i1T, 1, false);
         //attr_byval = get_attribute(get_attribute_kind("byval"));
@@ -845,7 +852,7 @@ struct LLVMIRGenerator {
                     auto param = LLVMGetParam(func, k++);
                     build_store(param, dest);
                 }
-                ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(T, 0), "");
+                ptr = LLVMBuildBitCast(builder, ptr, ScopesPointerType(T, 0), "");
                 return LLVMBuildLoad(builder, ptr, "");
             }
         }
@@ -876,7 +883,7 @@ struct LLVMIRGenerator {
                 auto ptr = safe_alloca(LLVMTypeOf(val));
                 auto zero = LLVMConstInt(i32T,0,false);
                 build_store(val, ptr);
-                ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ST, 0), "");
+                ptr = LLVMBuildBitCast(builder, ptr, ScopesPointerType(ST, 0), "");
                 for (size_t i = 0; i < sz; ++i) {
                     LLVMValueRef indices[] = {
                         zero, LLVMConstInt(i32T,i,false),
@@ -901,7 +908,7 @@ struct LLVMIRGenerator {
         size_t sz = abi_classify(AT, classes);
         auto T = SCOPES_GET_RESULT(type_to_llvm_type(AT));
         if (!sz) {
-            auto val = LLVMPointerType(T, 0);
+            auto val = ScopesPointerType(T, 0);
             assert(val);
             params.push_back(val);
             return {};
@@ -931,7 +938,7 @@ struct LLVMIRGenerator {
             auto lltype = SCOPES_GET_RESULT(_type_to_llvm_type(qt->type));
             auto rq = try_qualifier<ReferQualifier>(type);
             if (rq) {
-                lltype = LLVMPointerType(lltype, 0);
+                lltype = ScopesPointerType(lltype, 0);
             }
             return lltype;
         } break;
@@ -950,7 +957,7 @@ struct LLVMIRGenerator {
             }
             break;
         case TK_Pointer:
-            return LLVMPointerType(
+            return ScopesPointerType(
                 SCOPES_GET_RESULT(_type_to_llvm_type(cast<PointerType>(type)->element_type)), 0);
         case TK_Array:
         case TK_Matrix: {
@@ -1004,7 +1011,7 @@ struct LLVMIRGenerator {
             LLVMTypeRef rettype;
             if (use_sret) {
                 elements.push_back(
-                    LLVMPointerType(SCOPES_GET_RESULT(_type_to_llvm_type(rtype)), 0));
+                    ScopesPointerType(SCOPES_GET_RESULT(_type_to_llvm_type(rtype)), 0));
                 rettype = voidT;
             } else {
                 ABIClass classes[MAX_ABI_CLASSES];
@@ -1340,7 +1347,7 @@ struct LLVMIRGenerator {
             if (retT != srcT) {
                 LLVMValueRef dest = safe_alloca(srcT);
                 build_store(value, dest);
-                value = LLVMBuildBitCast(builder, dest, LLVMPointerType(retT, 0), "");
+                value = LLVMBuildBitCast(builder, dest, ScopesPointerType(retT, 0), "");
                 value = LLVMBuildLoad(builder, value, "");
             }
             return LLVMBuildRet(builder, value);
@@ -1741,7 +1748,7 @@ struct LLVMIRGenerator {
         auto ST = LLVMTypeOf(val);
         if (ET != ST) {
             assert(LLVMGetTypeKind(ET) == LLVMStructTypeKind);
-            ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ST, 0), "");
+            ptr = LLVMBuildBitCast(builder, ptr, ScopesPointerType(ST, 0), "");
         }
         return ptr;
     }
@@ -1752,7 +1759,7 @@ struct LLVMIRGenerator {
                 // completely braindead, but what can you do
                 LLVMValueRef ptr = safe_alloca(LLVMTypeOf(val));
                 build_store(val, ptr);
-                ptr = LLVMBuildBitCast(builder, ptr, LLVMPointerType(ty,0), "");
+                ptr = LLVMBuildBitCast(builder, ptr, ScopesPointerType(ty,0), "");
                 return LLVMBuildLoad(builder, ptr, "");
             }
         }
@@ -2547,7 +2554,7 @@ struct LLVMIRGenerator {
         LLVMSetInitializer(result, data);
         LLVMSetGlobalConstant(result, true);
         LLVMSetLinkage(result, LLVMPrivateLinkage);
-        LLVMSetVisibility(result, LLVMHiddenVisibility);
+        //LLVMSetVisibility(result, LLVMHiddenVisibility); // This doesn't make sense on private linkage
         result = LLVMConstBitCast(result, LLT);
         return result;
     }
@@ -2632,7 +2639,7 @@ struct LLVMIRGenerator {
                 if ((namestr->count > 5) && !strncmp(name, "llvm.", 5)) {
                     result = LLVMGetNamedFunction(module, name);
                     if (result) {
-                        LLT = LLVMPointerType(LLT, 0);
+                        LLT = ScopesPointerType(LLT, 0);
                         if (LLVMTypeOf(result) != LLT) {
                             result = LLVMConstBitCast(result, LLT);
                             //LLVMDumpValue(result);
@@ -2644,7 +2651,7 @@ struct LLVMIRGenerator {
                 } else {
                     result = LLVMGetNamedGlobal(module, name);
                     if (result) {
-                        LLT = LLVMPointerType(LLT, 0);
+                        LLT = ScopesPointerType(LLT, 0);
                         if (LLVMTypeOf(result) != LLT) {
                             //result = LLVMConstBitCast(result, LLT);
                             //LLVMDumpValue(result);
@@ -2721,7 +2728,12 @@ struct LLVMIRGenerator {
         if (!node->value) {
             return LLVMConstPointerNull(LLT);
         } else if (!generate_object) {
+#if 0
+            // Making a global variable of a function is illegal so this fails with debug LLVM
+            if (serialize_pointers && LLVMGetTypeKind(LLVMGetElementType(LLT)) != LLVMFunctionTypeKind) { 
+#else
             if (serialize_pointers) {
+#endif
                 auto name = get_local_pointer_id(node->value);
                 auto ET = LLVMGetElementType(LLT);
                 auto glob = LLVMAddGlobal(module, ET, name.c_str());
@@ -2875,7 +2887,7 @@ struct LLVMIRGenerator {
             if (retT != srcT) {
                 LLVMValueRef dest = safe_alloca(srcT);
                 build_store(ret, dest);
-                ret = LLVMBuildBitCast(builder, dest, LLVMPointerType(retT, 0), "");
+                ret = LLVMBuildBitCast(builder, dest, ScopesPointerType(retT, 0), "");
                 ret = LLVMBuildLoad(builder, ret, "");
             }
         }
