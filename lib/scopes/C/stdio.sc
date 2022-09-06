@@ -19,4 +19,8 @@ do
     let stdout = (lib.extern.__stdout_scopes__)
     let stdin = (lib.extern.__stdin_scopes__)
     let stderr = (lib.extern.__stderr_scopes__)
+    
+    let SEEK_CUR = lib.define.SEEK_CUR
+    let SEEK_SET = lib.define.SEEK_SET
+    let SEEK_END = lib.define.SEEK_END
     locals;
