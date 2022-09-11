@@ -2,30 +2,42 @@
   description = "Scopes retargetable programming language & infrastructure";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-21.11";
-    genie-src.url = "github:bkaradzic/genie";
-    genie-src.flake = false;
-    spirv-cross-src.url = "github:KhronosGroup/SPIRV-Cross";
-    spirv-cross-src.flake = false;
-    nix-filter.url = "github:numtide/nix-filter";
+    fenix.url = "github:nix-community/fenix";
     flake-utils.url = "github:numtide/flake-utils";
+    genie-src.flake = false;
+    genie-src.url = "github:bkaradzic/genie";
+    naersk.url = "github:nix-community/naersk";
+    naersk.inputs.nixpkgs.follows = "fenix/nixpkgs";
+    nix-filter.url = "github:numtide/nix-filter";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-21.11";
+    spirv-cross-src.flake = false;
+    spirv-cross-src.url = "github:KhronosGroup/SPIRV-Cross";
   };
 
   outputs =
-    { self, nixpkgs, genie-src, spirv-cross-src, nix-filter, flake-utils }:
+    { self, fenix, flake-utils, genie-src, naersk, nix-filter, nixpkgs, spirv-cross-src }:
     let
+      inherit (self) packages checks defaultPackage templates;
       supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
       nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
-
+      fenixToolchainFor = forAllSystems (system: fenix.packages.${system}.fromToolchainFile {
+        file = ./rust-toolchain.toml;
+        sha256 = "1dlf1r9b9h1r00nqgsj5xisjn8va6aragivj0wv6iqij7lh7wz19";
+      });
     in {
       packages = forAllSystems (system:
         let
+          fenixToolchainHost = fenixToolchainFor.${system};
+          packagesHost = packages.${system};
           pkgs = nixpkgsFor.${system};
-          selfpkgs = self.packages.${system};
-          llvmpkgs = pkgs.llvmPackages_13;
-        in {
 
+          llvmPackages = pkgs.llvmPackages_13;
+          naersk' = pkgs.callPackage naersk {
+            cargo = fenixToolchainHost;
+            rustc = fenixToolchainHost;
+          };
+        in {
           genie = pkgs.stdenv.mkDerivation {
             name = "genie";
             src = genie-src;
@@ -83,12 +95,12 @@
                   enableParallelBuilding = true;
 
                   buildInputs = [
-                    llvmpkgs.clang
-                    llvmpkgs.libclang
-                    llvmpkgs.llvm.dev
-                    # llvmpkgs.llvm-polly
+                    llvmPackages.clang
+                    llvmPackages.libclang
+                    llvmPackages.llvm.dev
+                    # llvmPackages.llvm-polly
                     pkgs.spirv-tools
-                    selfpkgs.genie
+                    packagesHost.genie
                     pkgs.makeWrapper
                     pkgs.abseil-cpp
                   ];
@@ -110,7 +122,7 @@
                   makeFlags = [ "-C build" "config=release" ];
 
                   buildPhase = ''
-                    NIX_CFLAGS_COMPILE+=\ -DSCOPES_ADD_IMPORT_CFLAGS=\"-isystem!${llvmpkgs.clang}/resource-root/include/!-isystem!${
+                    NIX_CFLAGS_COMPILE+=\ -DSCOPES_ADD_IMPORT_CFLAGS=\"-isystem!${llvmPackages.clang}/resource-root/include/!-isystem!${
                       nixpkgs.lib.getDev pkgs.stdenv.cc.libc
                     }/include/\"
 
@@ -123,12 +135,12 @@
 
                   installPhase = ''
                     install -D --target-directory="$out/bin" bin/scopes
-                    # wrapProgram $out/bin/scopes --suffix NIX_CFLAGS_COMPILE "" " -isystem ${llvmpkgs.clang}/resource-root/include/ -isystem ${
+                    # wrapProgram $out/bin/scopes --suffix NIX_CFLAGS_COMPILE "" " -isystem ${llvmPackages.clang}/resource-root/include/ -isystem ${
                       nixpkgs.lib.getDev pkgs.stdenv.cc.libc
                     }/include/"
                     install -D --target-directory="$out/lib" bin/libscopesrt.so
                     # cp -r ./lib/scopes $out/lib/scopes
-                    # echo ${llvmpkgs.clang} >> $out/clangpath
+                    # echo ${llvmPackages.clang} >> $out/clangpath
                     # mkdir -p $out
                     # cp -r ./ $out/builddump
                   '';
@@ -149,26 +161,45 @@
                 };
               in scopes-nolibs;
           in (withTargets [ "native" "webassembly" ]).withLibraries
-          [ selfpkgs.scopesStdlib ];
-          scopesAllTargets = (selfpkgs.scopes.withTargets [
+          [ packagesHost.scopesStdlib ];
+          scopesAllTargets = (packagesHost.scopes.withTargets [
             "native"
             "webassembly"
             "aarch64"
             "riscv"
-          ]).withLibraries [ selfpkgs.scopesStdlib ];
+          ]).withLibraries [ packagesHost.scopesStdlib ];
 
+          scopes-rust = naersk'.buildPackage {
+            src = ./.;
+          };
         });
 
       checks = forAllSystems (system: {
-        build = self.defaultPackage.${system};
+        build = defaultPackage.${system};
         unit-tests = nixpkgsFor.${system}.runCommandNoCC "unit-tests" {
-          buildInputs = [ self.packages.${system}.scopes ];
+          buildInputs = [ packages.${system}.scopes ];
           testDir = ./testing;
         }
           "cp -r $testDir ./testing && SCOPES_CACHE=./scopes-cache scopes testing/test_all.sc && touch $out";
       });
 
-      defaultPackage = forAllSystems (system: self.packages.${system}.scopes);
+      defaultPackage = forAllSystems (system: packages.${system}.scopes);
+
+      devShell = forAllSystems (system: let
+        fenixPackagesHost = fenix.packages.${system};
+        fenixToolchainHost = fenixToolchainFor.${system};
+        nixpkgsHost = nixpkgsFor.${system};
+        packagesHost = packages.${system};
+      in nixpkgsHost.mkShell {
+        inputsFrom = [
+          packagesHost.scopes
+          packagesHost.scopes-rust
+        ];
+        nativeBuildInputs = [
+          fenixPackagesHost.rust-analyzer
+          fenixToolchainHost
+        ];
+      });
 
       templates = {
         minimal = {
@@ -178,4 +209,9 @@
         };
       };
     };
+
+  nixConfig = {
+    extra-trusted-public-keys = "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs=";
+    extra-substituters = "https://nix-community.cachix.org";
+  };
 }
