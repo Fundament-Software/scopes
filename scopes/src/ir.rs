@@ -46,39 +46,6 @@ macro_rules! impl_debug_with_db {
             ))*
             .finish()
     );
-    // (<$db_type:ty> for enum $ident:ident { $($variant_idents:ident $variants:tt),* $(,)? }) => {
-    //     impl ::salsa::DebugWithDb<$db_type> for $ident {
-    //         fn fmt(&self, _f: &mut ::core::fmt::Formatter<'_>, _db: &$db_type) -> ::core::fmt::Result {
-    //             #[allow(unused_imports)]
-    //             use ::salsa::debug::helper::Fallback;
-    //             impl_debug_with_db!(@enum_variants (&self: $ident, _f, (_db): $db_type) {
-    //                 $($variant_idents $variants),*
-    //             } => { })
-    //         }
-    //     }
-    // };
-    // (@enum_variants (&self: $ident:ident, $f:expr, ($db:expr): $db_type:ty) { } => { $($variant_tts:tt)* }) => (
-    //     match self {
-    //         $(variant_tts)*
-    //     }
-    // );
-    // (@enum_variants (&self: $ident:ident, $f:expr, ($db:expr): $db_type:ty) {
-    //     $variant_ident:ident ($variant_field_type:ty $(,)?),
-    //     $($variant_idents:ident $variants:tt),*
-    // } => { $(variant_tts:tt)* }) => (impl_debug_with_db!(@enum_variants (&self: $ident, $f, ($db): $db_type) {
-    //     $($variant_idents $variants),*
-    // } => {
-    //     $ident::$variant_ident(variant_field: $variant_field_type) => $f.debug_tuple(::core::stringify!($variant_ident))
-    //         .field(
-    //             &::salsa::debug::helper::SalsaDebug::<$variant_field_type, $db_type>::salsa_debug(
-    //                 #[allow(clippy::needless_borrow)]
-    //                 &variant_field,
-    //                 $db
-    //             )
-    //         )
-    //         .finish(),
-    //     $(variant_tts)*
-    // }));
 }
 
 #[salsa::input]
