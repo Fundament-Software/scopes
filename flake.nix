@@ -9,7 +9,7 @@
     naersk.url = "github:nix-community/naersk";
     naersk.inputs.nixpkgs.follows = "fenix/nixpkgs";
     nix-filter.url = "github:numtide/nix-filter";
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-21.11";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-22.05";
     spirv-cross-src.flake = false;
     spirv-cross-src.url = "github:KhronosGroup/SPIRV-Cross";
   };
@@ -198,6 +198,7 @@
         nativeBuildInputs = [
           fenixPackagesHost.rust-analyzer
           fenixToolchainHost
+          nixpkgsHost.clang-tools
         ];
       });
 
