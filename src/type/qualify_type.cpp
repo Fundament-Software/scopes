@@ -10,7 +10,7 @@
 #include "../qualifiers.hpp"
 
 #include <algorithm>
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 #include <cstring>
 
 namespace scopes {
@@ -55,7 +55,7 @@ struct KeyEqual {
 };
 } // namespace QualifySet
 
-static std::unordered_set<const QualifyType *, QualifySet::Hash, QualifySet::KeyEqual> qualifys;
+static absl::flat_hash_set<const QualifyType *, QualifySet::Hash, QualifySet::KeyEqual> qualifys;
 
 //------------------------------------------------------------------------------
 

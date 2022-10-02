@@ -36,6 +36,7 @@
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/LiteralSupport.h"
+#include "absl/container/flat_hash_map.h"
 
 #ifdef _MSC_VER
 #include "stdlib_ex.h"
@@ -79,8 +80,8 @@ public:
     CNamespaces *dest;
     clang::ASTContext *Context;
     Result<void> ok;
-    std::unordered_map<clang::RecordDecl *, const Type *> record_defined;
-    std::unordered_map<clang::EnumDecl *, const Type *> enum_defined;
+    absl::flat_hash_map<clang::RecordDecl *, const Type *> record_defined;
+    absl::flat_hash_map<clang::EnumDecl *, const Type *> enum_defined;
 
     CVisitor() : dest(nullptr), Context(NULL) {
     }
@@ -1021,6 +1022,12 @@ SCOPES_RESULT(const Scope *) import_c_module (
             aargs.push_back(it.c_str());
         }
     }
+
+#ifdef SCOPES_WIN32
+    // Unfuck the windows stdio header
+    aargs.push_back("-D_NO_CRT_STDIO_INLINE=1");
+#endif
+
 #ifdef SCOPES_ADD_IMPORT_CFLAGS
     std::vector<std::string> addargs;
     {

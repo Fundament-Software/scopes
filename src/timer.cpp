@@ -5,8 +5,7 @@
 */
 
 #include "timer.hpp"
-
-#include <unordered_map>
+#include "absl/container/flat_hash_map.h"
 
 namespace scopes {
 
@@ -16,7 +15,7 @@ struct TimerData {
     TimerData() : time(0.0) {}
 };
 
-static std::unordered_map<Symbol, TimerData, Symbol::Hash> timers;
+static absl::flat_hash_map<Symbol, TimerData, Symbol::Hash> timers;
 
 //------------------------------------------------------------------------------
 // TIMER

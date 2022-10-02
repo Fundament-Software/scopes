@@ -14,8 +14,8 @@
 #include "symbol_enum.hpp"
 #include "dyn_cast.inc"
 #include "symbol_enum.inc"
-
-#include <unordered_map>
+#include "absl/container/flat_hash_set.h"
+#include "absl/container/flat_hash_map.h"
 
 namespace scopes {
 
@@ -127,9 +127,9 @@ StreamExprFormat fmt;
 bool line_anchors;
 bool atom_anchors;
 
-typedef std::unordered_map<Value *, ValueRef> Map;
-typedef std::unordered_map<Value *, int> IDMap;
-typedef std::unordered_set<Value *> Set;
+typedef absl::flat_hash_map<Value *, ValueRef> Map;
+typedef absl::flat_hash_map<Value *, int> IDMap;
+typedef absl::flat_hash_set<Value *> Set;
 int next_id = 1;
 
 Map map;

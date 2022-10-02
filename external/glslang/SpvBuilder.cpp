@@ -41,7 +41,7 @@
 #include <cassert>
 #include <cstdlib>
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 #include <algorithm>
 
 #include "SpvBuilder.h"
@@ -2390,8 +2390,8 @@ Id Builder::accessChainGetInferredType()
 
 // comment in header
 void Builder::eliminateDeadDecorations() {
-    std::unordered_set<const Block*> reachable_blocks;
-    std::unordered_set<Id> unreachable_definitions;
+    absl::flat_hash_set<const Block*> reachable_blocks;
+    absl::flat_hash_set<Id> unreachable_definitions;
     // Collect IDs defined in unreachable blocks. For each function, label the
     // reachable blocks first. Then for each unreachable block, collect the
     // result IDs of the instructions in it.

@@ -8,7 +8,7 @@
 #define SCOPES_ORDERED_MAP_HPP
 
 #include <vector>
-#include <unordered_map>
+#include "absl/container/flat_hash_map.h"
 #include <algorithm>
 
 namespace scopes {
@@ -73,7 +73,7 @@ struct OrderedMap {
     }
 
     std::vector< std::pair<KeyType, ValueType> > entries;
-    std::unordered_map<KeyType, int, KeyHash> _key_index;
+    absl::flat_hash_map<KeyType, int, KeyHash> _key_index;
 };
 
 } // namespace scopes

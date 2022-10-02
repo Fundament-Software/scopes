@@ -11,7 +11,7 @@
 
 #include <assert.h>
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -35,7 +35,7 @@ namespace PointerSet {
     };
 } // namespace PointerSet
 
-static std::unordered_set<const PointerType *, PointerSet::Hash, PointerSet::KeyEqual> pointers;
+static absl::flat_hash_set<const PointerType *, PointerSet::Hash, PointerSet::KeyEqual> pointers;
 
 //------------------------------------------------------------------------------
 // POINTER TYPE

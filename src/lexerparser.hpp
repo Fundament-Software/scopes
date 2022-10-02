@@ -12,7 +12,7 @@
 #include "symbol.hpp"
 
 #include <stddef.h>
-#include <unordered_map>
+#include "absl/container/flat_hash_map.h"
 
 namespace scopes {
 
@@ -166,7 +166,7 @@ struct LexerParser {
     int string_len;
 
     ValueRef value;
-    std::unordered_map<Symbol, ConstIntRef, Symbol::Hash> prefix_symbol_map;
+    absl::flat_hash_map<Symbol, ConstIntRef, Symbol::Hash> prefix_symbol_map;
 };
 
 

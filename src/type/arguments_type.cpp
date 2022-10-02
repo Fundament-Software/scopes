@@ -13,7 +13,7 @@
 
 #include <assert.h>
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -42,7 +42,7 @@ namespace ArgumentsSet {
     };
 } // namespace TupleSet
 
-static std::unordered_set<const ArgumentsType *,
+static absl::flat_hash_set<const ArgumentsType *,
     ArgumentsSet::Hash, ArgumentsSet::KeyEqual> arguments;
 
 //------------------------------------------------------------------------------
