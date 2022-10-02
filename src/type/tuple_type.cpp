@@ -16,7 +16,7 @@
 
 #include <assert.h>
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 #include <algorithm>
 
 namespace scopes {
@@ -49,7 +49,7 @@ namespace TupleSet {
     };
 } // namespace TupleSet
 
-static std::unordered_set<const TupleType *, TupleSet::Hash, TupleSet::KeyEqual> tuples;
+static absl::flat_hash_set<const TupleType *, TupleSet::Hash, TupleSet::KeyEqual> tuples;
 
 //------------------------------------------------------------------------------
 // TUPLE TYPE
@@ -141,7 +141,7 @@ SCOPES_RESULT(Symbol) TupleType::field_name(size_t i) const {
 
 std::vector<Symbol> TupleType::find_closest_field_match(Symbol name) const {
     const String *s = name.name();
-    std::unordered_set<Symbol, Symbol::Hash> done;
+    absl::flat_hash_set<Symbol, Symbol::Hash> done;
     std::vector<Symbol> best_syms;
     size_t best_dist = (size_t)-1;
     for (int i = 0; i < values.size(); ++i) {

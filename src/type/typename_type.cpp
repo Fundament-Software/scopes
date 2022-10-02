@@ -84,7 +84,7 @@ const Type *TypenameType::super() const {
     return super_type;
 }
 
-std::unordered_set<Symbol, Symbol::Hash> TypenameType::used_names;
+absl::flat_hash_set<Symbol, Symbol::Hash> TypenameType::used_names;
 
 //------------------------------------------------------------------------------
 

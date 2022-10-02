@@ -9,7 +9,7 @@
 #include "../dyn_cast.inc"
 #include "../hash.hpp"
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -27,7 +27,7 @@ namespace SampledImageSet {
     };
 } // namespace SampledImageSet
 
-static std::unordered_set<const SampledImageType *, SampledImageSet::Hash, SampledImageSet::KeyEqual> sampled_images;
+static absl::flat_hash_set<const SampledImageType *, SampledImageSet::Hash, SampledImageSet::KeyEqual> sampled_images;
 
 //------------------------------------------------------------------------------
 // SAMPLED IMAGE TYPE

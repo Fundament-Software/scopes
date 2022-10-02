@@ -16,9 +16,10 @@
 #include "hash.hpp"
 #include "anchor.hpp"
 #include "prover.hpp"
+#include "alloc.hpp"
 
 #include <assert.h>
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -686,7 +687,7 @@ struct ConstSet {
         }
     };
 
-    std::unordered_set<T *, Hash, Equal> map;
+    absl::flat_hash_set<T *, Hash, Equal> map;
 
     template<typename ... Args>
     TValueRef<T> from(Args ... args) {
@@ -729,7 +730,7 @@ PureRef PureCast::from(const Type *type, PureRef value) {
         switch (value->kind()) {
         case VK_ConstInt: {
             auto node = value.cast<ConstInt>();
-            result = ConstInt::from(type, node->words);
+            result = ConstInt::from(type, node->words.data(), node->words.size());
         } break;
         case VK_ConstReal: {
             auto node = value.cast<ConstReal>();
@@ -1671,9 +1672,24 @@ Const::Const(ValueKind _kind, const Type *type)
 
 static ConstSet<ConstInt> constints;
 
-ConstInt::ConstInt(const Type *type, const std::vector<uint64_t> &_value)
-    : Const(VK_ConstInt, type), words(_value) {
-    assert(!_value.empty());
+ConstInt::ConstInt(const Type *type, const uint64_t* _value, size_t count)
+    : Const(VK_ConstInt, type), words(nullptr, count) {
+  assert(count > 0);
+  if (count == 1)
+  {
+    word = *_value;
+    words = std::span<uint64_t>(&word, 1);
+  }
+  else
+  {
+    words = std::span<uint64_t>((uint64_t*)malloc(sizeof(uint64_t) * count), count);
+    memcpy(words.data(), _value, count * sizeof(uint64_t));
+  }
+}
+ConstInt::~ConstInt()
+{
+  if(words.size() > 1)
+    free(words.data());
 }
 
 bool ConstInt::key_equal(const ConstInt *other) const {
@@ -1704,27 +1720,28 @@ uint64_t ConstInt::msw() const {
     return words.back();
 }
 
-ConstIntRef ConstInt::from(const Type *type, std::vector<uint64_t> values) {
+ConstIntRef ConstInt::from(const Type *type, const uint64_t* cvalues, size_t numvalues) {
     auto T = cast<IntegerType>(storage_type(type).assert_ok());
     // truncate value
     auto w = T->width;
     auto issigned = T->issigned;
     auto numwords = (w + 63) / 64;
-    if (values.size() > numwords) {
+    uint64_t* nvalues = (uint64_t*)alloca(numwords * sizeof(uint64_t));
+    if (numvalues >= numwords) {
         // truncate
-        values.resize(numwords);
-    } else {
-        // pad
-        uint64_t val = (!issigned || (int64_t(values.back()) >= 0ll))?0ull:-1ull;
-        while (values.size() < numwords) {
-            values.push_back(val);
-        }
+      numvalues = numwords;
+      memcpy(nvalues, cvalues, numvalues * sizeof(uint64_t));
+    } else if(numvalues < numwords) {
+      memset(nvalues, (!issigned || (int64_t(cvalues[numvalues - 1]) >= 0ll)) ? 0 : 0xFF, numwords * sizeof(uint64_t));
+      memcpy(nvalues, cvalues, numvalues * sizeof(uint64_t));
+      numvalues = numwords;
     }
-    assert(values.size() == numwords);
+
+    assert(numvalues == numwords);
     if (w % 64 != 0) {
         w = w % 64;
         // mask tail
-        auto &&value = values[numwords - 1];
+        auto &&value = nvalues[numwords - 1];
         if (issigned) {
             int64_t intval = value;
             int shift = 64 - w;
@@ -1734,12 +1751,11 @@ ConstIntRef ConstInt::from(const Type *type, std::vector<uint64_t> values) {
             value = value & ~(-1ull << w);
         }
     }
-    return constints.from(type, values);
+    return constints.from(type, nvalues, numvalues);
 }
 
 ConstIntRef ConstInt::from(const Type *type, uint64_t value) {
-    std::vector<uint64_t> values = { value };
-    return from(type, values);
+    return from(type, &value, 1);
 }
 
 ConstIntRef ConstInt::symbol_from(Symbol value) {
@@ -2197,7 +2213,7 @@ struct Equal {
 
 } // namespace ClosureSet
 
-static std::unordered_set<Closure *, ClosureSet::Hash, ClosureSet::Equal> closures;
+static absl::flat_hash_set<Closure *, ClosureSet::Hash, ClosureSet::Equal> closures;
 
 Closure::Closure(const TemplateRef &_func, const FunctionRef &_frame) :
     func(_func), frame(_frame) {}

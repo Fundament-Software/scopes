@@ -10,7 +10,7 @@
 #include "../hash.hpp"
 #include "../utils.hpp"
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -32,7 +32,7 @@ struct KeyEqual {
 };
 } // namespace VectorSet
 
-static std::unordered_set<const VectorType *, VectorSet::Hash, VectorSet::KeyEqual> vectors;
+static absl::flat_hash_set<const VectorType *, VectorSet::Hash, VectorSet::KeyEqual> vectors;
 
 //------------------------------------------------------------------------------
 // VECTOR TYPE

@@ -10,7 +10,7 @@
 #include "../type.hpp"
 
 #include <vector>
-#include <unordered_map>
+#include "absl/container/flat_hash_map.h"
 
 namespace scopes {
 

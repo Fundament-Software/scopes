@@ -9,6 +9,7 @@
 #include "../dyn_cast.inc"
 #include "../hash.hpp"
 #include "../qualifier.inc"
+#include "absl/container/flat_hash_set.h"
 
 #include <algorithm>
 
@@ -30,7 +31,7 @@ struct KeyEqual {
 };
 } // namespace ViewSet
 
-static std::unordered_set<const ViewQualifier *, ViewSet::Hash, ViewSet::KeyEqual> views;
+static absl::flat_hash_set<const ViewQualifier *, ViewSet::Hash, ViewSet::KeyEqual> views;
 
 //------------------------------------------------------------------------------
 
@@ -48,7 +49,7 @@ struct KeyEqual {
 };
 } // namespace ViewSet
 
-static std::unordered_set<const UniqueQualifier *, UniqueSet::Hash, UniqueSet::KeyEqual> uniques;
+static absl::flat_hash_set<const UniqueQualifier *, UniqueSet::Hash, UniqueSet::KeyEqual> uniques;
 
 //------------------------------------------------------------------------------
 

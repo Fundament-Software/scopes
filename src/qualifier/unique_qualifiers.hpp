@@ -11,7 +11,7 @@
 #include "../type/qualify_type.hpp"
 
 #include <vector>
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -42,9 +42,9 @@ struct MutateQualifier : Qualifier {
 
 //------------------------------------------------------------------------------
 
-typedef std::unordered_set<int> IDSet;
+typedef absl::flat_hash_set<int> IDSet;
 typedef std::vector<int> IDs;
-typedef std::unordered_map<int, IDSet > ID2SetMap;
+typedef absl::flat_hash_map<int, IDSet > ID2SetMap;
 
 void map_unique_id(ID2SetMap &idmap, int fromid, int toid);
 void dump_idmap(const ID2SetMap &idmap);

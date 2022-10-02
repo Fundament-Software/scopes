@@ -8,6 +8,7 @@
 #include "gc.hpp"
 #include "utils.hpp"
 #include "hash.hpp"
+#include "alloc.hpp"
 
 #define STB_SPRINTF_DECORATE(name) stb_##name
 #define STB_SPRINTF_NOUNALIGNED
@@ -19,7 +20,7 @@
 
 #include <locale>
 #include <codecvt>
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 #pragma GCC diagnostic ignored "-Wvla-extension"
 
@@ -216,7 +217,7 @@ int escape_string(char *buf, const char *str, int strcount, const char *quote_ch
 // STRING
 //------------------------------------------------------------------------------
 
-static std::unordered_set<const String *, String::Hash, String::KeyEqual> string_map;
+static absl::flat_hash_set<const String *, String::Hash, String::KeyEqual> string_map;
 
 //------------------------------------------------------------------------------
 
@@ -233,6 +234,8 @@ bool String::KeyEqual::operator()( const String *lhs, const String *rhs ) const 
 
 //------------------------------------------------------------------------------
 
+static GreedyAlloc<&track> string_pool;
+
 std::size_t String::hash() const {
     return hash_bytes(data, count);
 }
@@ -246,7 +249,9 @@ const String *String::from(const char *buf, size_t count) {
     if (it != string_map.end()) {
         return *it;
     }
-    char *s = (char *)tracked_malloc(sizeof(char) * (count + 1));
+    //char *s = (char *)tracked_malloc(sizeof(char) * (count + 1));
+    char* s = (char *)string_pool.alloc(sizeof(char) * (count + 1));
+
     memcpy(s, buf, count * sizeof(char));
     s[count] = 0;
     const String *str = new String(s, count);

@@ -11,7 +11,7 @@
 
 #include <assert.h>
 
-#include <unordered_set>
+#include "absl/container/flat_hash_set.h"
 
 namespace scopes {
 
@@ -33,7 +33,7 @@ namespace ReferSet {
     };
 } // namespace ReferSet
 
-static std::unordered_set<const ReferQualifier *, ReferSet::Hash, ReferSet::KeyEqual> refers;
+static absl::flat_hash_set<const ReferQualifier *, ReferSet::Hash, ReferSet::KeyEqual> refers;
 
 //------------------------------------------------------------------------------
 // REFER QUALIFIER

@@ -45,6 +45,7 @@
 #include <vector>
 
 #include <zlib.h>
+#include "absl/container/flat_hash_map.h"
 
 #define SCOPES_CACHE_KEY_BITCODE 1
 #define SCOPES_LLVM_SUPPORT_DISASSEMBLY 1
@@ -116,7 +117,7 @@ public:
 
     DisassemblyListener() {}
 
-    std::unordered_map<std::string, size_t> sizes;
+    absl::flat_hash_map<std::string, size_t> sizes;
 
     void InitializeDebugData(
         llvm::StringRef name,
@@ -232,7 +233,7 @@ static LLVMOrcJITDylibRef jit_dylib = nullptr;
 static LLVMTargetMachineRef jit_target_machine = nullptr;
 static LLVMTargetMachineRef object_target_machine = nullptr;
 //static std::vector<void *> loaded_libs;
-static std::unordered_map<Symbol, void *, Symbol::Hash> cached_dlsyms;
+static absl::flat_hash_map<Symbol, void *, Symbol::Hash> cached_dlsyms;
 
 const String *get_default_target_triple() {
     auto str = LLVMGetDefaultTargetTriple();
@@ -331,7 +332,24 @@ static LLVMErrorRef definition_generator(
         }
     }
 
-    auto mu = LLVMOrcAbsoluteSymbols(&symbolpairs[0], symbolpairs.size());
+    /*auto custom = LLVMOrcCreateCustomMaterializationUnit("Custom Materialization", nullptr, orcpairs.data(), orcpairs.size(), symbolpairs[0].Name,
+      [](void* Ctx, LLVMOrcMaterializationResponsibilityRef MR) {
+        int MainResult = 0;
+
+        size_t NumSymbols;
+        LLVMOrcSymbolStringPoolEntryRef* Symbols =
+          LLVMOrcMaterializationResponsibilityGetRequestedSymbols(MR, &NumSymbols);
+
+        for (int i = 0; i < NumSymbols; ++i)
+          printf("%s\n", LLVMOrcSymbolStringPoolEntryStr(Symbols[i]));
+
+        LLVMOrcDisposeSymbols(Symbols);
+      },
+      [](void* Ctx, LLVMOrcJITDylibRef JD, LLVMOrcSymbolStringPoolEntryRef Symbol) { printf("%s\n", LLVMOrcSymbolStringPoolEntryStr(Symbol)); },
+        [](void* Ctx) {});
+    err = LLVMOrcJITDylibDefine(jit_dylib, custom);*/
+
+    auto mu = LLVMOrcAbsoluteSymbols(symbolpairs.data(), symbolpairs.size());
     return LLVMOrcJITDylibDefine(jit_dylib, mu);
 }
 
@@ -522,7 +540,7 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
         pair.Sym.Address = (uint64_t)ptr;
         symbolpairs.push_back(pair);
     }
-    auto mu = LLVMOrcAbsoluteSymbols(&symbolpairs[0], symbolpairs.size());
+    auto mu = LLVMOrcAbsoluteSymbols(symbolpairs.data(), symbolpairs.size());
     err = LLVMOrcJITDylibDefine(jit_dylib, mu);
     if (err) {
         SCOPES_ERROR(ExecutionEngineFailed, LLVMGetErrorMessage(err));
@@ -561,7 +579,7 @@ SCOPES_RESULT(void) add_module(LLVMModuleRef module, const PointerMap &map,
         gzclose(f);
 
         membuf = LLVMCreateMemoryBufferWithMemoryRangeCopy(
-            &data[0], data.size(), "");
+            data.data(), data.size(), "");
 
         #endif
 
@@ -653,12 +671,10 @@ void init_llvm() {
     //LLVMEnablePrettyStackTrace();
 
     // new known targets must also be handled elsewhere; grep SCOPES_KNOWN_TARGETS to find them
-#ifdef SCOPES_TARGET_NATIVE
     LLVMInitializeNativeTarget();
     LLVMInitializeNativeAsmPrinter();
     LLVMInitializeNativeAsmParser();
     LLVMInitializeNativeDisassembler();
-#endif
 #ifdef SCOPES_TARGET_WEBASSEMBLY
     LLVMInitializeWebAssemblyTargetInfo();
     LLVMInitializeWebAssemblyTarget();

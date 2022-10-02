@@ -15,6 +15,7 @@
 
 #include "../qualifier/unique_qualifiers.hpp"
 #include "../qualifier.inc"
+#include "absl/container/flat_hash_map.h"
 
 #include <assert.h>
 
@@ -198,7 +199,7 @@ const Type *raising_function_type(const Type *except_type, const Type *return_ty
         };
     };
 
-    typedef std::unordered_map<TypeArgs, FunctionType *, typename TypeArgs::Hash> ArgMap;
+    typedef absl::flat_hash_map<TypeArgs, FunctionType *, typename TypeArgs::Hash> ArgMap;
 
     static ArgMap map;
 
