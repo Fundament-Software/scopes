@@ -49,7 +49,7 @@
             withLibraries = scopes: libs:
               let
                 newscopes = pkgs.symlinkJoin {
-                  name = "scopesWithLibraries";
+                  name = "scopes";
                   paths = [ scopes ] ++ libs;
                   postBuild = ''
                     rm $out/bin/scopes
