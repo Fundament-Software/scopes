@@ -3865,6 +3865,18 @@ let
     ^= = (make-inplace-op ^)
     ..= = (make-inplace-op ..)
 
+    # also supported within infix expressions
+    := =
+        sugar-macro
+            fn expand-infix-let (expr)
+                raising Error
+                let name value = (decons expr)
+                let value =
+                    if (== (countof value) 1)
+                        let k = (decons value)
+                        k
+                    else `value
+                qq [let] [name] = [value]
     as:= = (make-inplace-let-op as)
     <- =
         sugar-macro
@@ -3894,6 +3906,7 @@ define-infix< 50 >>=; define-infix< 50 <<=
 define-infix< 50 &=; define-infix< 50 |=; define-infix< 50 ^=
 define-infix< 50 ..=
 
+define-infix* 50 :=
 define-infix* 50 as:=
 
 define-infix> 100 or
