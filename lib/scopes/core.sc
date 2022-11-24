@@ -3072,18 +3072,17 @@ fn get-ifx-op (env op)
     '@ env `[(get-ifx-symbol (as op Symbol))]
 
 fn has-infix-ops? (infix-table expr)
-    # any expression of which one odd argument matches an infix operator
+    # any expression of which the second argument matches an infix operator
         has infix operations.
-    loop (expr = expr)
-        if (< (countof expr) 3)
-            return false
-        let __ expr = ('decons expr)
-        let at next = ('decons expr)
-        try
-            get-ifx-op infix-table at
-            return true
-        except (err)
-            repeat expr
+    if (< (countof expr) 3)
+        return false
+    let __ expr = ('decons expr)
+    let at next = ('decons expr)
+    try
+        get-ifx-op infix-table at
+        return true
+    except (err)
+        return false
 
 fn unpack-infix-op (op)
     let op = (as op list)
