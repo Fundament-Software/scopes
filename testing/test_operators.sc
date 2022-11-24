@@ -61,10 +61,18 @@ do
     test
         not not not not true
 
-# := auto-wraps the right hand side
+# := auto-wraps the right hand side, accepts multiple left hand arguments
 x := + 1 2
 test (x == 3)
 x := 4
 test (x == 4)
+x y z := 1, 2, 3
+test (and (x == 1) (y == 2) (z == 3))
+x := 1.0
+# as:= auto-wraps right hand side as well
+x as:= integer 32
+test (x == 1)
+
+
 
 ;

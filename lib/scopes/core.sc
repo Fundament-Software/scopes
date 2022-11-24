@@ -3042,6 +3042,38 @@ fn pointer-ras (T vT)
     __as = (box-pointer (spice-cast-macro pointer-as))
     __ras = (box-pointer (spice-cast-macro pointer-ras))
 
+# explicit support for binding operator :=
+# --------------------------------------------------------------------------
+
+fn has-binding-operator? (expr)
+    loop (expr)
+        if (empty? expr)
+            break false
+        let at next = ('decons expr)
+        if (== ('typeof at) Symbol)
+            let at = (as at Symbol)
+            if (== at ':=)
+                return true
+        repeat next
+
+fn parse-binding-expr (anchor expr)
+    loop (lhs rhs = '() expr)
+        if (empty? rhs)
+            error str"unexpected end of binding expression"
+        let at rhs = ('decons rhs)
+        if (== ('typeof at) Symbol)
+            let at = (as at Symbol)
+            if (== at ':=)
+                let rhs =
+                    if (== (countof rhs) 1) rhs
+                    else (list rhs)
+                let newexpr =
+                    'join
+                        cons let ('reverse lhs)
+                        cons '= rhs
+                return newexpr
+        repeat (cons at lhs) rhs
+
 # infix notation support
 # --------------------------------------------------------------------------
 
@@ -3260,7 +3292,7 @@ fn list-handler (topexpr env)
                 sc_error_append_calltrace err ('tag msg expr-anchor)
                 raise err
         return expr env
-    elseif (has-infix-ops? env expr)
+    if (has-infix-ops? env expr)
         let at next = ('decons expr)
         let expr =
             try
@@ -3270,6 +3302,8 @@ fn list-handler (topexpr env)
                 hide-traceback;
                 error@+ err ('anchor topexpr-at) "while expanding infix expression"
         return (cons expr topexpr-next) env
+    elseif (has-binding-operator? expr)
+        return (cons (parse-binding-expr expr-anchor expr) topexpr-next) env
     else
         return topexpr env
 
@@ -3805,7 +3839,12 @@ inline make-inplace-let-op (op)
     sugar-macro
         fn expand-infix-let (expr)
             raising Error
-            let name value = (decons expr 2)
+            let name value = (decons expr)
+            let value =
+                if (== (countof value) 1)
+                    let k = (decons value)
+                    k
+                else `value
             qq [let] [name] = ([op] [name] [value])
 
 inline make-inplace-op (op)
@@ -3826,17 +3865,6 @@ let
     ^= = (make-inplace-op ^)
     ..= = (make-inplace-op ..)
 
-    := =
-        sugar-macro
-            fn expand-infix-let (expr)
-                raising Error
-                let name value = (decons expr)
-                let value =
-                    if (== (countof value) 1)
-                        let k = (decons value)
-                        k
-                    else `value
-                qq [let] [name] = [value]
     as:= = (make-inplace-let-op as)
     <- =
         sugar-macro
@@ -3866,8 +3894,7 @@ define-infix< 50 >>=; define-infix< 50 <<=
 define-infix< 50 &=; define-infix< 50 |=; define-infix< 50 ^=
 define-infix< 50 ..=
 
-define-infix* 50 :=
-define-infix< 50 as:=
+define-infix* 50 as:=
 
 define-infix> 100 or
 define-infix> 200 and
