@@ -3132,6 +3132,12 @@ fn parse-infix-expr (infix-table lhs state mprec)
         if (== ('typeof op) Nothing)
             return lhs state
         let op-prec op-order op-name = (unpack-infix-op op)
+        if (== op-order '*)
+            let rhs = next-state
+            let anchor = ('anchor la)
+            return
+                'tag `[(cons ('tag `op-name anchor) lhs rhs)] anchor
+                '()
         loop (rhs state = ('decons next-state))
             if (empty? state)
                 let anchor = ('anchor la)
@@ -3704,6 +3710,7 @@ let
     define = (sugar-macro expand-define)
     define-infix> = (sugar-scope-macro (make-expand-define-infix '>))
     define-infix< = (sugar-scope-macro (make-expand-define-infix '<))
+    define-infix* = (sugar-scope-macro (make-expand-define-infix '*))
     .. = (spice-macro (fn (args) (rtl-multiop args `.. 2)))
     + = (spice-macro (fn (args) (ltr-multiop args `+ 2)))
     * = (spice-macro (fn (args) (ltr-multiop args `* 2)))
@@ -3823,7 +3830,12 @@ let
         sugar-macro
             fn expand-infix-let (expr)
                 raising Error
-                let name value = (decons expr 2)
+                let name value = (decons expr)
+                let value =
+                    if (== (countof value) 1)
+                        let k = (decons value)
+                        k
+                    else `value
                 qq [let] [name] = [value]
     as:= = (make-inplace-let-op as)
     <- =
@@ -3854,7 +3866,7 @@ define-infix< 50 >>=; define-infix< 50 <<=
 define-infix< 50 &=; define-infix< 50 |=; define-infix< 50 ^=
 define-infix< 50 ..=
 
-define-infix< 50 :=
+define-infix* 50 :=
 define-infix< 50 as:=
 
 define-infix> 100 or

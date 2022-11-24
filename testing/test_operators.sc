@@ -61,6 +61,10 @@ do
     test
         not not not not true
 
-
+# := auto-wraps the right hand side
+x := + 1 2
+test (x == 3)
+x := 4
+test (x == 4)
 
 ;
