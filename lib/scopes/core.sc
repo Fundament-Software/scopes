@@ -3056,7 +3056,7 @@ fn has-binding-operator? (expr)
                 return true
         repeat next
 
-fn parse-binding-expr (anchor expr)
+fn parse-binding-expr (anchor expr next-expr env)
     loop (lhs rhs = '() expr)
         if (empty? rhs)
             error str"unexpected end of binding expression"
@@ -3065,13 +3065,16 @@ fn parse-binding-expr (anchor expr)
             let at = (as at Symbol)
             if (== at ':=)
                 let rhs =
-                    if (== (countof rhs) 1) rhs
-                    else (list rhs)
+                    if (== (countof rhs) 1)
+                        let rhs = (decons rhs)
+                        rhs
+                    else `rhs
+                let rhs next-expr env = (sc_expand ('tag rhs anchor) next-expr env)
                 let newexpr =
                     'join
                         cons let ('reverse lhs)
-                        cons '= rhs
-                return newexpr
+                        list '= rhs
+                return (cons newexpr next-expr) env
         repeat (cons at lhs) rhs
 
 # infix notation support
@@ -3292,7 +3295,9 @@ fn list-handler (topexpr env)
                 sc_error_append_calltrace err ('tag msg expr-anchor)
                 raise err
         return expr env
-    if (has-infix-ops? env expr)
+    if (has-binding-operator? expr)
+        return (parse-binding-expr expr-anchor expr topexpr-next env)
+    elseif (has-infix-ops? env expr)
         let at next = ('decons expr)
         let expr =
             try
@@ -3302,8 +3307,6 @@ fn list-handler (topexpr env)
                 hide-traceback;
                 error@+ err ('anchor topexpr-at) "while expanding infix expression"
         return (cons expr topexpr-next) env
-    elseif (has-binding-operator? expr)
-        return (cons (parse-binding-expr expr-anchor expr) topexpr-next) env
     else
         return topexpr env
 
@@ -3865,18 +3868,6 @@ let
     ^= = (make-inplace-op ^)
     ..= = (make-inplace-op ..)
 
-    # also supported within infix expressions
-    := =
-        sugar-macro
-            fn expand-infix-let (expr)
-                raising Error
-                let name value = (decons expr)
-                let value =
-                    if (== (countof value) 1)
-                        let k = (decons value)
-                        k
-                    else `value
-                qq [let] [name] = [value]
     as:= = (make-inplace-let-op as)
     <- =
         sugar-macro

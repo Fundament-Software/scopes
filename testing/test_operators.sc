@@ -68,11 +68,20 @@ x := 4
 test (x == 4)
 x y z := 1, 2, 3
 test (and (x == 1) (y == 2) (z == 3))
-x := 1.0
+
+# := also support block sugars like `if`
+# right hand side is evaluated in same scope
+x := if ((z := 10) == 10)
+    20
+else
+    30
+test (and (x == 20) (z == 10))
+
+
 # as:= auto-wraps right hand side as well
+x := 1.0
 x as:= integer 32
 test (x == 1)
-
 
 
 ;
