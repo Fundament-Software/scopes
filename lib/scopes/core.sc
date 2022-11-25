@@ -2788,9 +2788,9 @@ inline printrepr (value)
         inline () value
         inline () (repr value)
 
-let print =
+let write =
     do
-        inline print-element (i key value)
+        inline write-element (i key value)
             let value = (view value)
             static-branch (const.icmp<=.i32.i32 i 0)
                 inline ()
@@ -2799,9 +2799,12 @@ let print =
             sc_write
                 printrepr value
 
-        inline print (values...)
-            va-lifold none print-element values...
-            sc_write "\n"
+        inline write (values...)
+            va-lifold none write-element values...
+
+inline print (values...)
+    write values...
+    sc_write "\n"
 
 let report =
     spice-macro
