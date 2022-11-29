@@ -378,7 +378,7 @@ fn finalize-enum-runtime (T storage)
         case (args...)
             returning void
             va-map __drop args...
-            _;
+            ;
         inline cmp-default () false
         inline hash-default () (nullof hash)
         # build repr function
