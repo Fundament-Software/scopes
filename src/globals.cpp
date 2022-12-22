@@ -323,6 +323,11 @@ sc_void_raises_t sc_compile_object(const sc_string_t *target_triple,
     return convert_result(compile_object(target_triple, (CompilerFileKind)file_kind, path, table, flags));
 }
 
+const sc_string_t *sc_compile_wasm_to_buffer(const sc_string_t *module_name, int file_kind, const sc_scope_t *table, uint64_t flags) {
+    using namespace scopes;
+    return convert_result(compile_wasm_to_buffer(module_name, (CompilerFileKind)file_kind, table, flags));
+}
+
 void sc_show_targets() {
     llvm::TargetRegistry::printRegisteredTargetsForVersion(llvm::outs());
 }
