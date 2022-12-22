@@ -3288,6 +3288,66 @@ unsigned LLVMIRGenerator::attr_kind_byval = 0;
 // IL COMPILER
 //------------------------------------------------------------------------------
 
+SCOPES_RESULT(const String *) compile_wasm_to_buffer(const String *module_name, CompilerFileKind kind, const Scope *scope, uint64_t flags) {
+    SCOPES_RESULT_TYPE(const String *);
+    
+    LLVMIRGenerator ctx;
+    Timer sum_compile_time(TIMER_Compile);
+
+    LLVMModuleRef module;
+    {
+        Timer generate_timer(TIMER_Generate);
+        module = SCOPES_GET_RESULT(ctx.generate(module_name, scope))
+    }
+
+    if (flags & CF_O3) {
+        Timer optimize_timer(TIMER_Optimize);
+        int level = 0;
+        if ((flags & CF_O3) == CF_O1)
+            level = 1;
+        else if ((flags & CF_O3) == CF_O2)
+            level = 2;
+        else if ((flags & CF_O3) == CF_O3)
+            level = 3;
+        build_and_run_opt_passes(module, level);
+    }
+
+    if (flags & CF_DumpModule) {
+        LLVMDumpModule(module);
+    }
+
+    static char triplestr[1024];
+    strncpy(triplestr, "wasm32-unknown-unknown", 1024 - 1);
+
+    char *error_message = nullptr;
+    LLVMTargetRef target = nullptr;
+    if (LLVMGetTargetFromTriple(triplestr, &target, &error_message)) {
+        SCOPES_ERROR(CGenBackendFailed, error_message);
+    }
+
+    // code model must be JIT default for reasons beyond my comprehension
+    auto tm = LLVMCreateTargetMachine(target, triplestr, nullptr, nullptr,
+        LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelJITDefault);
+    assert(tm);
+
+    LLVMBool failed = false;
+
+    char *error_message = nullptr;
+    LLVMMemoryBufferRef buffer = nullptr;
+
+    failed = LLVMTargetMachineEmitToMemoryBuffer(tm, module, LLVMObjectFile, &buffer, &error_message);
+
+    if (failed) {
+        SCOPES_ERROR(CGenBackendFailed, error_message);
+    }
+
+    char *buffer_start = LLVMGetBufferStart(buffer);
+    size_t buffer_size = LLVMGetBufferSize(buffer);
+
+    LLVMDisposeMemoryBuffer(buffer);
+
+    return String::from(buffer_start, buffer_size);
+}
 
 SCOPES_RESULT(void) compile_object(const String *triple,
     CompilerFileKind kind, const String *path, const Scope *scope, uint64_t flags) {
