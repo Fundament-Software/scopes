@@ -3292,13 +3292,15 @@ SCOPES_RESULT(const String *) compile_wasm_to_buffer(const String *module_name, 
     SCOPES_RESULT_TYPE(const String *);
     
     LLVMIRGenerator ctx;
+    ctx.generate_object = true;
+
     Timer sum_compile_time(TIMER_Compile);
 
     LLVMModuleRef module;
     {
         Timer generate_timer(TIMER_Generate);
-        module = SCOPES_GET_RESULT(ctx.generate(module_name, scope))
-    }
+        module = SCOPES_GET_RESULT(ctx.generate(module_name, scope));
+    }    
 
     if (flags & CF_O3) {
         Timer optimize_timer(TIMER_Optimize);
@@ -3316,11 +3318,10 @@ SCOPES_RESULT(const String *) compile_wasm_to_buffer(const String *module_name, 
         LLVMDumpModule(module);
     }
 
-    static char triplestr[1024];
-    strncpy(triplestr, "wasm32-unknown-unknown", 1024 - 1);
-
+    const char* triplestr = "wasm32-unknown-unknown";
     char *error_message = nullptr;
     LLVMTargetRef target = nullptr;
+
     if (LLVMGetTargetFromTriple(triplestr, &target, &error_message)) {
         SCOPES_ERROR(CGenBackendFailed, error_message);
     }
@@ -3331,20 +3332,16 @@ SCOPES_RESULT(const String *) compile_wasm_to_buffer(const String *module_name, 
     assert(tm);
 
     LLVMBool failed = false;
-
-    char *error_message = nullptr;
     LLVMMemoryBufferRef buffer = nullptr;
 
-    failed = LLVMTargetMachineEmitToMemoryBuffer(tm, module, LLVMObjectFile, &buffer, &error_message);
+    failed = LLVMTargetMachineEmitToMemoryBuffer(tm, module, LLVMAssemblyFile, &error_message, &buffer);
 
     if (failed) {
         SCOPES_ERROR(CGenBackendFailed, error_message);
     }
 
-    char *buffer_start = LLVMGetBufferStart(buffer);
-    size_t buffer_size = LLVMGetBufferSize(buffer);
-
-    LLVMDisposeMemoryBuffer(buffer);
+    const char* buffer_start = LLVMGetBufferStart(buffer);
+    const size_t buffer_size = LLVMGetBufferSize(buffer);
 
     return String::from(buffer_start, buffer_size);
 }
