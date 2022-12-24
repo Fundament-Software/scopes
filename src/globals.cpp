@@ -317,15 +317,14 @@ const sc_string_t *sc_default_target_triple() {
     return get_default_target_triple();
 }
 
-sc_void_raises_t sc_compile_object(const sc_string_t *target_triple,
-    int file_kind, const sc_string_t *path, const sc_scope_t *table, uint64_t flags) {
+sc_void_raises_t sc_compile_object(const sc_string_t *target_triple, int file_kind, const sc_string_t *path, const sc_scope_t *table, uint64_t flags) {
     using namespace scopes;
     return convert_result(compile_object(target_triple, (CompilerFileKind)file_kind, path, table, flags));
 }
 
-sc_string_raises_t sc_compile_wasm_to_buffer(const sc_string_t *module_name, int file_kind, const sc_scope_t *table, uint64_t flags) {
+sc_string_raises_t sc_compile_to_buffer(const sc_string_t *target_triple, const sc_string_t *module_name, int file_kind, const sc_scope_t *table, uint64_t flags) {
     using namespace scopes;
-    return convert_result(compile_wasm_to_buffer(module_name, (CompilerFileKind)file_kind, table, flags));
+    return convert_result(compile_to_buffer(target_triple, module_name, (CompilerFileKind)file_kind, table, flags));
 }
 
 void sc_show_targets() {
@@ -2488,7 +2487,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_spirv_to_glsl, TYPE_String, TYPE_String);
     DEFINE_EXTERN_C_FUNCTION(sc_default_target_triple, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_object, _void, TYPE_String, TYPE_I32, TYPE_String, TYPE_Scope, TYPE_U64);
-    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_wasm_to_buffer, TYPE_String, TYPE_String, TYPE_I32, TYPE_Scope, TYPE_U64);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_compile_to_buffer, TYPE_String, TYPE_String, TYPE_String, TYPE_I32, TYPE_Scope, TYPE_U64);
     DEFINE_EXTERN_C_FUNCTION(sc_show_targets, _void);
     DEFINE_EXTERN_C_FUNCTION(sc_enter_solver_cli, _void);
     DEFINE_EXTERN_C_FUNCTION(sc_launch_args, arguments_type({TYPE_I32,native_ro_pointer_type(rawstring)}));

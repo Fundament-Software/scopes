@@ -23,6 +23,9 @@
 #include "qualifier.inc"
 #include "verify_tools.inc"
 
+#include <iostream>
+#include <fstream>
+
 #ifdef SCOPES_WIN32
 #include "stdlib_ex.h"
 #else
@@ -3288,7 +3291,8 @@ unsigned LLVMIRGenerator::attr_kind_byval = 0;
 // IL COMPILER
 //------------------------------------------------------------------------------
 
-SCOPES_RESULT(const String *) compile_wasm_to_buffer(const String *module_name, CompilerFileKind kind, const Scope *scope, uint64_t flags) {
+SCOPES_RESULT(const String *) compile_to_buffer(const String *triple, const String *module_name,
+    CompilerFileKind kind, const Scope *scope, uint64_t flags) {
     SCOPES_RESULT_TYPE(const String *);
     
     LLVMIRGenerator ctx;
@@ -3317,33 +3321,53 @@ SCOPES_RESULT(const String *) compile_wasm_to_buffer(const String *module_name, 
     if (flags & CF_DumpModule) {
         LLVMDumpModule(module);
     }
-
-    const char* triplestr = "wasm32-unknown-unknown";
+    
+    auto tt = LLVMNormalizeTargetTriple(triple->data);
+    static char triplestr[1024];
+    strncpy(triplestr, tt, 1024 - 1);
+    LLVMDisposeMessage(tt);
+    
     char *error_message = nullptr;
     LLVMTargetRef target = nullptr;
-
     if (LLVMGetTargetFromTriple(triplestr, &target, &error_message)) {
         SCOPES_ERROR(CGenBackendFailed, error_message);
     }
-
     // code model must be JIT default for reasons beyond my comprehension
     auto tm = LLVMCreateTargetMachine(target, triplestr, nullptr, nullptr,
         LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelJITDefault);
     assert(tm);
-
+    
     LLVMBool failed = false;
     LLVMMemoryBufferRef buffer = nullptr;
 
-    failed = LLVMTargetMachineEmitToMemoryBuffer(tm, module, LLVMAssemblyFile, &error_message, &buffer);
+    switch(kind) {
+        case CFK_Object: {
+            failed = LLVMTargetMachineEmitToMemoryBuffer(tm, module, LLVMObjectFile, &error_message, &buffer);
+        } break;
+        case CFK_ASM: {
+            failed = LLVMTargetMachineEmitToMemoryBuffer(tm, module, LLVMAssemblyFile, &error_message, &buffer);
+        } break;
+        default: {
+            SCOPES_ERROR(CGenBackendFailed, "unknown file kind");
+            break;
+        }
+    }
 
     if (failed) {
         SCOPES_ERROR(CGenBackendFailed, error_message);
     }
 
-    const char* buffer_start = LLVMGetBufferStart(buffer);
+    const char* buffer_data = LLVMGetBufferStart(buffer);
     const size_t buffer_size = LLVMGetBufferSize(buffer);
 
-    return String::from(buffer_start, buffer_size);
+    /** DEBUG START */
+    // std::ofstream file;
+    // file.open("_test.wasm");
+    // file << std::string(buffer_data, buffer_size);
+    // file.close();
+    /** DEBUG END*/
+
+    return String::from(buffer_data, buffer_size);
 }
 
 SCOPES_RESULT(void) compile_object(const String *triple,
