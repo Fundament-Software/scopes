@@ -31,8 +31,6 @@ SCOPES_COMPILER_FILE_KIND()
 #undef T
 };
 
-SCOPES_RESULT(const String *) compile_to_buffer(const String *triple, const String *module_name, CompilerFileKind kind, const Scope *scope, uint64_t flags);
-
 SCOPES_RESULT(void) compile_object(const String *triple,
     CompilerFileKind kind, const String *path, const Scope *scope, uint64_t flags);
 SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags);
