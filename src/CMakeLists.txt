@@ -211,9 +211,11 @@ find_package(SPIRV-Tools CONFIG REQUIRED)
 find_package(SPIRV-Tools-opt CONFIG REQUIRED)
 find_package(SPIRV-Tools-link CONFIG REQUIRED)
 
-if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+if(USE_MIMALLOC)
   find_package(mimalloc CONFIG REQUIRED)
-  
+endif()
+
+if (CMAKE_SYSTEM_NAME MATCHES "Windows")  
   target_compile_definitions(scopesrt PRIVATE SCOPES_WIN32)
   target_include_directories(scopesrt PRIVATE ${CMAKE_SOURCE_DIR}/src/win32)
 else()
@@ -267,11 +269,15 @@ target_compile_definitions(scopesrt PRIVATE SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS
 target_link_directories(scopesrt PRIVATE ${LLVM_LIBRARY_DIR})
 
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
-  target_link_libraries(scopesrt ZLIB::ZLIB ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs} absl::flat_hash_map absl::flat_hash_set mimalloc-static)
+  target_link_libraries(scopesrt ZLIB::ZLIB ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs} absl::flat_hash_map absl::flat_hash_set)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
   target_link_libraries(scopesrt ZLIB::ZLIB ${Threads} ${CMAKE_DL_LIBS} ${TINFO_LIBRARY} ${EXTRA_LIBS} ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs} absl::flat_hash_map absl::flat_hash_set)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
   target_link_libraries(scopesrt ZLIB::ZLIB ${Threads} ${CMAKE_DL_LIBS} ${TINFO_LIBRARY} ${EXTRA_LIBS} ${llvm_libs} spirv-cross-c spirv-cross-cpp spirv-cross-core spirv-cross-glsl spirv-cross-hlsl spirv-cross-msl spirv-cross-reflect spirv-cross-util SPIRV-Tools-static SPIRV-Tools-opt SPIRV-Tools-link ${clang_libs} absl::flat_hash_map absl::flat_hash_set)
+endif()
+
+if(USE_MIMALLOC)
+  target_link_libraries(scopesrt mimalloc-static)
 endif()
 
 # ---------------------------------
