@@ -23,9 +23,6 @@
 #include "qualifier.inc"
 #include "verify_tools.inc"
 
-#include <iostream>
-#include <fstream>
-
 #ifdef SCOPES_WIN32
 #include "stdlib_ex.h"
 #else
