@@ -1,4 +1,3 @@
-
 fn sum_two (x y)
     x + y
 
@@ -14,7 +13,6 @@ compile-object
             sum_two_float =
                 static-typify sum_two f32 f32
         locals;
-        #
 
 # link file using llvm's webassembly linker
     wasm-ld --no-entry --export-dynamic _test.wasm -o test.wasm

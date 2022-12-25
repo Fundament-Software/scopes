@@ -31,8 +31,10 @@ SCOPES_COMPILER_FILE_KIND()
 #undef T
 };
 
-SCOPES_RESULT(void) compile_object(const String *triple,
-    CompilerFileKind kind, const String *path, const Scope *scope, uint64_t flags);
+template <typename T>
+SCOPES_RESULT(T) compile_object(const String *triple, CompilerFileKind kind,
+    const String *path, const Scope *scope, uint64_t flags);
+
 SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags);
 
 } // namespace scopes
