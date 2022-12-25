@@ -5,6 +5,8 @@ option(USE_DEFAULT_FOLDERS "Don't override the cmake output folders with a unifi
 option(TARGET_WEBASSEMBLY "Enable WebAssembly target" OFF)
 option(TARGET_AARCH64 "Enable AArch64 target" OFF)
 option(TARGET_RISCV "Enable RISC-V target" OFF)
+option(USE_ASAN_UBSAN "Use address sanitizer" OFF)
+option(USE_MIMALLOC "Replace the default allocator with mimalloc" OFF)
 
 if(MSVC)
   # This ensures that we default to static but let vcpkg configure things the way it wants
