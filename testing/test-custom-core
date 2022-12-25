@@ -1,0 +1,8 @@
+cp ../bin/scopes myscopes &&
+cat mycore.sc >> myscopes &&
+echo "(core-size " >> myscopes &&
+wc -c < mycore.sc >> myscopes &&
+echo ")" >> myscopes &&
+tail -c 30 myscopes &&
+./myscopes
+
