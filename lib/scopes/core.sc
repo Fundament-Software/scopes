@@ -5026,6 +5026,9 @@ spice-quote
 
     inline compile-object (target file-kind path table flags...)
         sc_compile_object target file-kind path table (parse-compile-flags flags...)
+    
+    inline compile-object-to-buffer (target file-kind module-name table flags...)
+        sc_compile_object_to_buffer target file-kind module-name table (parse-compile-flags flags...)
 
 inline convert-assert-args (args cond msg)
     if ((countof args) == 2) msg
