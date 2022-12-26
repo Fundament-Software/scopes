@@ -3399,7 +3399,7 @@ SCOPES_RESULT(T) compile_object(const String *triple, CompilerFileKind kind, con
 
         return String::from(buffer_data, buffer_size);
     } else {
-        SCOPES_ERROR(CGenBackendFailed, "unimplemented template type");
+        static_assert(std::is_void_v<T>, "unimplemented template type");
 
         return {};
     }
