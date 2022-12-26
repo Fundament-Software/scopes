@@ -34,6 +34,10 @@
 
 #include <deque>
 
+// cleaner template specialization
+#include <type_traits>
+
+
 #include <llvm-c/Core.h>
 //#include <llvm-c/ExecutionEngine.h>
 #include <llvm-c/Analysis.h>
@@ -3288,10 +3292,9 @@ unsigned LLVMIRGenerator::attr_kind_byval = 0;
 // IL COMPILER
 //------------------------------------------------------------------------------
 
-
-SCOPES_RESULT(void) compile_object(const String *triple,
-    CompilerFileKind kind, const String *path, const Scope *scope, uint64_t flags) {
-    SCOPES_RESULT_TYPE(void);
+template <typename T> 
+SCOPES_RESULT(T) compile_object(const String *triple, CompilerFileKind kind, const String *path, const Scope *scope, uint64_t flags) {
+    SCOPES_RESULT_TYPE(T);
     Timer sum_compile_time(TIMER_Compile);
 
     LLVMIRGenerator ctx;
@@ -3317,6 +3320,7 @@ SCOPES_RESULT(void) compile_object(const String *triple,
             level = 3;
         build_and_run_opt_passes(module, level);
     }
+
     if (flags & CF_DumpModule) {
         LLVMDumpModule(module);
     }
@@ -3328,42 +3332,81 @@ SCOPES_RESULT(void) compile_object(const String *triple,
 
     char *error_message = nullptr;
     LLVMTargetRef target = nullptr;
+
     if (LLVMGetTargetFromTriple(triplestr, &target, &error_message)) {
         SCOPES_ERROR(CGenBackendFailed, error_message);
     }
     // code model must be JIT default for reasons beyond my comprehension
-    auto tm = LLVMCreateTargetMachine(target, triplestr, nullptr, nullptr,
+    LLVMTargetMachineRef tm = LLVMCreateTargetMachine(target, triplestr, nullptr, nullptr,
         LLVMCodeGenLevelDefault, LLVMRelocPIC, LLVMCodeModelJITDefault);
     assert(tm);
 
     char *path_cstr = strdup(path->data);
     LLVMBool failed = false;
-    switch(kind) {
-    case CFK_Object: {
-        failed = LLVMTargetMachineEmitToFile(tm, module, path_cstr,
-            LLVMObjectFile, &error_message);
-    } break;
-    case CFK_ASM: {
-        failed = LLVMTargetMachineEmitToFile(tm, module, path_cstr,
-            LLVMAssemblyFile, &error_message);
-    } break;
-    case CFK_BC: {
-        failed = LLVMWriteBitcodeToFile(module, path_cstr);
-    } break;
-    case CFK_LLVM: {
-        failed = LLVMPrintModuleToFile(module, path_cstr, &error_message);
-    } break;
-    default: {
+
+    if constexpr (std::is_void_v<T>) {
+        switch(kind) {
+            case CFK_Object: {
+                failed = LLVMTargetMachineEmitToFile(tm, module, path_cstr,
+                    LLVMObjectFile, &error_message);
+            } break;
+            case CFK_ASM: {
+                failed = LLVMTargetMachineEmitToFile(tm, module, path_cstr,
+                    LLVMAssemblyFile, &error_message);
+            } break;
+            case CFK_BC: {
+                failed = LLVMWriteBitcodeToFile(module, path_cstr);
+            } break;
+            case CFK_LLVM: {
+                failed = LLVMPrintModuleToFile(module, path_cstr, &error_message);
+            } break;
+            default: {
+                free(path_cstr);
+                SCOPES_ERROR(CGenBackendFailed, "unknown file kind");
+            } break;
+        }
+        
         free(path_cstr);
-        SCOPES_ERROR(CGenBackendFailed, "unknown file kind");
-    } break;
+        
+        if (failed) {
+            SCOPES_ERROR(CGenBackendFailed, error_message);
+        }
+        
+        return {};
+
+    } else if constexpr (std::is_same_v<T, const String*>) {
+        LLVMMemoryBufferRef buffer = nullptr;
+        LLVMBool failed = false;
+
+        switch(kind) {
+            case CFK_Object: {
+                failed = LLVMTargetMachineEmitToMemoryBuffer(tm, module, LLVMObjectFile, &error_message, &buffer);
+            } break;
+            case CFK_ASM: {
+                failed = LLVMTargetMachineEmitToMemoryBuffer(tm, module, LLVMAssemblyFile, &error_message, &buffer);
+            } break;
+            default: {
+                SCOPES_ERROR(CGenBackendFailed, "unknown file kind");
+            } break;
+        }
+
+        if (failed) {
+            SCOPES_ERROR(CGenBackendFailed, error_message);
+        }
+
+        const char* buffer_data = LLVMGetBufferStart(buffer);
+        const size_t buffer_size = LLVMGetBufferSize(buffer);
+
+        return String::from(buffer_data, buffer_size);
+    } else {
+        SCOPES_ERROR(CGenBackendFailed, "unimplemented template type");
+
+        return {};
     }
-    free(path_cstr);
-    if (failed) {
-        SCOPES_ERROR(CGenBackendFailed, error_message);
-    }
-    return {};
 }
+
+template SCOPES_RESULT(void) compile_object<void>(const String *triple, CompilerFileKind kind, const String *path, const Scope *scope, uint64_t flags);
+template SCOPES_RESULT(const String *) compile_object<const String *>(const String *triple, CompilerFileKind kind, const String *path, const Scope *scope, uint64_t flags);
 
 SCOPES_RESULT(ConstPointerRef) compile(const FunctionRef &fn, uint64_t flags) {
     SCOPES_RESULT_TYPE(ConstPointerRef);
