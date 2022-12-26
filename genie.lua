@@ -292,7 +292,7 @@ project "scopesrt"
         }
 
         buildoptions_cpp {
-            "-std=c++14",
+            "-std=c++17",
             "-fno-rtti",
             "-fno-exceptions",
             "-ferror-limit=1",
@@ -380,7 +380,7 @@ project "scopesrt"
         buildoptions_cpp {
             "-D_GNU_SOURCE",
             "-Wa,-mbig-obj",
-            "-std=gnu++14",
+            "-std=gnu++17",
             "-fno-exceptions",
             "-fno-rtti",
             "-fno-strict-aliasing",
@@ -476,7 +476,7 @@ project "scopesrt"
         }
 
         buildoptions_cpp {
-            "-std=c++14",
+            "-std=c++17",
             "-fno-rtti",
             "-fno-exceptions",
             "-ferror-limit=1",
@@ -543,7 +543,7 @@ project "scopes"
         }
 
         buildoptions_cpp {
-            "-std=c++14",
+            "-std=c++17",
             "-fno-rtti",
             "-fno-exceptions",
             "-ferror-limit=1",
@@ -583,7 +583,7 @@ project "scopes"
         buildoptions_cpp {
             "-D_GNU_SOURCE",
             "-Wa,-mbig-obj",
-            "-std=gnu++14",
+            "-std=gnu++17",
             "-fno-exceptions",
             "-fno-rtti",
             "-fno-strict-aliasing",
@@ -649,7 +649,7 @@ project "scopes"
         defines { "SCOPES_MACOS" }
 
         buildoptions_cpp {
-            "-std=c++14",
+            "-std=c++17",
             "-fno-rtti",
             "-fno-exceptions",
             "-ferror-limit=1",
