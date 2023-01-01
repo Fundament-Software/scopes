@@ -42,8 +42,9 @@ fn debug_print(buffer)
         (countof buffer)
 
     loop (a = 0)
+
         if (a < length)
-            print (@ buffer a)
+            print ((@ buffer a) as string)
             repeat (a + 1)
         else
             break a
