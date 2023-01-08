@@ -26,3 +26,4 @@ compile-object
     https://github.com/WebAssembly/wabt
 
     particularly wasm2wat and wasm-validate
+
