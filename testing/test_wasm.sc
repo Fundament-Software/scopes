@@ -1,21 +1,18 @@
-
-fn testfunc (x y)
+fn sum_two (x y)
     x + y
 
 # generate webassembly
 compile-object
-    "wasm32-unknown-unknown-wasm"
+    "wasm32-unknown-unknown"
     compiler-file-kind-object
     module-dir .. "/_test.wasm"
     do
         let 
-            testfunc =
-                static-typify testfunc i32 i32
-            testfunc2 =
-                static-typify testfunc f32 f32
+            sum_two = 
+                static-typify sum_two i32 i32
+            sum_two_float =
+                static-typify sum_two f32 f32
         locals;
-    #'no-debug-info
-    'dump-module
 
 # link file using llvm's webassembly linker
     wasm-ld --no-entry --export-dynamic _test.wasm -o test.wasm
@@ -29,3 +26,4 @@ compile-object
     https://github.com/WebAssembly/wabt
 
     particularly wasm2wat and wasm-validate
+
