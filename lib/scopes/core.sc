@@ -2788,9 +2788,9 @@ inline printrepr (value)
         inline () value
         inline () (repr value)
 
-let print =
+let write =
     do
-        inline print-element (i key value)
+        inline write-element (i key value)
             let value = (view value)
             static-branch (const.icmp<=.i32.i32 i 0)
                 inline ()
@@ -2799,9 +2799,12 @@ let print =
             sc_write
                 printrepr value
 
-        inline print (values...)
-            va-lifold none print-element values...
-            sc_write "\n"
+        inline write (values...)
+            va-lifold none write-element values...
+
+inline print (values...)
+    write values...
+    sc_write "\n"
 
 let report =
     spice-macro
@@ -3056,6 +3059,16 @@ fn has-binding-operator? (expr)
                 return true
         repeat next
 
+# properly expand a right hand side term of a binding-like expression to conform to
+    how `:=` treats right hand side terms
+fn expand-binding-expr (anchor rhs next-expr env)
+    let rhs =
+        if (== (countof rhs) 1)
+            let rhs = (decons rhs)
+            rhs
+        else `rhs
+    sc_expand ('tag rhs anchor) next-expr env
+
 fn parse-binding-expr (anchor expr next-expr env)
     loop (lhs rhs = '() expr)
         if (empty? rhs)
@@ -3064,12 +3077,7 @@ fn parse-binding-expr (anchor expr next-expr env)
         if (== ('typeof at) Symbol)
             let at = (as at Symbol)
             if (== at ':=)
-                let rhs =
-                    if (== (countof rhs) 1)
-                        let rhs = (decons rhs)
-                        rhs
-                    else `rhs
-                let rhs next-expr env = (sc_expand ('tag rhs anchor) next-expr env)
+                let rhs next-expr env = (expand-binding-expr anchor rhs next-expr env)
                 let newexpr =
                     'join
                         cons let ('reverse lhs)
@@ -7770,18 +7778,30 @@ inline gen-allocator-sugar (copyf newf)
         let _let = ('tag `let anchor)
         let result =
             sugar-match values...
-            case (name '= value)
+            case (name '= value...)
+                let value next-expr sugar-scope = (expand-binding-expr anchor value... next-expr sugar-scope)
                 let callexpr =
                     'tag `[(qq ([copy-by-value expr-head value]))] anchor
-                `[(qq [_let name] = [callexpr])]
-            case ('= value)
-                `[(qq ([copy-by-value expr-head value]))]
-            case (name ': T '= value)
+                return `[(qq [_let name] = [callexpr])] next-expr sugar-scope
+            case (name ':= value...)
+                let value next-expr sugar-scope = (expand-binding-expr anchor value... next-expr sugar-scope)
+                let callexpr =
+                    'tag `[(qq ([copy-by-value expr-head value]))] anchor
+                return `[(qq [_let name] = [callexpr])] next-expr sugar-scope
+            case ('= value...)
+                let value next-expr sugar-scope = (expand-binding-expr anchor value... next-expr sugar-scope)
+                return `[(qq ([copy-by-value expr-head value]))] next-expr sugar-scope
+            case (':= value...)
+                let value next-expr sugar-scope = (expand-binding-expr anchor value... next-expr sugar-scope)
+                return `[(qq ([copy-by-value expr-head value]))] next-expr sugar-scope
+            case (name ': T '= value...)
+                let value next-expr sugar-scope = (expand-binding-expr anchor value... next-expr sugar-scope)
                 let callexpr =
                     'tag `[(qq ([copyf expr-head T value]))] anchor
-                `[(qq [_let name] = [callexpr])]
-            case (': T '= value)
-                `[(qq ([copyf expr-head T value]))]
+                return `[(qq [_let name] = [callexpr])] next-expr sugar-scope
+            case (': T '= value...)
+                let value next-expr sugar-scope = (expand-binding-expr anchor value... next-expr sugar-scope)
+                return `[(qq ([copyf expr-head T value]))] next-expr sugar-scope
             case (name ': T args...)
                 let callexpr =
                     'tag `[(qq [newf expr-head T] (unquote-splice args...))] anchor
@@ -7793,7 +7813,7 @@ inline gen-allocator-sugar (copyf newf)
             default
                 error
                     .. "syntax: " (tostring expr-head) " [<name>] [: <type>] [= <value>]"
-        'tag result anchor
+        _ ('tag result anchor) next-expr sugar-scope
 
 """"declares a mutable variable on the local function stack.
 
