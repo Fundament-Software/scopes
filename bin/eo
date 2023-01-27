@@ -44,7 +44,7 @@ import glob
 import subprocess
 import shlex
 
-VERSION = "0.12"
+VERSION = "0.13"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -74,6 +74,10 @@ IS_WIN32 = (sys.platform == "win32")
 IS_MINGW = False
 if IS_WIN32 and sysconfig.get_platform().startswith("mingw"):
     IS_MINGW = True
+if IS_WIN32:
+    TAR_CMD = "tar --force-local"
+else:
+    TAR_CMD = "tar"
 
 ################################################################################
 
@@ -1007,9 +1011,9 @@ def builtin_extract (ee, archivepath):
     if ext == ".zip" and not IS_MINGW:
         shell("unzip \"{}\" -d {}".format(archivepath, tempdir))
     elif archivepath.endswith(".tar.zst"):
-        shell("unzstd --stdout \"{}\" | tar -xf - -C {}".format(archivepath, tempdir))
+        shell("unzstd --stdout \"{}\" | {} -xf - -C {}".format(archivepath, TAR_CMD, tempdir))
     else:
-        shell("tar -xf \"{}\" -C {}".format(archivepath, tempdir))
+        shell("{} -xf \"{}\" -C {}".format(TAR_CMD, archivepath, tempdir))
     ee.tempdirs.append(tempdir)
     return tempdir
 
@@ -1030,7 +1034,7 @@ def builtin_download_svn(ee, url, revision):
     if ee.package.always_sync() or not os.path.isfile(filepath):
         tempdir = tempfile.mkdtemp("_eo_svn") + "/export"
         shell('svn export -q -r {} {} {}'.format(revision, url, tempdir))
-        shell("tar -czf {} -C {} .".format(filepath, tempdir))
+        shell("{} -czf {} -C {} .".format(TAR_CMD, filepath, tempdir))
         shutil.rmtree(tempdir)
     return filepath
 
