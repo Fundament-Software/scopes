@@ -1261,7 +1261,7 @@ class Package:
                     print("  " + line.strip())
         elif self.is_built():
             print("files in package:")
-            shell("tar -ztf {}".format(self.archivepath), silent=True)
+            shell("{} -ztf {}".format(TAR_CMD, self.archivepath), silent=True)
 
     def build(self,for_sync=False,force=False):
         if self.is_built() and not self.always_sync() and not force:
@@ -1309,7 +1309,7 @@ class Package:
         os.makedirs(self.project.archive_dir, exist_ok=True)
         if os.path.isfile(self.archivepath):
             os.remove(self.archivepath)
-        shell("tar -czf {} -C {} .".format(self.archivepath, tempdir))
+        shell("{} -czf {} -C {} .".format(TAR_CMD, self.archivepath, tempdir))
         print("cleaning up package image...")
         shutil.rmtree(tempdir)
         print("package built.")
@@ -1370,7 +1370,7 @@ class Package:
         ee = ExecutionEnv(self)
         if self.pre_install:
             eval_expr(ee, self.pre_install)
-        shell("tar -xf {} -C {}".format(self.archivepath, self.project.path),
+        shell("{} -xf {} -C {}".format(TAR_CMD, self.archivepath, self.project.path),
             silent=True)
         if self.post_install:
             eval_expr(ee, self.post_install)
