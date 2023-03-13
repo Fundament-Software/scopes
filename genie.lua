@@ -152,6 +152,7 @@ project "gensyms"
 
     configuration { "linux" }
         buildoptions_cpp {
+            "-std=c++14",
             "-ferror-limit=1",
         }
 
@@ -271,7 +272,7 @@ project "scopesrt"
             "-Wno-keyword-macro",
             "-Wno-gnu-redeclared-enum",
             "-Werror=switch",
-            "-fdiagnostics-absolute-paths"
+            "-fdiagnostics-absolute-paths",
         }
 
         if USE_ASAN_UBSAN then
