@@ -8190,6 +8190,9 @@ fn constructor (cls args...)
             if (key == unnamed) i
             else
                 sc_type_field_index cls key
+        if (k >= numfields)
+            error@ ('anchor arg) "while initializing tuple fields"
+                "excess argument passed to tuple constructor"
         if ((load (getelementptr fields k)) != null)
             error@ ('anchor arg) "while initializing struct fields"
                 "field is already initialized"
@@ -8332,6 +8335,9 @@ typedef+ tuple
                 if (k == unnamed) i
                 else
                     sc_type_field_index cls k
+            if (k >= numfields)
+                error@ ('anchor arg) "while initializing tuple fields"
+                    "excess argument passed to tuple constructor"
             if ((load (getelementptr fields k)) != null)
                 error@ ('anchor arg) "while initializing tuple fields"
                     "field is already initialized"

@@ -36,7 +36,7 @@
 #pragma GCC diagnostic ignored "-Wgnu-statement-expression"
 
 #define SCOPES_DEBUG_SYNTAX_EXTEND 0
-#define SCOPES_ANNOTATE_TRACKING 1
+#define SCOPES_ANNOTATE_TRACKING 0
 
 // the old specializer is at
 // https://bitbucket.org/duangle/scopes/raw/dfb69b02546e859b702176c58e92a63de3461d77/src/specializer.cpp
