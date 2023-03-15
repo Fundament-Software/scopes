@@ -95,7 +95,7 @@ typedef struct stb_printf_ctx {
     char tmp[STB_SPRINTF_MIN];
 } stb_printf_ctx;
 
-static char *_printf_cb(char * buf, void * user, int len) {
+static char *_printf_cb(char const * buf, void * user, int len) {
     stb_printf_ctx *ctx = (stb_printf_ctx *)user;
     fwrite (buf, 1, len, ctx->dest);
     return ctx->tmp;

@@ -138,8 +138,7 @@ typedef Set < Struct
                 let index_prev = (prevpos index mask)
                 let atkey = (self._keys @ index)
                 let prev_key = (self._keys @ index_prev)
-                let pd = (keydistance ((hash atkey) as u64) index mask)
-                if ((pd == 0) or (not (valid-slot? self index)))
+                if ((not (valid-slot? self index)) or ((keydistance ((hash atkey) as u64) index mask) == 0))
                     unset-slot self index_prev
                     merge done
                 swap atkey prev_key

@@ -582,4 +582,17 @@ fn testfunc ()
 testfunc;
 One.test-refcount-balanced;
 
+do
+    using import Map
+    using import struct
+
+    struct A
+        a : i32
+    local a : A
+    local m : (Map i32 A)
+
+    # this used to fail because `store` did not move-dereference arguments
+    'set m 10 a
+    ;
+
 ;
