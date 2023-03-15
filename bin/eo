@@ -3,7 +3,7 @@
 """
 Major EO - Project Oriented Package Management
 
-Copyright (C) 2022 Leonard Ritter.
+Copyright (C) 2022, 2023 Leonard Ritter.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -44,7 +44,7 @@ import glob
 import subprocess
 import shlex
 
-VERSION = "0.12"
+VERSION = "0.13"
 
 PROJECT_CONFIG_DIR = "/.eo"
 PROJECT_RECIPE_DIR = "/recipes"
@@ -74,6 +74,10 @@ IS_WIN32 = (sys.platform == "win32")
 IS_MINGW = False
 if IS_WIN32 and sysconfig.get_platform().startswith("mingw"):
     IS_MINGW = True
+if IS_WIN32:
+    TAR_CMD = "tar --force-local"
+else:
+    TAR_CMD = "tar"
 
 ################################################################################
 
@@ -1007,9 +1011,9 @@ def builtin_extract (ee, archivepath):
     if ext == ".zip" and not IS_MINGW:
         shell("unzip \"{}\" -d {}".format(archivepath, tempdir))
     elif archivepath.endswith(".tar.zst"):
-        shell("unzstd --stdout \"{}\" | tar -xf - -C {}".format(archivepath, tempdir))
+        shell("unzstd --stdout \"{}\" | {} -xf - -C {}".format(archivepath, TAR_CMD, tempdir))
     else:
-        shell("tar -xf \"{}\" -C {}".format(archivepath, tempdir))
+        shell("{} -xf \"{}\" -C {}".format(TAR_CMD, archivepath, tempdir))
     ee.tempdirs.append(tempdir)
     return tempdir
 
@@ -1030,7 +1034,7 @@ def builtin_download_svn(ee, url, revision):
     if ee.package.always_sync() or not os.path.isfile(filepath):
         tempdir = tempfile.mkdtemp("_eo_svn") + "/export"
         shell('svn export -q -r {} {} {}'.format(revision, url, tempdir))
-        shell("tar -czf {} -C {} .".format(filepath, tempdir))
+        shell("{} -czf {} -C {} .".format(TAR_CMD, filepath, tempdir))
         shutil.rmtree(tempdir)
     return filepath
 
@@ -1257,7 +1261,7 @@ class Package:
                     print("  " + line.strip())
         elif self.is_built():
             print("files in package:")
-            shell("tar -ztf {}".format(self.archivepath), silent=True)
+            shell("{} -ztf {}".format(TAR_CMD, self.archivepath), silent=True)
 
     def build(self,for_sync=False,force=False):
         if self.is_built() and not self.always_sync() and not force:
@@ -1305,7 +1309,7 @@ class Package:
         os.makedirs(self.project.archive_dir, exist_ok=True)
         if os.path.isfile(self.archivepath):
             os.remove(self.archivepath)
-        shell("tar -czf {} -C {} .".format(self.archivepath, tempdir))
+        shell("{} -czf {} -C {} .".format(TAR_CMD, self.archivepath, tempdir))
         print("cleaning up package image...")
         shutil.rmtree(tempdir)
         print("package built.")
@@ -1366,7 +1370,7 @@ class Package:
         ee = ExecutionEnv(self)
         if self.pre_install:
             eval_expr(ee, self.pre_install)
-        shell("tar -xf {} -C {}".format(self.archivepath, self.project.path),
+        shell("{} -xf {} -C {}".format(TAR_CMD, self.archivepath, self.project.path),
             silent=True)
         if self.post_install:
             eval_expr(ee, self.post_install)

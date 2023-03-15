@@ -37,7 +37,7 @@
 #pragma GCC diagnostic ignored "-Wgnu-statement-expression"
 
 #define SCOPES_DEBUG_SYNTAX_EXTEND 0
-#define SCOPES_ANNOTATE_TRACKING 1
+#define SCOPES_ANNOTATE_TRACKING 0
 
 // the old specializer is at
 // https://bitbucket.org/duangle/scopes/raw/dfb69b02546e859b702176c58e92a63de3461d77/src/specializer.cpp
@@ -457,6 +457,7 @@ void map_arguments_to_block(const ASTContext &ctx, const TypedValueRef &src) {
     }
 }
 
+#if SCOPES_ANNOTATE_TRACKING
 static void write_annotation(const ASTContext &ctx,
     const Anchor *anchor, const String *msg, Values values) {
     values.insert(values.begin(),
@@ -471,6 +472,7 @@ static void write_annotation(const ASTContext &ctx,
         assert(false && "error while annotating");
     }
 }
+#endif
 
 static SCOPES_RESULT(void) verify_valid(const ASTContext &ctx, int id, const char *by) {
     SCOPES_RESULT_TYPE(void);
@@ -695,7 +697,9 @@ static SCOPES_RESULT(void) drop_values(const ASTContext &ctx,
     IDs drop_ids;
     drop_ids.reserve(todrop.size());
     sort_drop_ids(todrop, drop_ids);
+    #if SCOPES_ANNOTATE_TRACKING
     auto anchor = mover.anchor();
+    #endif
     for (auto &&id : drop_ids) {
         if (!ctx.block->is_valid(id)) // already moved
             continue;
@@ -3081,7 +3085,7 @@ repeat:
         case FN_VolatileStore:
         case FN_Store: {
             CHECKARGS(2, 2);
-            READ_STORAGETYPEOF(ElemT);
+            READ_MOVE_STORAGETYPEOF(ElemT);
             READ_STORAGETYPEOF(DestT);
             SCOPES_CHECK_RESULT(verify_kind<TK_Pointer>(DestT));
             SCOPES_CHECK_RESULT(verify_writable(DestT));
