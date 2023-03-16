@@ -6583,16 +6583,22 @@ fn nodefault? (x)
 fn spice-typematch? (qparamT qargT arg-constant?)
     let argT = ('strip-qualifiers qargT)
     let paramT = ('strip-qualifiers qparamT)
+    inline match-param-ref? ()
+        not (('refer? qparamT) & (not ('refer? qargT)))
     assert (paramT != Variadic)
     if (paramT == Unknown)
         return true
     elseif (argT <= paramT)
-        return (not (('refer? qparamT) & (not ('refer? qargT))))
+        return (match-param-ref?)
     try
         let matchfunc = ('@ paramT '__typematch)
         let result = (sc_prove `(matchfunc paramT argT))
+        if ((result as bool) and (match-param-ref?))
+            return true
+        # try fully qualified
+        let result = (sc_prove `(matchfunc qparamT qargT))
         if (result as bool)
-            return (not (('refer? qparamT) & (not ('refer? qargT))))
+            return true
         else
             return false
     else;
