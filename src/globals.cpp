@@ -2655,7 +2655,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_offsetof, TYPE_USize, TYPE_Type, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_countof, TYPE_I32, TYPE_Type);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_is_unsized, TYPE_Bool, TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_kind, TYPE_I32, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_kind, TYPE_TypeKind, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_debug_abi, _void, TYPE_Type);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_storage, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_opaque, TYPE_Bool, TYPE_Type);
@@ -2809,7 +2809,11 @@ B_TYPES()
 #undef T
 
 #define T(NAME, BNAME, CLASS) \
-    bind_new_value(Symbol(BNAME), ConstInt::from(TYPE_I32, (int32_t)NAME));
+    { \
+        ConstIntRef tk = ConstInt::from(TYPE_TypeKind, (int32_t)NAME); \
+        bind_new_value(Symbol(BNAME), tk); \
+        TYPE_TypeKind->bind(Symbol(#CLASS), tk); \
+    }
     B_TYPE_KIND()
 #undef T
 

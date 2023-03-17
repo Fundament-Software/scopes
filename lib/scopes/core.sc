@@ -1126,6 +1126,9 @@ run-stage; # 3
     unsized? = sc_type_is_unsized
     storageof = sc_type_storage
     kind = sc_type_kind
+    kind? =
+        inline (self kind)
+            icmp== (sc_type_kind self) kind
     sizeof = sc_type_sizeof
     alignof = sc_type_alignof
     offsetof = sc_type_offsetof
@@ -3591,7 +3594,7 @@ let
     mutable? =
         make-const-type-property-function
             fn (T)
-                if (== ('kind T) type-kind-pointer)
+                if ('kind? T type-kind-pointer)
                     'writable? T
                 else
                     hide-traceback;
@@ -3599,7 +3602,7 @@ let
     signed? =
         make-const-type-property-function
             fn (T)
-                if (== ('kind T) type-kind-integer)
+                if ('kind? T type-kind-integer)
                     'signed? T
                 else
                     hide-traceback;
@@ -8590,6 +8593,7 @@ fn cenum-gen-repr-funcs (this-type)
     'set-symbol this-type '__tostring (gen-repr-func this-type false)
 
 cenum-gen-repr-funcs ValueKind
+cenum-gen-repr-funcs TypeKind
 
 do
     inline simple-unary-storage-op (f)

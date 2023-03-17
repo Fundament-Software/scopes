@@ -117,6 +117,7 @@ typedef std::vector<const Type *> Types;
     T(TYPE_ValueRef, "Value") \
     \
     T(TYPE_ValueKind, "ValueKind") \
+    T(TYPE_TypeKind, "TypeKind") \
     \
     T(TYPE_Bool, "bool") \
     \
