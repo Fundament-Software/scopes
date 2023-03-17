@@ -1,5 +1,6 @@
 
 using import testing
+using import enum
 import inspect
 
 # test introspection
@@ -12,8 +13,7 @@ fn somefunc (a b)
 
 somefunc := `[(static-typify somefunc bool i32)]
 
-print ('kind somefunc)
-#print (('kind somefunc) == value-kind-const-string)
+assert ((tostring ('kind somefunc)) == "Function")
 
 
 ;

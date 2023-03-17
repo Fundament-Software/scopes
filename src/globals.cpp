@@ -2814,7 +2814,11 @@ B_TYPES()
 #undef T
 
 #define T(NAME, BNAME, CLASS) \
-    bind_new_value(Symbol(BNAME), ConstInt::from(TYPE_ValueKind, (int32_t)NAME));
+    { \
+        ConstIntRef vk = ConstInt::from(TYPE_ValueKind, (int32_t)NAME); \
+        bind_new_value(Symbol(BNAME), vk); \
+        TYPE_ValueKind->bind(Symbol(#CLASS), vk); \
+    }
     SCOPES_VALUE_KIND()
 #undef T
 

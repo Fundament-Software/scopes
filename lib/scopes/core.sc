@@ -227,7 +227,11 @@ let typify =
                             `(store ty (getelementptr types j))
                         _ (add i 1) (add j 1)
                     body
-                sc_typify src_fn typecount (bitcast types TypeArrayPointer)
+                spice-unquote
+                    if (ptrcmp== (sc_value_type src_fn) Closure)
+                        `(sc_typify src_fn typecount (bitcast types TypeArrayPointer))
+                    else
+                        `(sc_typify_template src_fn typecount (bitcast types TypeArrayPointer))
 
         build-typify-function typify
 
@@ -8517,6 +8521,76 @@ typedef+ CUnion
 # enums (classical C enums or tagged unions)
 #-------------------------------------------------------------------------------
 
+fn cenum-gen-repr-funcs (this-type)
+    fn cenum-gen-repr-switch (T self style?)
+        fn shabbysort (buf sz)
+            for i in (range sz)
+                for j in (range (i + 1) sz)
+                    let a = (load (getelementptr buf i))
+                    let ak = (extractvalue a 0)
+                    let b = (load (getelementptr buf j))
+                    let bk = (extractvalue b 0)
+                    if (ak > bk)
+                        # swap
+                        store b (getelementptr buf i)
+                        store a (getelementptr buf j)
+        # count number of fields
+        local numfields = 0
+        for k v in ('symbols T)
+            if (('typeof v) == T)
+                numfields += 1
+        numfields := deref numfields
+        sorted := alloca-array (tuple u64 Symbol) numfields
+        local i = 0
+        for k v in ('symbols T)
+            if (('typeof v) == T)
+                store (tupleof (sc_const_int_extract v) k) (getelementptr sorted i)
+                i += 1
+        # sort array so duplicates are next to each other and merge names
+        shabbysort sorted numfields
+        let sw = (sc_switch_new self)
+        loop (i = 0)
+            if (i == numfields)
+                break;
+            index name := unpack (load (getelementptr sorted i))
+            lit := sc_const_int_new T index
+            name := name as string
+            # accumulate all fields with the same index
+            i name := loop (i name = (i + 1) name)
+                if (i == numfields)
+                    break i name
+                let index2 name2 = (unpack (load (getelementptr sorted i)))
+                if (index2 == index)
+                    name2 := name2 as string
+                    repeat (i + 1) (.. name "|" name2)
+                else
+                    break i name
+            name := if style?
+                sc_default_styler style-number name
+            else name
+            sc_switch_append_case sw lit `(string name)
+            i
+        sc_switch_append_default sw `(string "?invalid?")
+        sw
+    fn gen-repr-func (this-type styled?)
+        spice-quote
+            fn cenum-repr (self)
+                spice-unquote
+                    cenum-gen-repr-switch this-type self styled?
+            fn __repr (self)
+                if ('constant? self)
+                    self := self as this-type
+                    spice-unquote
+                        result := cenum-gen-repr-switch this-type self styled?
+                    `result
+                else
+                    `(cenum-repr self)
+        bitcast ((compile (typify __repr Value)) as SpiceMacroFunction) SpiceMacro
+    'set-symbol this-type '__repr (gen-repr-func this-type true)
+    'set-symbol this-type '__tostring (gen-repr-func this-type false)
+
+cenum-gen-repr-funcs ValueKind
+
 do
     inline simple-unary-storage-op (f)
         inline (self) (f (storagecast self))
@@ -8906,7 +8980,7 @@ sugar static-shared-library (name...)
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
     \ tuple-comparison gen-arrayof MethodsAccessor-typeattr floorf modules
-    \ string-array-ref-type? llvm.memcpy.p0i8.p0i8.i64
+    \ string-array-ref-type? llvm.memcpy.p0i8.p0i8.i64 cenum-gen-repr-funcs
 
 run-stage; # 12
 
