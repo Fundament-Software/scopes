@@ -1049,6 +1049,9 @@ run-stage; # 3
     constant? = sc_value_is_constant
     pure? = sc_value_is_pure
     kind = sc_value_kind
+    kind? =
+        inline (self kind)
+            icmp== (sc_value_kind self) kind
     tag =
         inline (self anchor)
             sc_valueref_tag anchor self
@@ -2816,7 +2819,7 @@ let report =
                 view args
 
 fn extract-integer (value)
-    if (== ('kind value) value-kind-const-int)
+    if ('kind? value value-kind-const-int)
         return (sc_const_int_extract value)
     error@ ('anchor value) "while extracting integer" str"integer constant expected"
 
@@ -4482,7 +4485,7 @@ let import =
                     repeat (add i 1:usize) start
             let sxname rest = (decons args)
             let name namestr bind? =
-                if (('kind sxname) == value-kind-const-string)
+                if ('kind? sxname value-kind-const-string)
                     let name = (sxname as string)
                     _ (Symbol name) name false
                 else
@@ -5182,8 +5185,8 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                     let other = ('getarg args 1)
                     if
                         &
-                            ('kind self) == value-kind-const-string
-                            ('kind self) == value-kind-const-string
+                            'kind? self value-kind-const-string
+                            'kind? other value-kind-const-string
                         return ('tag `[(self == other)] ('anchor args))
                     loop (i result = ('element-count ('typeof self)) `true)
                         if (i == 0)
@@ -5206,8 +5209,8 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                 let rhs = ('getarg args 1)
                                 if
                                     &
-                                        ('kind lhs) == value-kind-const-string
-                                        ('kind rhs) == value-kind-const-string
+                                        'kind? lhs value-kind-const-string
+                                        'kind? rhs value-kind-const-string
                                     return
                                         sc_const_string_new
                                             sc_string_join
@@ -5973,12 +5976,12 @@ fn gen-sugar-matcher (failfunc expr scope params)
                 sc_expression_append outexpr arg
                 let scope = ('bind scope param arg)
                 repeat (i + 1) rest next (| varargs variadic?) scope
-            elseif (('kind paramv) == value-kind-const-string)
+            elseif ('kind? paramv value-kind-const-string)
                 let str = (unbox-string paramv)
                 sc_expression_append outexpr
                     spice-quote
                         let arg next = (sc_list_decons next)
-                        if (('kind arg) != value-kind-const-string)
+                        if (not ('kind? arg value-kind-const-string))
                             failfunc;
                         if ((unbox-string arg) != paramv)
                             failfunc;
@@ -6015,7 +6018,7 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                 sc_list_decons next
                     let check =
                         if ((('typeof exprT) == type) and (exprT == string))
-                            `(('kind arg) == value-kind-const-string)
+                            `('kind? arg value-kind-const-string)
                         else
                             `(('constant? arg) and (('typeof arg) == exprT))
                     let arg =
@@ -6623,7 +6626,7 @@ spice overloaded-fn-append (T args...)
                 # separator for (using ...)
                 let fT = ('typeof f)
                 if ('function-pointer? fT)
-                    if ((('kind f) != value-kind-function)
+                    if ((not ('kind? f value-kind-function))
                         and (not ('constant? f)))
                         error "argument must be constant or function"
                     let fT = ('element@ fT 0)

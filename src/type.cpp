@@ -554,6 +554,7 @@ void init_types() {
 
     DEFINE_BASIC_TYPE("Symbol", Symbol, TYPE_Symbol, TYPE_Immutable, TYPE_U64);
     DEFINE_BASIC_TYPE("Builtin", Builtin, TYPE_Builtin, nullptr, TYPE_U64);
+    DEFINE_BASIC_TYPE("ValueKind", ValueKind, TYPE_ValueKind, TYPE_CEnum, TYPE_I32);
 
     DEFINE_OPAQUE_HANDLE_TYPE("_Value", Value, TYPE__Value, nullptr);
 

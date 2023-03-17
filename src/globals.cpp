@@ -2493,12 +2493,12 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_constant, TYPE_Bool, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_pure, TYPE_Bool, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_compare, TYPE_Bool, TYPE_ValueRef, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_value_kind, TYPE_I32, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_kind, TYPE_ValueKind, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_block_depth, TYPE_I32, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_identity, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_wrap, TYPE_ValueRef, TYPE_Type, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_unwrap, TYPE_ValueRef, TYPE_Type, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_value_kind_string, TYPE_String, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_kind_string, TYPE_String, TYPE_ValueKind);
 
     DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_ValueRef, TYPE_Symbol, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_empty_argument_list, TYPE_ValueRef);
@@ -2814,7 +2814,7 @@ B_TYPES()
 #undef T
 
 #define T(NAME, BNAME, CLASS) \
-    bind_new_value(Symbol(BNAME), ConstInt::from(TYPE_I32, (int32_t)NAME));
+    bind_new_value(Symbol(BNAME), ConstInt::from(TYPE_ValueKind, (int32_t)NAME));
     SCOPES_VALUE_KIND()
 #undef T
 
