@@ -155,6 +155,9 @@ typedef std::vector<const Type *> Types;
     \
     T(TYPE_Sampler, "Sampler") \
     \
+    /* inspect API */ \
+    T(TYPE_Block, "SCILBlock") \
+    \
     /* supertypes */ \
     T(TYPE_Immutable, "immutable") \
     T(TYPE_Aggregate, "aggregate") \

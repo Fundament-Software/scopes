@@ -569,6 +569,8 @@ void init_types() {
 
     DEFINE_OPAQUE_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor, nullptr);
 
+    DEFINE_OPAQUE_HANDLE_TYPE("SCILBlock", Block, TYPE_Block, nullptr);
+
 
     DEFINE_BASIC_TYPE("Value", ValueRef, TYPE_ValueRef, nullptr,
         tuple_type({ TYPE__Value, TYPE_Anchor }).assert_ok());

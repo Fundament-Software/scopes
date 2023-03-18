@@ -56,6 +56,7 @@ namespace scopes {
     struct Frame;
     struct Value;
     struct Closure;
+    struct Block;
 }
 
 extern "C" {
@@ -72,6 +73,8 @@ typedef scopes::Value sc_value_t;
 typedef scopes::Closure sc_closure_t;
 
 typedef scopes::ValueRef sc_valueref_t;
+
+typedef scopes::Block sc_block_t;
 
 // some of the return types are technically illegal in C, but we take care
 // that the alignment is correct
@@ -91,6 +94,8 @@ typedef struct sc_value_ sc_value_t;
 typedef struct sc_closure_ sc_closure_t;
 
 typedef struct sc_valueref_ { sc_value_t *_0; const sc_anchor_t *_1; } sc_valueref_t;
+
+typedef struct sc_block_ sc_block_t;
 
 #endif
 
@@ -533,6 +538,23 @@ SCOPES_LIBEXPORT const sc_type_t *sc_image_type(const sc_type_t *_type, sc_symbo
 // sampled image types
 
 SCOPES_LIBEXPORT const sc_type_t *sc_sampled_image_type(const sc_type_t *_type);
+
+// inspect API
+
+// Function
+SCOPES_LIBEXPORT sc_block_t *sc_function_get_body(sc_valueref_t fn);
+
+// Block
+SCOPES_LIBEXPORT int sc_block_instruction_count(sc_block_t *block);
+SCOPES_LIBEXPORT sc_valueref_t sc_block_get_instruction(sc_block_t *block, int index);
+SCOPES_LIBEXPORT sc_valueref_t sc_block_terminator(sc_block_t *block);
+
+// Call
+SCOPES_LIBEXPORT sc_valueref_t sc_icall_callee(sc_valueref_t value);
+SCOPES_LIBEXPORT int sc_icall_argcount(sc_valueref_t value);
+SCOPES_LIBEXPORT sc_valueref_t sc_icall_getarg(sc_valueref_t value, int index);
+SCOPES_LIBEXPORT sc_block_t *sc_icall_exception_body(sc_valueref_t value);
+SCOPES_LIBEXPORT sc_type_raises_t sc_icall_exception_type(sc_valueref_t value);
 
 #if defined __cplusplus
 }

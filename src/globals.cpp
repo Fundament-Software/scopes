@@ -2400,6 +2400,67 @@ const sc_type_t *sc_sampled_image_type(const sc_type_t *_type) {
     return sampled_image_type(cast<ImageType>(_type));
 }
 
+// Inspect API
+////////////////////////////////////////////////////////////////////////////////
+
+// Function
+////////////////////////////////////////////////////////////////////////////////
+
+sc_block_t *sc_function_get_body(sc_valueref_t fn) {
+    using namespace scopes;
+    return &fn.cast<Function>()->body;
+}
+
+// Block
+////////////////////////////////////////////////////////////////////////////////
+
+int sc_block_instruction_count(sc_block_t *block) {
+    assert(block);
+    return block->body.size();
+}
+
+sc_valueref_t sc_block_get_instruction(sc_block_t *block, int index) {
+    assert(block);
+    return block->body[index];
+}
+
+sc_valueref_t sc_block_terminator(sc_block_t *block) {
+    assert(block);
+    return block->terminator;
+}
+
+// Call
+////////////////////////////////////////////////////////////////////////////////
+
+sc_valueref_t sc_icall_callee(sc_valueref_t value) {
+    using namespace scopes;
+    return value.cast<Call>()->callee;
+}
+
+int sc_icall_argcount(sc_valueref_t value) {
+    using namespace scopes;
+    return value.cast<Call>()->args.size();
+}
+
+sc_valueref_t sc_icall_getarg(sc_valueref_t value, int index) {
+    using namespace scopes;
+    return value.cast<Call>()->args[index];
+}
+
+sc_block_t *sc_icall_exception_body(sc_valueref_t value) {
+    using namespace scopes;
+    return &value.cast<Call>()->except_body;
+}
+
+sc_type_raises_t sc_icall_exception_type(sc_valueref_t value) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(const Type *);
+    auto exc = value.cast<Call>()->except;
+    if (!exc) {
+        SCOPES_C_ERROR(RTUndefinedAttribute);
+    }
+    SCOPES_C_RETURN(exc->get_type());
+}
 
 } // extern "C"
 
@@ -2751,6 +2812,18 @@ void init_globals(int argc, char *argv[]) {
 
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_path, TYPE_ValueRef, TYPE_String);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_string, TYPE_ValueRef, TYPE_String);
+
+    DEFINE_EXTERN_C_FUNCTION(sc_function_get_body, TYPE_Block, TYPE_ValueRef);
+
+    DEFINE_EXTERN_C_FUNCTION(sc_block_instruction_count, TYPE_I32, TYPE_Block);
+    DEFINE_EXTERN_C_FUNCTION(sc_block_get_instruction, TYPE_ValueRef, TYPE_Block, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_block_terminator, TYPE_ValueRef, TYPE_Block);
+
+    DEFINE_EXTERN_C_FUNCTION(sc_icall_callee, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_icall_argcount, TYPE_I32, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_icall_getarg, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_icall_exception_body, TYPE_Block, TYPE_ValueRef);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_icall_exception_type, TYPE_Type, TYPE_ValueRef);
 
 #undef DEFINE_EXTERN_C_FUNCTION
 
