@@ -29,6 +29,11 @@
           genie = pkgs.stdenv.mkDerivation {
             name = "genie";
             src = genie-src;
+            # Remove x86_64 specific m64 if not on that system
+            # see https://github.com/bkaradzic/GENie/issues/425
+            prePatch = pkgs.lib.optionalString (!pkgs.stdenv.isx86_64) ''
+              find . -name '*.make' -a -exec sed -i 's/-m64//g' build/gmake.linux/genie.make {} +
+            '';
             installPhase = ''
               install -D --target-directory="$out/bin" bin/linux/genie
             '';
