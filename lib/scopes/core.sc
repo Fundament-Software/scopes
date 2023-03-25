@@ -5381,15 +5381,22 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
             inline arrayref->pointer (T)
                 inline (self)
                     bitcast (reftoptr self) T
+            inline array1->element (self)
+                @ self 0
             spice-cast-macro
                 fn "array.__imply" (cls T)
+                    let clsET = ('element@ cls 0)
                     # &(array T n) -> @T
                     if ('refer? cls)
                         if ('pointer? T)
-                            let clsET = ('element@ cls 0)
                             let TET = ('element@ T 0)
                             if (== clsET TET)
                                 return `(arrayref->pointer T)
+                    # (array T 1) -> T
+                      &(array T 1) -> T
+                    elseif (== clsET T)
+                        if (('element-count cls) == 1)
+                            return `array1->element
                     `()
     __as =
         do
@@ -8813,52 +8820,6 @@ typedef MethodsAccessor
 spice methodsof (context)
     typedef BoundMethodsAccessor < MethodsAccessor
         let Context = context
-
-#-------------------------------------------------------------------------------
-# hex/oct/bin conversion
-#-------------------------------------------------------------------------------
-
-fn integer->string (value base)
-    let value base = (deref value) (deref base)
-    let N = 65
-    let T = (typeof value)
-    let digits = (alloca-array char N)
-    let absvalue = (abs value)
-    let neg? = (value != absvalue)
-    loop (i value = N absvalue)
-        if (i == 0)
-            break (string digits N)
-        let i = (i - 1)
-        let digit = ((value % base) as char)
-        digits @ i =
-            + digit
-                ? (digit >= 10:char) (97:char - 10:char) 48:char
-        let value = (value // base)
-        if (value == (0 as T))
-            let i =
-                if ((i > 0) & neg?)
-                    let i = (i - 1)
-                    digits @ i = 45:char
-                    i
-                else i
-            break (string (& (digits @ i)) ((N - i) as usize))
-        repeat i value
-
-fn bin (value)
-    let value = (value as integer)
-    integer->string value (2 as (typeof value))
-
-fn oct (value)
-    let value = (value as integer)
-    integer->string value (8 as (typeof value))
-
-fn dec (value)
-    let value = (value as integer)
-    integer->string value (10 as (typeof value))
-
-fn hex (value)
-    let value = (value as integer)
-    integer->string value (16 as (typeof value))
 
 #-------------------------------------------------------------------------------
 # typematching

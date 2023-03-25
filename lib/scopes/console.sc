@@ -372,8 +372,12 @@ case (global-scope, show-logo : bool = false, history-path : string = "")
         repeat str"" str"" counter eval-scope
 
 if main-module?
-    read-eval-print-loop (globals) true
-        .. cache-dir str"/console.history"
+    do
+        import format
+        g := (globals)
+        g := g .. format
+        read-eval-print-loop g true
+            .. cache-dir str"/console.history"
 
 do
     let read-eval-print-loop

@@ -1,5 +1,5 @@
 
-# use http://falutin.net/iching/ to learn more
+using import format
 
 let C =
     include
@@ -164,7 +164,7 @@ fn get-text (hexagram)
     case 0b101010
         str""""64. Wei Chi / Before Completion
     default
-        .. "unknown hexagram: " (bin hexagram)
+        .. "unknown hexagram: " (string (bin hexagram))
 
 let ctpop =
     extern 'llvm.ctpop.i32 (function i32 i32)

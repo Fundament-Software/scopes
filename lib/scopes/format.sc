@@ -32,6 +32,54 @@ using import String
                 name = "Joana"
                 age = 42
 
+#-------------------------------------------------------------------------------
+# hex/oct/bin conversion
+#-------------------------------------------------------------------------------
+
+fn integer->string (value base)
+    let value base = (deref value) (deref base)
+    let N = 65
+    let T = (typeof value)
+    let digits = (alloca-array char N)
+    let absvalue = (abs value)
+    let neg? = (value != absvalue)
+    loop (i value = N absvalue)
+        if (i == 0)
+            break (String digits N)
+        let i = (i - 1)
+        let digit = ((value % base) as char)
+        digits @ i =
+            + digit
+                ? (digit >= 10:char) (97:char - 10:char) 48:char
+        let value = (value // base)
+        if (value == (0 as T))
+            let i =
+                if ((i > 0) & neg?)
+                    let i = (i - 1)
+                    digits @ i = 45:char
+                    i
+                else i
+            break (String (& (digits @ i)) ((N - i) as usize))
+        repeat i value
+
+fn bin (value)
+    let value = (value as integer)
+    integer->string value (2 as (typeof value))
+
+fn oct (value)
+    let value = (value as integer)
+    integer->string value (8 as (typeof value))
+
+fn dec (value)
+    let value = (value as integer)
+    integer->string value (10 as (typeof value))
+
+fn hex (value)
+    let value = (value as integer)
+    integer->string value (16 as (typeof value))
+
+#-------------------------------------------------------------------------------
+
 fn string-array-ref-type? (T)
     if (icmp== ('kind T) type-kind-array)
         & ('refer? T)
@@ -133,5 +181,6 @@ spice format (str args...)
     sc_argument_list_new ((countof block) as i32) (& (block @ 0))
 
 do
+    let integer->string bin oct dec hex
     let format
     locals;
