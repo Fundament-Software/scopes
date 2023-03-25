@@ -5378,15 +5378,22 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
             inline arrayref->pointer (T)
                 inline (self)
                     bitcast (reftoptr self) T
+            inline array1->element (self)
+                extractvalue self 0
             spice-cast-macro
                 fn "array.__imply" (cls T)
+                    let clsET = ('element@ cls 0)
                     # &(array T n) -> @T
                     if ('refer? cls)
                         if ('pointer? T)
-                            let clsET = ('element@ cls 0)
                             let TET = ('element@ T 0)
                             if (== clsET TET)
                                 return `(arrayref->pointer T)
+                    # (array T 1) -> T
+                      &(array T 1) -> T
+                    elseif (== clsET T)
+                        if (('element-count cls) == 1)
+                            return `array1->element
                     `()
     __as =
         do
