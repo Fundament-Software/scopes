@@ -499,6 +499,8 @@ formatters:
     T(RTTypeBitcountMismatch, \
         "runtime: provided word count (%1) does not match word count of type %0 (%2)", \
         PType, int, int) \
+    T(RTUndefinedAttribute, \
+        "runtime: undefined attribute") \
 
 // main
 #define SCOPES_MAIN_ERROR_KIND() \

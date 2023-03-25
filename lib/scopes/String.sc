@@ -11,8 +11,6 @@
 
 using import struct
 
-let &chararray = (& (array char))
-
 # declare void @llvm.memcpy.p0i8.p0i8.i64(i8* <dest>, i8* <src>,
                                         i64 <len>, i1 <isvolatile>)
 let llvm.memcpy.p0i8.p0i8.i64 =
@@ -159,6 +157,14 @@ inline &chararray? (T)
         &? T
         (unqualified T) < array
         (elementof T) == char
+
+# dispatch helper
+typedef &chararray
+    inline __typematch (paramT argT)
+        &chararray? argT
+    # simple passthru, since __typematch has already been used
+    inline __rimply (argT clsT)
+        inline (self) self
 
 inline string-binary-op (f superf)
     @@ memo

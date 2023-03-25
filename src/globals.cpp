@@ -2421,6 +2421,68 @@ SCOPES_DLL_EXPORT const sc_string_t* sc_getenv(const sc_string_t* name)
     }
 }
 
+// Inspect API
+////////////////////////////////////////////////////////////////////////////////
+
+// Function
+////////////////////////////////////////////////////////////////////////////////
+
+sc_block_t *sc_function_get_body(sc_valueref_t fn) {
+    using namespace scopes;
+    return &fn.cast<Function>()->body;
+}
+
+// Block
+////////////////////////////////////////////////////////////////////////////////
+
+int sc_block_instruction_count(sc_block_t *block) {
+    assert(block);
+    return block->body.size();
+}
+
+sc_valueref_t sc_block_get_instruction(sc_block_t *block, int index) {
+    assert(block);
+    return block->body[index];
+}
+
+sc_valueref_t sc_block_terminator(sc_block_t *block) {
+    assert(block);
+    return block->terminator;
+}
+
+// Call
+////////////////////////////////////////////////////////////////////////////////
+
+sc_valueref_t sc_icall_callee(sc_valueref_t value) {
+    using namespace scopes;
+    return value.cast<Call>()->callee;
+}
+
+int sc_icall_argcount(sc_valueref_t value) {
+    using namespace scopes;
+    return value.cast<Call>()->args.size();
+}
+
+sc_valueref_t sc_icall_getarg(sc_valueref_t value, int index) {
+    using namespace scopes;
+    return value.cast<Call>()->args[index];
+}
+
+sc_block_t *sc_icall_exception_body(sc_valueref_t value) {
+    using namespace scopes;
+    return &value.cast<Call>()->except_body;
+}
+
+sc_type_raises_t sc_icall_exception_type(sc_valueref_t value) {
+    using namespace scopes;
+    SCOPES_RESULT_TYPE(const Type *);
+    auto exc = value.cast<Call>()->except;
+    if (!exc) {
+        SCOPES_C_ERROR(RTUndefinedAttribute);
+    }
+    SCOPES_C_RETURN(exc->get_type());
+}
+
 } // extern "C"
 
 namespace scopes {
@@ -2515,12 +2577,12 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_constant, TYPE_Bool, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_is_pure, TYPE_Bool, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_compare, TYPE_Bool, TYPE_ValueRef, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_value_kind, TYPE_I32, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_kind, TYPE_ValueKind, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_block_depth, TYPE_I32, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_identity, TYPE_ValueRef, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_wrap, TYPE_ValueRef, TYPE_Type, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_value_unwrap, TYPE_ValueRef, TYPE_Type, TYPE_ValueRef);
-    DEFINE_EXTERN_C_FUNCTION(sc_value_kind_string, TYPE_String, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_value_kind_string, TYPE_String, TYPE_ValueKind);
 
     DEFINE_EXTERN_C_FUNCTION(sc_keyed_new, TYPE_ValueRef, TYPE_Symbol, TYPE_ValueRef);
     DEFINE_EXTERN_C_FUNCTION(sc_empty_argument_list, TYPE_ValueRef);
@@ -2677,7 +2739,7 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_offsetof, TYPE_USize, TYPE_Type, TYPE_I32);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_countof, TYPE_I32, TYPE_Type);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_is_unsized, TYPE_Bool, TYPE_Type);
-    DEFINE_EXTERN_C_FUNCTION(sc_type_kind, TYPE_I32, TYPE_Type);
+    DEFINE_EXTERN_C_FUNCTION(sc_type_kind, TYPE_TypeKind, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_debug_abi, _void, TYPE_Type);
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_type_storage, TYPE_Type, TYPE_Type);
     DEFINE_EXTERN_C_FUNCTION(sc_type_is_opaque, TYPE_Bool, TYPE_Type);
@@ -2775,6 +2837,17 @@ void init_globals(int argc, char *argv[]) {
     DEFINE_RAISING_EXTERN_C_FUNCTION(sc_parse_from_string, TYPE_ValueRef, TYPE_String);
 
     DEFINE_EXTERN_C_FUNCTION(sc_getenv, TYPE_String, TYPE_String);
+    DEFINE_EXTERN_C_FUNCTION(sc_function_get_body, TYPE_Block, TYPE_ValueRef);
+
+    DEFINE_EXTERN_C_FUNCTION(sc_block_instruction_count, TYPE_I32, TYPE_Block);
+    DEFINE_EXTERN_C_FUNCTION(sc_block_get_instruction, TYPE_ValueRef, TYPE_Block, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_block_terminator, TYPE_ValueRef, TYPE_Block);
+
+    DEFINE_EXTERN_C_FUNCTION(sc_icall_callee, TYPE_ValueRef, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_icall_argcount, TYPE_I32, TYPE_ValueRef);
+    DEFINE_EXTERN_C_FUNCTION(sc_icall_getarg, TYPE_ValueRef, TYPE_ValueRef, TYPE_I32);
+    DEFINE_EXTERN_C_FUNCTION(sc_icall_exception_body, TYPE_Block, TYPE_ValueRef);
+    DEFINE_RAISING_EXTERN_C_FUNCTION(sc_icall_exception_type, TYPE_Type, TYPE_ValueRef);
 
 #undef DEFINE_EXTERN_C_FUNCTION
 
@@ -2833,12 +2906,20 @@ B_TYPES()
 #undef T
 
 #define T(NAME, BNAME, CLASS) \
-    bind_new_value(Symbol(BNAME), ConstInt::from(TYPE_I32, (int32_t)NAME));
+    { \
+        ConstIntRef tk = ConstInt::from(TYPE_TypeKind, (int32_t)NAME); \
+        bind_new_value(Symbol(BNAME), tk); \
+        TYPE_TypeKind->bind(Symbol(#CLASS), tk); \
+    }
     B_TYPE_KIND()
 #undef T
 
 #define T(NAME, BNAME, CLASS) \
-    bind_new_value(Symbol(BNAME), ConstInt::from(TYPE_I32, (int32_t)NAME));
+    { \
+        ConstIntRef vk = ConstInt::from(TYPE_ValueKind, (int32_t)NAME); \
+        bind_new_value(Symbol(BNAME), vk); \
+        TYPE_ValueKind->bind(Symbol(#CLASS), vk); \
+    }
     SCOPES_VALUE_KIND()
 #undef T
 
