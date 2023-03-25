@@ -546,7 +546,7 @@ struct LLVMIRGenerator {
     case ENUMVAL: { \
         LLVMTypeRef argtypes[] = { __VA_ARGS__ }; \
         result = LLVMAddFunction(module, STRNAME, \
-            LLVMFunctionType(f32T, argtypes, sizeof(argtypes) / sizeof(LLVMTypeRef), false)); \
+            LLVMFunctionType((RETTYPE), argtypes, sizeof(argtypes) / sizeof(LLVMTypeRef), false)); \
         LLVMSetLinkage(result, LLVMPrivateLinkage); \
         auto bb = LLVMAppendBasicBlock(result, ""); \
         auto oldbb = LLVMGetInsertBlock(builder); \
