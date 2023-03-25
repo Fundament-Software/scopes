@@ -50,6 +50,7 @@ test-modules
     .test_import
     .test_inline
     .test_inplace_arithmetic
+    .test_inspect
     .test_intrinsics
     .test_iter2
     .test_itertools

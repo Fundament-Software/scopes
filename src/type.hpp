@@ -116,6 +116,9 @@ typedef std::vector<const Type *> Types;
     T(TYPE__Value, "_Value") \
     T(TYPE_ValueRef, "Value") \
     \
+    T(TYPE_ValueKind, "ValueKind") \
+    T(TYPE_TypeKind, "TypeKind") \
+    \
     T(TYPE_Bool, "bool") \
     \
     T(TYPE_I8, "i8") \
@@ -151,6 +154,9 @@ typedef std::vector<const Type *> Types;
     T(TYPE_USize, "usize") \
     \
     T(TYPE_Sampler, "Sampler") \
+    \
+    /* inspect API */ \
+    T(TYPE_Block, "SCILBlock") \
     \
     /* supertypes */ \
     T(TYPE_Immutable, "immutable") \

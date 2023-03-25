@@ -2,6 +2,7 @@
 #let x = (unconst true)
 #global y = x
 
+using import String
 using import C.stdio
 
 let i32x10 = (array i32 10)
@@ -33,6 +34,7 @@ print "y=" (deref y)
 fn main (argc argv)
     x @ 3 = 6
     #y = 7
+    local s = (String "banana")
     printf "hello world %i %i\n"
         deref (x @ 3)
         deref y

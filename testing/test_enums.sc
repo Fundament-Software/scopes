@@ -274,6 +274,5 @@ do
 
     test (constant? (K.X == K.X))
 
-
 ;
 

@@ -556,6 +556,9 @@ void init_types() {
     DEFINE_BASIC_TYPE("Symbol", Symbol, TYPE_Symbol, TYPE_Immutable, TYPE_U64);
     DEFINE_BASIC_TYPE("Builtin", Builtin, TYPE_Builtin, nullptr, TYPE_U64);
 
+    DEFINE_BASIC_TYPE("ValueKind", ValueKind, TYPE_ValueKind, TYPE_CEnum, TYPE_I32);
+    DEFINE_BASIC_TYPE("TypeKind", TypeKind, TYPE_TypeKind, TYPE_CEnum, TYPE_I32);
+
     DEFINE_OPAQUE_HANDLE_TYPE("_Value", Value, TYPE__Value, nullptr);
 
     DEFINE_OPAQUE_HANDLE_TYPE("SourceFile", SourceFile, TYPE_SourceFile, nullptr);
@@ -566,6 +569,8 @@ void init_types() {
     DEFINE_OPAQUE_HANDLE_TYPE("Error", Error, TYPE_Error, nullptr);
 
     DEFINE_OPAQUE_HANDLE_TYPE("Anchor", Anchor, TYPE_Anchor, nullptr);
+
+    DEFINE_OPAQUE_HANDLE_TYPE("SCILBlock", Block, TYPE_Block, nullptr);
 
 
     DEFINE_BASIC_TYPE("Value", ValueRef, TYPE_ValueRef, nullptr,

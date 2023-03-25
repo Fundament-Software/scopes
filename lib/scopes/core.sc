@@ -227,7 +227,11 @@ let typify =
                             `(store ty (getelementptr types j))
                         _ (add i 1) (add j 1)
                     body
-                sc_typify src_fn typecount (bitcast types TypeArrayPointer)
+                spice-unquote
+                    if (ptrcmp== (sc_value_type src_fn) Closure)
+                        `(sc_typify src_fn typecount (bitcast types TypeArrayPointer))
+                    else
+                        `(sc_typify_template src_fn typecount (bitcast types TypeArrayPointer))
 
         build-typify-function typify
 
@@ -1049,6 +1053,9 @@ run-stage; # 3
     constant? = sc_value_is_constant
     pure? = sc_value_is_pure
     kind = sc_value_kind
+    kind? =
+        inline (self kind)
+            icmp== (sc_value_kind self) kind
     tag =
         inline (self anchor)
             sc_valueref_tag anchor self
@@ -1119,6 +1126,9 @@ run-stage; # 3
     unsized? = sc_type_is_unsized
     storageof = sc_type_storage
     kind = sc_type_kind
+    kind? =
+        inline (self kind)
+            icmp== (sc_type_kind self) kind
     sizeof = sc_type_sizeof
     alignof = sc_type_alignof
     offsetof = sc_type_offsetof
@@ -2816,7 +2826,7 @@ let report =
                 view args
 
 fn extract-integer (value)
-    if (== ('kind value) value-kind-const-int)
+    if ('kind? value value-kind-const-int)
         return (sc_const_int_extract value)
     error@ ('anchor value) "while extracting integer" str"integer constant expected"
 
@@ -3584,7 +3594,7 @@ let
     mutable? =
         make-const-type-property-function
             fn (T)
-                if (== ('kind T) type-kind-pointer)
+                if ('kind? T type-kind-pointer)
                     'writable? T
                 else
                     hide-traceback;
@@ -3592,7 +3602,7 @@ let
     signed? =
         make-const-type-property-function
             fn (T)
-                if (== ('kind T) type-kind-integer)
+                if ('kind? T type-kind-integer)
                     'signed? T
                 else
                     hide-traceback;
@@ -4482,7 +4492,7 @@ let import =
                     repeat (add i 1:usize) start
             let sxname rest = (decons args)
             let name namestr bind? =
-                if (('kind sxname) == value-kind-const-string)
+                if ('kind? sxname value-kind-const-string)
                     let name = (sxname as string)
                     _ (Symbol name) name false
                 else
@@ -5185,8 +5195,8 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                     let other = ('getarg args 1)
                     if
                         &
-                            ('kind self) == value-kind-const-string
-                            ('kind self) == value-kind-const-string
+                            'kind? self value-kind-const-string
+                            'kind? other value-kind-const-string
                         return ('tag `[(self == other)] ('anchor args))
                     loop (i result = ('element-count ('typeof self)) `true)
                         if (i == 0)
@@ -5209,8 +5219,8 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                                 let rhs = ('getarg args 1)
                                 if
                                     &
-                                        ('kind lhs) == value-kind-const-string
-                                        ('kind rhs) == value-kind-const-string
+                                        'kind? lhs value-kind-const-string
+                                        'kind? rhs value-kind-const-string
                                     return
                                         sc_const_string_new
                                             sc_string_join
@@ -5976,12 +5986,12 @@ fn gen-sugar-matcher (failfunc expr scope params)
                 sc_expression_append outexpr arg
                 let scope = ('bind scope param arg)
                 repeat (i + 1) rest next (| varargs variadic?) scope
-            elseif (('kind paramv) == value-kind-const-string)
+            elseif ('kind? paramv value-kind-const-string)
                 let str = (unbox-string paramv)
                 sc_expression_append outexpr
                     spice-quote
                         let arg next = (sc_list_decons next)
-                        if (('kind arg) != value-kind-const-string)
+                        if (not ('kind? arg value-kind-const-string))
                             failfunc;
                         if ((unbox-string arg) != paramv)
                             failfunc;
@@ -6018,7 +6028,7 @@ fn gen-sugar-matcher (failfunc expr scope params)
                                 sc_list_decons next
                     let check =
                         if ((('typeof exprT) == type) and (exprT == string))
-                            `(('kind arg) == value-kind-const-string)
+                            `('kind? arg value-kind-const-string)
                         else
                             `(('constant? arg) and (('typeof arg) == exprT))
                     let arg =
@@ -6586,16 +6596,22 @@ fn nodefault? (x)
 fn spice-typematch? (qparamT qargT arg-constant?)
     let argT = ('strip-qualifiers qargT)
     let paramT = ('strip-qualifiers qparamT)
+    inline match-param-ref? ()
+        not (('refer? qparamT) & (not ('refer? qargT)))
     assert (paramT != Variadic)
     if (paramT == Unknown)
         return true
     elseif (argT <= paramT)
-        return (not (('refer? qparamT) & (not ('refer? qargT))))
+        return (match-param-ref?)
     try
         let matchfunc = ('@ paramT '__typematch)
         let result = (sc_prove `(matchfunc paramT argT))
+        if ((result as bool) and (match-param-ref?))
+            return true
+        # try fully qualified
+        let result = (sc_prove `(matchfunc qparamT qargT))
         if (result as bool)
-            return (not (('refer? qparamT) & (not ('refer? qargT))))
+            return true
         else
             return false
     else;
@@ -6620,7 +6636,7 @@ spice overloaded-fn-append (T args...)
                 # separator for (using ...)
                 let fT = ('typeof f)
                 if ('function-pointer? fT)
-                    if ((('kind f) != value-kind-function)
+                    if ((not ('kind? f value-kind-function))
                         and (not ('constant? f)))
                         error "argument must be constant or function"
                     let fT = ('element@ fT 0)
@@ -8549,6 +8565,77 @@ typedef+ CUnion
 # enums (classical C enums or tagged unions)
 #-------------------------------------------------------------------------------
 
+fn cenum-gen-repr-funcs (this-type)
+    fn cenum-gen-repr-switch (T self style?)
+        fn shabbysort (buf sz)
+            for i in (range sz)
+                for j in (range (i + 1) sz)
+                    let a = (load (getelementptr buf i))
+                    let ak = (extractvalue a 0)
+                    let b = (load (getelementptr buf j))
+                    let bk = (extractvalue b 0)
+                    if (ak > bk)
+                        # swap
+                        store b (getelementptr buf i)
+                        store a (getelementptr buf j)
+        # count number of fields
+        local numfields = 0
+        for k v in ('symbols T)
+            if (('typeof v) == T)
+                numfields += 1
+        numfields := deref numfields
+        sorted := alloca-array (tuple u64 Symbol) numfields
+        local i = 0
+        for k v in ('symbols T)
+            if (('typeof v) == T)
+                store (tupleof (sc_const_int_extract v) k) (getelementptr sorted i)
+                i += 1
+        # sort array so duplicates are next to each other and merge names
+        shabbysort sorted numfields
+        let sw = (sc_switch_new self)
+        loop (i = 0)
+            if (i == numfields)
+                break;
+            index name := unpack (load (getelementptr sorted i))
+            lit := sc_const_int_new T index
+            name := name as string
+            # accumulate all fields with the same index
+            i name := loop (i name = (i + 1) name)
+                if (i == numfields)
+                    break i name
+                let index2 name2 = (unpack (load (getelementptr sorted i)))
+                if (index2 == index)
+                    name2 := name2 as string
+                    repeat (i + 1) (.. name "|" name2)
+                else
+                    break i name
+            name := if style?
+                sc_default_styler style-number name
+            else name
+            sc_switch_append_case sw lit `(string name)
+            i
+        sc_switch_append_default sw `(string "?invalid?")
+        sw
+    fn gen-repr-func (this-type styled?)
+        spice-quote
+            fn cenum-repr (self)
+                spice-unquote
+                    cenum-gen-repr-switch this-type self styled?
+            fn __repr (self)
+                if ('constant? self)
+                    self := self as this-type
+                    spice-unquote
+                        result := cenum-gen-repr-switch this-type self styled?
+                    `result
+                else
+                    `(cenum-repr self)
+        bitcast ((compile (typify __repr Value)) as SpiceMacroFunction) SpiceMacro
+    'set-symbol this-type '__repr (gen-repr-func this-type true)
+    'set-symbol this-type '__tostring (gen-repr-func this-type false)
+
+cenum-gen-repr-funcs ValueKind
+cenum-gen-repr-funcs TypeKind
+
 do
     inline simple-unary-storage-op (f)
         inline (self) (f (storagecast self))
@@ -8938,7 +9025,7 @@ sugar static-shared-library (name...)
 unlet _memo dot-char dot-sym ellipsis-symbol _Value constructor destructor
     \ gen-tupleof nested-struct-field-accessor nested-union-field-accessor
     \ tuple-comparison gen-arrayof MethodsAccessor-typeattr floorf modules
-    \ string-array-ref-type? llvm.memcpy.p0i8.p0i8.i64
+    \ string-array-ref-type? llvm.memcpy.p0i8.p0i8.i64 cenum-gen-repr-funcs
 
 run-stage; # 12
 
