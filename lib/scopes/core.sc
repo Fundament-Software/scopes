@@ -5379,7 +5379,7 @@ let packedtupleof = (gen-tupleof sc_packed_tuple_type)
                 inline (self)
                     bitcast (reftoptr self) T
             inline array1->element (self)
-                extractvalue self 0
+                @ self 0
             spice-cast-macro
                 fn "array.__imply" (cls T)
                     let clsET = ('element@ cls 0)
