@@ -22,6 +22,8 @@ test
     (sign 3.5) == 1.0
 test
     (sign 0.0) == 0.0
+test
+    (sign 3.0:f64) == 1.0:f64
 
 test
     (sqrt 9.0) == 3.0
@@ -49,3 +51,13 @@ test ((step 0.0 0.5) == 1.0)
 test
     all?
         ((step (vectorof f32 0.0 1.0) (vectorof f32 0.5 0.5)) == (vectorof f32 1.0 0.0))
+
+test
+    (abs ((radians 180.0) - pi)) < 1e-30
+test
+    (abs ((radians 180.0:f64) - pi:f64)) < 1e-30
+
+test
+    (abs ((degrees pi) - 180.0)) < 1e-30
+test
+    (abs ((degrees pi:f64) - 180.0:f64)) < 1e-30

@@ -18,6 +18,7 @@ test-modules
     .test_borrowing
     .test_callback
     .test_capture
+    .test_cgen
     .test_clang
     .test_closure
     .test_codegen
